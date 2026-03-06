@@ -45,10 +45,10 @@ const Layout = async ({ children, params }: { children: React.ReactNode; params:
         {children}
       </div>
 
-      <Divider />
+      {/* <Divider />
       <SectionSliderLargeProduct products={products.slice(0, 4)} />
-      <Divider />
-      <SectionPromo1 />
+      <Divider /> */}
+      {/* <SectionPromo1 /> */}
     </div>
   )
 }

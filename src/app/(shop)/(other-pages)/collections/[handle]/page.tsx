@@ -11,6 +11,8 @@ import {
   PaginationPrevious,
 } from '@/shared/Pagination/Pagination'
 
+
+// all colllections page
 export default async function Page({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params
   const products = await getProducts()

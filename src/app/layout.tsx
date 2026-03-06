@@ -22,7 +22,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={poppins.className}>
+    <html
+        lang="en"
+        className={poppins.className}
+        data-google-analytics-opt-out="" // keep attribute on server side to match client
+        suppressHydrationWarning={true}
+      >
       <body className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-neutral-200">
         <Aside.Provider>
           {children}

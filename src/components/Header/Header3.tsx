@@ -110,12 +110,12 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
           
         </div>
-        <div className="mx-4 hidden flex-2  lg:flex">
+        {/* <div className="mx-4 hidden flex-2  lg:flex">
             <CategoryNav
               menu={navigationMenu}
               featuredCollection={featuredCollection}
             />
-          </div>
+          </div> */}
       </div>
     </div>
   )
@@ -123,7 +123,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
 
 
 
-const Header2: FC<Props> = async ({ hasBorder = true }) => {
+const Header3: FC<Props> = async ({ hasBorder = true }) => {
   const navigationMenu = await getNavigation()
   const allCollections = await getCollections()
 
@@ -141,4 +141,4 @@ const Header2: FC<Props> = async ({ hasBorder = true }) => {
   )
 }
 
-export default Header2
+export default Header3

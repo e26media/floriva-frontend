@@ -42,28 +42,30 @@ async function PageHome() {
       <SectionCollectionSlider className="mt-24 lg:mt-32" collections={featuredCollections} />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
-        <SectionSliderProductCard data={carouselProducts1} />
+        <SectionSliderProductCard 
+        // data={carouselProducts1}
+         />
         <Divider />
         <div className="pb-16">
           <SectionHowItWork />
         </div>
-        <SectionPromo1 />
-        <div className="relative pt-24 pb-20 lg:pt-28">
+        {/* <SectionPromo1 /> */}
+        {/* <div className="relative pt-24 pb-20 lg:pt-28">
           <BackgroundSection />
           <SectionGridMoreExplore groupCollections={groupCollections} />
-        </div>
+        </div> */}
         <SectionSliderProductCard
-          data={carouselProducts2}
+          // data={carouselProducts2}
           heading="Best Sellers"
           subHeading="Best selling of the month"
         />
         <SectionPromo2 />
-        <SectionSliderLargeProduct products={carouselProducts3} />
-        <SectionGridFeatureItems data={products} />
-        <Divider />
+        {/* <SectionSliderLargeProduct products={carouselProducts3} /> */}
+        {/* <SectionGridFeatureItems data={products} /> */}
+        {/* <Divider /> */}
         <SectionCollectionSlider2 collections={departmentCollections} />
         <Divider />
-        <div>
+        {/* <div>
           <Heading headingDim="From the Ciseco blog">The latest news</Heading>
           <SectionMagazine5 posts={blogPosts} />
           <div className="mt-20 flex justify-center">
@@ -72,7 +74,7 @@ async function PageHome() {
               <ArrowRightIcon className="h-4 w-4" />
             </Button>
           </div>
-        </div>
+        </div> */}
 
         <Divider />
         <SectionClientSay />
