@@ -54,11 +54,7 @@ async function PageHome() {
           <BackgroundSection />
           <SectionGridMoreExplore groupCollections={groupCollections} />
         </div> */}
-        <SectionSliderProductCard
-          // data={carouselProducts2}
-          heading="Best Sellers"
-          subHeading="Best selling of the month"
-        />
+        <SectionSliderProductCard products={carouselProducts2} subHeading="New Sports equipment" />
         <SectionPromo2 />
         {/* <SectionSliderLargeProduct products={carouselProducts3} /> */}
         {/* <SectionGridFeatureItems data={products} /> */}
