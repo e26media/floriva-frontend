@@ -113,8 +113,8 @@ const StickyHeader: FC<StickyHeaderProps> = ({
         </div>
         <div className="mx-4 hidden flex-2  lg:flex">
             <CategoryNav
-              menu={navigationMenu}
-              featuredCollection={featuredCollection}
+              // menu={navigationMenu}
+              // featuredCollection={featuredCollection}
             />
           </div>
       </div>
