@@ -40,7 +40,9 @@ async function PageHome2() {
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-36 lg:gap-y-36">
         <SectionHowItWork />
-        <SectionSliderProductCard data={carouselProducts2} subHeading="New Sports equipment" />
+        <SectionSliderProductCard 
+        // data={carouselProducts2} subHeading="New Sports equipment" 
+        />
         <SectionPromo3 />
         <SectionSliderLargeProduct products={carouselProducts3} />
         <div className="relative pt-24 pb-20 lg:pt-28">
