@@ -173,11 +173,11 @@ export default async function Page({ params }: { params: Promise<{ handle: strin
         <Divider />
         {/* OTHER SECTION */}
         <SectionSliderProductCard
-          data={relatedProducts}
-          heading="Customers also purchased"
-          subHeading=""
-          headingFontClassName="text-3xl font-semibold"
-          headingClassName="mb-12 text-neutral-900 dark:text-neutral-50"
+          // data={relatedProducts}
+          // heading="Customers also purchased"
+          // subHeading=""
+          // headingFontClassName="text-3xl font-semibold"
+          // headingClassName="mb-12 text-neutral-900 dark:text-neutral-50"
         />
         {/* SECTION */}
         <div className="pb-20 lg:pt-16 xl:pb-28">

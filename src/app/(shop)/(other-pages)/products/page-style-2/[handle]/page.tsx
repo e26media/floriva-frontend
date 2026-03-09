@@ -186,7 +186,7 @@ export default async function Page({ params }: { params: Promise<{ handle: strin
         <SectionSliderProductCard
           heading="Customers also purchased"
           subHeading=""
-          data={relatedProducts}
+          // data={relatedProducts}
           headingFontClassName="text-2xl font-semibold"
           headingClassName="mb-10 text-neutral-900 dark:text-neutral-50"
         />
