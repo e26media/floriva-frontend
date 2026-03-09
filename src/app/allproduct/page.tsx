@@ -2,7 +2,7 @@
 
 import Header from "@/components/Header/Header";
 import Header2 from "@/components/Header/Header2";
-import MainHeader from "@/components/MainHeader";
+// import MainHeader from "@/components/MainHeader";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
