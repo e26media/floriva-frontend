@@ -825,7 +825,7 @@ export default function ProductDetailPage() {
             )}
 
             {/* Wishlist */}
-            <button
+            {/* <button
               onClick={() => setWished(w => !w)}
               className="w-full h-[50px] rounded-2xl font-semibold text-[0.88rem] flex items-center justify-center gap-2.5 mb-7 transition-all duration-200 cursor-pointer border-[1.5px]"
               style={{
@@ -836,10 +836,10 @@ export default function ProductDetailPage() {
             >
               <HeartIcon on={wished} />
               {wished ? "Saved to Wishlist" : "Add to Wishlist"}
-            </button>
+            </button> */}
 
             {/* Trust Badges */}
-            <div className="grid grid-cols-3 gap-2.5 mb-8">
+            {/* <div className="grid grid-cols-3 gap-2.5 mb-8">
               {[
                 { ico: <TruckIcon />,   title: "Free Delivery",    sub: "On all orders" },
                 { ico: <RefreshIcon />, title: "7-Day Returns",    sub: "Hassle-free" },
@@ -854,7 +854,7 @@ export default function ProductDetailPage() {
                   <span className="text-[0.62rem] text-stone-400">{b.sub}</span>
                 </div>
               ))}
-            </div>
+            </div> */}
 
             {/* ── TABS ── */}
             <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-md">

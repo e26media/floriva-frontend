@@ -104,9 +104,10 @@ const StickyHeader: FC<StickyHeaderProps> = ({
 
           {/* Actions */}
          <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5">
-            <SearchBtnPopover />
+            {/* <SearchBtnPopover /> */}
+             <CartBtn />
             <AvatarDropdown />
-            <CartBtn />
+           
           </div>
           
         </div>

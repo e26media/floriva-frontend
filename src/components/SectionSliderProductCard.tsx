@@ -60,14 +60,120 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cart Toast Notification
+// ─────────────────────────────────────────────────────────────────────────────
+
+type TCartToast = {
+  id: number
+  product: TApiProduct
+  qty: number
+}
+
+let _toastItems: TCartToast[] = []
+let _toastCounter = 0
+const _toastListeners = new Set<() => void>()
+const _notifyToast = () => _toastListeners.forEach((fn) => fn())
+
+function showCartToast(product: TApiProduct, qty: number) {
+  const id = ++_toastCounter
+  _toastItems = [..._toastItems, { id, product, qty }]
+  _notifyToast()
+  setTimeout(() => {
+    _toastItems = _toastItems.filter((t) => t.id !== id)
+    _notifyToast()
+  }, 3500)
+}
+
+function CartToastContainer() {
+  const [, rerender] = useState(0)
+
+  useEffect(() => {
+    const fn = () => rerender((n) => n + 1)
+    _toastListeners.add(fn)
+    return () => { _toastListeners.delete(fn) }
+  }, [])
+
+  if (_toastItems.length === 0) return null
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+      {_toastItems.map((toast) => {
+        const imageUrl = toast.product.images?.[0] ? imgSrc(toast.product.images[0]) : null
+        return (
+          <div
+            key={toast.id}
+            className="pointer-events-auto flex items-center gap-3.5 rounded-2xl bg-white shadow-2xl border border-neutral-100 px-4 py-3 dark:bg-neutral-900 dark:border-neutral-800"
+            style={{
+              animation: 'slideInRight 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards',
+              minWidth: '300px',
+              maxWidth: '360px',
+            }}
+          >
+            {/* Product image */}
+            <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800">
+              {imageUrl ? (
+                <img src={imageUrl} alt={toast.product.name} className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-neutral-300">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="flex flex-1 flex-col min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-500 flex-shrink-0">
+                  <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span className="text-xs font-semibold text-green-600 dark:text-green-400">Added to Bag!</span>
+              </div>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{toast.product.name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-neutral-400">Qty: {toast.qty}</span>
+                <span className="text-neutral-200 dark:text-neutral-700">·</span>
+                <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                  {formatPrice(toast.product.discountPrice)}
+                </span>
+              </div>
+            </div>
+
+            {/* Bag icon */}
+            <div className="flex-shrink-0 flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 dark:bg-white">
+              <svg className="h-4 w-4 text-white dark:text-neutral-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            </div>
+          </div>
+        )
+      })}
+
+      <style>{`
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(60px) scale(0.95); }
+          to   { opacity: 1; transform: translateX(0)   scale(1);    }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ✅ Cart API helpers — calls your Express backend
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function apiAddToCart(userEmail: string, productId: string, quantity: number) {
+  // ✅ Fixed payload order to match your API: { productId, userEmail, quantity }
   const res = await fetch(`${BASE_URL}/api/addtocart`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userEmail, productId, quantity }),
+    body: JSON.stringify({ productId, userEmail, quantity }),
   })
   if (!res.ok) throw new Error(`Cart API error ${res.status}`)
   return res.json()
@@ -101,16 +207,10 @@ async function apiDeleteCart(cartItemId: string) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ✅ Bag store — synced with backend
-//
-// USAGE:
-//   const { items, addItem, removeItem, updateItem, getQty, total, userEmail, setUserEmail } = useBag()
-//
-// Call setUserEmail(email) once you know the logged-in user's email.
-// Until then, actions are queued and run after email is set.
 // ─────────────────────────────────────────────────────────────────────────────
 
 type TBackendCartItem = {
-  _id: string           // MongoDB cart document _id
+  _id: string
   productId: TApiProduct
   quantity: number
   userEmail: string
@@ -128,10 +228,9 @@ type BagStore = {
   syncing: boolean
 }
 
-// Module-level shared state
 let _userEmail = ''
 let _bagItems: TCartItem[] = []
-let _cartDocMap: Record<string, string> = {}   // productId → cart _id
+let _cartDocMap: Record<string, string> = {}
 let _syncing = false
 const _bagListeners = new Set<() => void>()
 const _notifyBag = () => _bagListeners.forEach((fn) => fn())
@@ -145,13 +244,11 @@ function useBag(): BagStore {
     return () => { _bagListeners.delete(fn) }
   }, [])
 
-  // ── setUserEmail: fetch existing cart from backend ──
   const setUserEmail = useCallback((email: string) => {
     if (!email || _userEmail === email) return
     _userEmail = email
     _notifyBag()
 
-    // Load existing cart from backend
     apiViewCart(email)
       .then((res) => {
         const backendItems: TBackendCartItem[] = res.data ?? []
@@ -167,9 +264,8 @@ function useBag(): BagStore {
       .catch((err) => console.warn('Failed to load cart:', err))
   }, [])
 
-  // ── addItem ──
+  // ✅ addItem — shows toast on success
   const addItem = useCallback(async (product: TApiProduct, qty = 1) => {
-    // Optimistic update
     const existing = _bagItems.find((i) => i.product._id === product._id)
     if (existing) {
       _bagItems = _bagItems.map((i) =>
@@ -182,9 +278,10 @@ function useBag(): BagStore {
     }
     _notifyBag()
 
-    // Sync to backend
     if (!_userEmail) {
       console.warn('useBag: userEmail not set — cart not saved to backend')
+      // Still show toast even if not logged in (optimistic)
+      showCartToast(product, qty)
       return
     }
     try {
@@ -194,6 +291,8 @@ function useBag(): BagStore {
       if (res.data?._id) {
         _cartDocMap[product._id] = res.data._id
       }
+      // ✅ Show toast after successful API call
+      showCartToast(product, qty)
     } catch (err) {
       console.error('Failed to add to cart:', err)
     } finally {
@@ -202,9 +301,7 @@ function useBag(): BagStore {
     }
   }, [])
 
-  // ── removeItem ──
   const removeItem = useCallback(async (productId: string) => {
-    // Optimistic update
     _bagItems = _bagItems.filter((i) => i.product._id !== productId)
     _notifyBag()
 
@@ -219,11 +316,9 @@ function useBag(): BagStore {
     }
   }, [])
 
-  // ── updateItem ──
   const updateItem = useCallback(async (productId: string, qty: number) => {
     if (qty < 1) return removeItem(productId)
 
-    // Optimistic update
     _bagItems = _bagItems.map((i) =>
       i.product._id === productId ? { ...i, qty } : i
     )
@@ -366,7 +461,7 @@ function WishlistBtn({ productId }: { productId: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Add-to-Bag Button — calls real API
+// Add-to-Bag Button — calls real API + shows toast
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AddToBagBtn({
@@ -388,7 +483,7 @@ function AddToBagBtn({
     e.stopPropagation()
     if (outOfStock || loading) return
     setLoading(true)
-    await addItem(product, 1)
+    await addItem(product, 1)   // ✅ toast fires inside addItem
     setLoading(false)
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
@@ -519,7 +614,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal — with real API add-to-cart
+// Quick View Modal — with real API add-to-cart + toast
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
@@ -560,11 +655,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
     thumb?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
   }, [activeImg])
 
-  // ✅ Calls real API
+  // ✅ Calls real API + shows toast
   const handleAddToBag = async () => {
     if (outOfStock || adding) return
     setAdding(true)
-    await addItem(product, qty)
+    await addItem(product, qty)   // ✅ toast fires inside addItem
     setAdding(false)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
@@ -745,7 +840,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               </div>
             )}
 
-            {/* Qty + Add to Bag — ✅ Calls real API */}
+            {/* Qty + Add to Bag */}
             <div>
               <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-neutral-400">Quantity</p>
               <div className="flex gap-3">
@@ -989,7 +1084,6 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
     useCarouselArrowButtons(emblaApi)
 
-  // ✅ Set user email into bag store when prop is provided
   useEffect(() => {
     if (userEmail) {
       bag.setUserEmail(userEmail)
@@ -1030,6 +1124,9 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
   return (
     <>
+      {/* ✅ Global cart toast — renders above everything */}
+      <CartToastContainer />
+
       <div className={`nc-SectionSliderProductCard ${className}`}>
         <div className="relative">
           <Heading

@@ -12,16 +12,13 @@ interface ProductImage {
   url?: string;
 }
 
-interface ProductPrice {
-  exactPrice?: number | string;
-  discountPrice?: number | string;
-}
-
-interface Product extends ProductPrice {
+interface Product {
   _id?: string;
   name?: string;
   title?: string;
   images?: (string | ProductImage)[];
+  exactPrice?: number | string;
+  discountPrice?: number | string;
   color?: string | { name?: string };
   category?: string | { name?: string };
   stock?: number | string;
@@ -31,7 +28,7 @@ interface Product extends ProductPrice {
 interface CartItem {
   _id: string;
   productId: Product;
-  quantity: number | string;
+  quantity: number;
 }
 
 interface ToastState {
@@ -48,10 +45,10 @@ interface CheckoutData {
 // =============================================================================
 //  API CONFIG
 // =============================================================================
-const BASE       = "http://localhost:7000/api";
-const VIEW_URL   = (email: string) => `${BASE}/view/${encodeURIComponent(email)}`;
-const UPDATE_URL = (id: string)    => `${BASE}/update/${id}`;
-const DELETE_URL = (id: string)    => `${BASE}/delete/${id}`;
+const BASE       =process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';;
+const VIEW_URL   = (email: string) => `${BASE}/api/view/${encodeURIComponent(email)}`;
+const UPDATE_URL = (id: string)    => `${BASE}/api/cartupdate/${id}`;
+const DELETE_URL = (id: string)    => `${BASE}/api/cartdelete/${id}`;
 const IMAGE_BASE = "http://localhost:7000";
 
 // =============================================================================
@@ -100,32 +97,18 @@ function getPrice(p?: Product): number {
 
 function isSale(p?: Product): boolean {
   if (!p) return false;
-  return !!(
-    p.discountPrice &&
-    Number(p.discountPrice) > 0 &&
-    Number(p.discountPrice) < Number(p.exactPrice ?? 0)
-  );
+  return !!(p.discountPrice && Number(p.discountPrice) > 0 && Number(p.discountPrice) < Number(p.exactPrice ?? 0));
 }
 
 const COLOR_HEX: Record<string, string> = {
-  red:    "#ef4444",
-  blue:   "#3b82f6",
-  green:  "#22c55e",
-  black:  "#171717",
-  white:  "#e5e7eb",
-  yellow: "#eab308",
-  orange: "#f97316",
-  pink:   "#ec4899",
-  purple: "#a855f7",
-  gray:   "#6b7280",
-  grey:   "#6b7280",
-  brown:  "#92400e",
-  navy:   "#1e3a5f",
-  beige:  "#d4b896",
+  red: "#ef4444", blue: "#3b82f6", green: "#22c55e", black: "#171717",
+  white: "#e5e7eb", yellow: "#eab308", orange: "#f97316", pink: "#ec4899",
+  purple: "#a855f7", gray: "#6b7280", grey: "#6b7280", brown: "#92400e",
+  navy: "#1e3a5f", beige: "#d4b896",
 };
 
 // =============================================================================
-//  SAFE JSON FETCH
+//  SAFE FETCH
 // =============================================================================
 async function apiFetch(
   url: string,
@@ -133,13 +116,9 @@ async function apiFetch(
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   const res = await fetch(url, options);
   const ct  = res.headers.get("content-type") ?? "";
-
   if (ct.includes("text/html")) {
-    throw new Error(
-      `Wrong URL or server down: ${url} returned HTML (${res.status})`
-    );
+    throw new Error(`Wrong URL or server down: ${url} returned HTML (${res.status})`);
   }
-
   const json = (await res.json()) as Record<string, unknown>;
   return { ok: res.ok, status: res.status, json };
 }
@@ -238,15 +217,9 @@ function Toast({ t }: { t: ToastState | null }) {
   return (
     <div
       className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium text-white shadow-2xl
-        ${isSuccess
-          ? "bg-neutral-900 border-l-4 border-emerald-400"
-          : "bg-red-950 border-l-4 border-red-400"
-        }`}
+        ${isSuccess ? "bg-neutral-900 border-l-4 border-emerald-400" : "bg-red-950 border-l-4 border-red-400"}`}
     >
-      <div
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-          ${isSuccess ? "bg-emerald-400/20" : "bg-red-400/20"}`}
-      >
+      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSuccess ? "bg-emerald-400/20" : "bg-red-400/20"}`}>
         {isSuccess
           ? <IcoCheck cls="h-3.5 w-3.5 text-emerald-400" />
           : <IcoInfo  cls="h-3.5 w-3.5 text-red-400" />
@@ -333,7 +306,7 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove }: C
       className={`group flex gap-4 py-6 transition-all duration-300 sm:gap-5
         ${isRemoving ? "pointer-events-none scale-95 opacity-10" : "opacity-100 scale-100"}`}
     >
-      {/* Product Image */}
+      {/* Product image */}
       <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-50 sm:h-36 sm:w-28 dark:border-neutral-800 dark:bg-neutral-900">
         {src && !imgErr ? (
           <Image
@@ -359,7 +332,6 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove }: C
 
       {/* Details */}
       <div className="flex flex-1 flex-col gap-2 min-w-0">
-        {/* Category */}
         {catName && (
           <div className="flex items-center gap-1.5">
             <IcoTag cls="h-3 w-3 shrink-0 text-amber-500" />
@@ -369,24 +341,16 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove }: C
           </div>
         )}
 
-        {/* Name + desktop price */}
         <div className="flex items-start justify-between gap-3">
           <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-neutral-900 dark:text-neutral-100 sm:text-base">
             {p?.name ?? p?.title ?? "Unnamed Product"}
           </h3>
           <div className="hidden shrink-0 text-right sm:block">
-            <p className="text-base font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-              {fmt(lineTotal)}
-            </p>
-            {sale && (
-              <p className="text-xs tabular-nums text-neutral-400 line-through">
-                {fmt(origTotal)}
-              </p>
-            )}
+            <p className="text-base font-bold tabular-nums text-neutral-900 dark:text-neutral-100">{fmt(lineTotal)}</p>
+            {sale && <p className="text-xs tabular-nums text-neutral-400 line-through">{fmt(origTotal)}</p>}
           </div>
         </div>
 
-        {/* Badges */}
         <div className="flex flex-wrap items-center gap-2">
           {cName && (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
@@ -409,17 +373,13 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove }: C
           )}
         </div>
 
-        {/* Delivery info */}
         {p?.deliveryInfo && (
           <div className="flex items-center gap-1.5">
             <IcoTruck cls="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-            <p className="truncate text-xs text-neutral-400 dark:text-neutral-500">
-              {p.deliveryInfo}
-            </p>
+            <p className="truncate text-xs text-neutral-400 dark:text-neutral-500">{p.deliveryInfo}</p>
           </div>
         )}
 
-        {/* Bottom row: qty controls + remove + mobile price */}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex items-center gap-3">
             <QtyControl
@@ -435,26 +395,15 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove }: C
               disabled={isRemoving}
               className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/40 dark:hover:text-red-400"
             >
-              {isRemoving
-                ? <IcoSpin cls="h-3.5 w-3.5" />
-                : <IcoTrash cls="h-3.5 w-3.5" />
-              }
-              <span className="hidden sm:inline">
-                {isRemoving ? "Removing…" : "Remove"}
-              </span>
+              {isRemoving ? <IcoSpin cls="h-3.5 w-3.5" /> : <IcoTrash cls="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{isRemoving ? "Removing…" : "Remove"}</span>
             </button>
           </div>
 
           {/* Mobile price */}
           <div className="block text-right sm:hidden">
-            <p className="text-sm font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-              {fmt(lineTotal)}
-            </p>
-            {sale && (
-              <p className="text-xs tabular-nums text-neutral-400 line-through">
-                {fmt(origTotal)}
-              </p>
-            )}
+            <p className="text-sm font-bold tabular-nums text-neutral-900 dark:text-neutral-100">{fmt(lineTotal)}</p>
+            {sale && <p className="text-xs tabular-nums text-neutral-400 line-through">{fmt(origTotal)}</p>}
           </div>
         </div>
       </div>
@@ -475,7 +424,6 @@ function OrderSummary({ items, onCheckout }: OrderSummaryProps) {
     (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1),
     0
   );
-
   const totalSavings = items.reduce((acc, item) => {
     if (!isSale(item.productId)) return acc;
     const disc = getPrice(item.productId);
@@ -486,9 +434,7 @@ function OrderSummary({ items, onCheckout }: OrderSummaryProps) {
   return (
     <div className="sticky top-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="border-b border-neutral-100 px-6 py-5 dark:border-neutral-800">
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-          Order Summary
-        </h2>
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Order Summary</h2>
       </div>
 
       <div className="space-y-5 p-6">
@@ -500,25 +446,19 @@ function OrderSummary({ items, onCheckout }: OrderSummaryProps) {
                 ({items.length} {items.length === 1 ? "item" : "items"})
               </span>
             </span>
-            <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
-              {fmt(subtotal)}
-            </span>
+            <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">{fmt(subtotal)}</span>
           </div>
 
           {totalSavings > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-red-500 dark:text-red-400">Discount savings</span>
-              <span className="font-semibold tabular-nums text-red-500 dark:text-red-400">
-                -{fmt(totalSavings)}
-              </span>
+              <span className="font-semibold tabular-nums text-red-500 dark:text-red-400">-{fmt(totalSavings)}</span>
             </div>
           )}
 
           <div className="flex items-center justify-between border-t border-dashed border-neutral-200 pt-3 dark:border-neutral-700">
             <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">Total</span>
-            <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-              {fmt(subtotal)}
-            </span>
+            <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">{fmt(subtotal)}</span>
           </div>
         </div>
 
@@ -546,13 +486,9 @@ function OrderSummary({ items, onCheckout }: OrderSummaryProps) {
           <IcoInfo cls="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
           <p className="text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500">
             Learn more about{" "}
-            <a href="#" className="font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-400">
-              taxes
-            </a>{" "}
-            and{" "}
-            <a href="#" className="font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-400">
-              shipping
-            </a>.
+            <a href="#" className="font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-400">taxes</a>
+            {" "}and{" "}
+            <a href="#" className="font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-400">shipping</a>.
           </p>
         </div>
       </div>
@@ -571,8 +507,8 @@ function CartSkeleton() {
           <div key={i} className="flex gap-5 py-6">
             <div className="h-28 w-24 shrink-0 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800 sm:h-36 sm:w-28" />
             <div className="flex flex-1 flex-col gap-3 py-1">
-              <div className="h-3  w-16 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
-              <div className="h-5  w-40 animate-pulse rounded-lg  bg-neutral-100 dark:bg-neutral-800" />
+              <div className="h-3 w-16 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
+              <div className="h-5 w-40 animate-pulse rounded-lg  bg-neutral-100 dark:bg-neutral-800" />
               <div className="flex gap-2">
                 <div className="h-6 w-20 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
                 <div className="h-6 w-16 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
@@ -655,7 +591,6 @@ export default function CartPage() {
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [toast,       setToast]       = useState<ToastState | null>(null);
 
-  // Read user email on mount (client-side only)
   useEffect(() => {
     const email = getUserEmail();
     setUserEmail(email);
@@ -667,19 +602,15 @@ export default function CartPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // Fetch cart items
   const fetchCart = useCallback(async (email: string) => {
     if (!email) return;
     setLoading(true);
     try {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
-      setCartItems(
-        json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : []
-      );
+      setCartItems(json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      showToast(`Failed to load cart: ${msg}`, "error");
+      showToast(`Failed to load cart: ${(err as Error).message}`, "error");
       setCartItems([]);
     } finally {
       setLoading(false);
@@ -690,12 +621,10 @@ export default function CartPage() {
     if (userEmail) fetchCart(userEmail);
   }, [userEmail, fetchCart]);
 
-  // Update quantity
+  // ── Update quantity ─────────────────────────────────────────────────────────
   const handleUpdateQty = useCallback(async (cartId: string, newQty: number) => {
-    if (!cartId) return;
-    if (newQty < 1)  return;
+    if (!cartId || newQty < 1) return;
 
-    // Optimistic update
     setCartItems((prev) =>
       prev.map((i) => i._id === cartId ? { ...i, quantity: newQty } : i)
     );
@@ -709,12 +638,11 @@ export default function CartPage() {
       });
       if (!ok || !json.success) {
         showToast((json.message as string) ?? "Update failed", "error");
-        fetchCart(userEmail); // revert
+        fetchCart(userEmail);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      showToast(`Failed to update quantity: ${msg}`, "error");
-      fetchCart(userEmail); // revert
+      showToast(`Failed to update: ${(err as Error).message}`, "error");
+      fetchCart(userEmail);
     } finally {
       setUpdatingIds((prev) => {
         const next = new Set(prev);
@@ -724,13 +652,12 @@ export default function CartPage() {
     }
   }, [userEmail, fetchCart, showToast]);
 
-  // Remove item
+  // ── Remove item ─────────────────────────────────────────────────────────────
   const handleRemove = useCallback(async (cartId: string) => {
     if (!cartId) return;
 
     setRemovingIds((prev) => new Set(prev).add(cartId));
 
-    // Delayed optimistic removal (allows fade animation)
     const timer = setTimeout(() => {
       setCartItems((prev) => prev.filter((i) => i._id !== cartId));
     }, 300);
@@ -742,13 +669,12 @@ export default function CartPage() {
       } else {
         clearTimeout(timer);
         showToast((json.message as string) ?? "Remove failed", "error");
-        fetchCart(userEmail); // revert
+        fetchCart(userEmail);
       }
     } catch (err) {
       clearTimeout(timer);
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      showToast(`Failed to remove item: ${msg}`, "error");
-      fetchCart(userEmail); // revert
+      showToast(`Failed to remove: ${(err as Error).message}`, "error");
+      fetchCart(userEmail);
     } finally {
       setRemovingIds((prev) => {
         const next = new Set(prev);
@@ -758,12 +684,12 @@ export default function CartPage() {
     }
   }, [userEmail, fetchCart, showToast]);
 
-  // Proceed to checkout
+  // ── Proceed to checkout ─────────────────────────────────────────────────────
   const handleCheckout = useCallback(() => {
     const checkoutData: CheckoutData = {
-      items:     cartItems,
+      items: cartItems,
       userEmail,
-      subtotal:  cartItems.reduce(
+      subtotal: cartItems.reduce(
         (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1),
         0
       ),
@@ -781,10 +707,7 @@ export default function CartPage() {
         {/* Header */}
         <div className="mb-8 border-b border-neutral-200 pb-8 dark:border-neutral-800">
           <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs">
-            <Link
-              href="/"
-              className="text-neutral-400 transition-colors hover:text-neutral-700 dark:text-neutral-600 dark:hover:text-neutral-300"
-            >
+            <Link href="/" className="text-neutral-400 transition-colors hover:text-neutral-700 dark:text-neutral-600 dark:hover:text-neutral-300">
               Home
             </Link>
             <IcoChevR cls="h-3 w-3 text-neutral-300 dark:text-neutral-700" />
@@ -826,6 +749,7 @@ export default function CartPage() {
           <EmptyCart />
         ) : (
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
+
             {/* Items list */}
             <div className="min-w-0 flex-1">
               <div className="divide-y divide-neutral-100 dark:divide-neutral-800">

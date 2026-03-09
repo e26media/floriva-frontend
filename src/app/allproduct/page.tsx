@@ -18,7 +18,7 @@ interface Product {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BASE = "http://localhost:7000";
+const BASE =  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 const img  = (p: string) => `${BASE}${p}`;
 const pct  = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0;
 const PER_PAGE = 12;
@@ -279,7 +279,7 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
             )}
 
             {/* Wishlist */}
-            <button
+            {/* <button
               onClick={() => setWished(w => !w)}
               className={`w-full h-10 rounded-[9px] border font-medium text-[0.84rem] cursor-pointer flex items-center justify-center gap-1.5 mb-4 transition-all duration-200 ${
                 wished
@@ -291,7 +291,7 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
               </svg>
               {wished ? "Saved to Wishlist" : "Add to Wishlist"}
-            </button>
+            </button> */}
 
             {/* Sub-categories */}
             {product.category?.subCategories?.length > 0 && (
