@@ -45,11 +45,11 @@ interface CheckoutData {
 // =============================================================================
 //  API CONFIG
 // =============================================================================
-const BASE       =process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';;
+const BASE       =process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 const VIEW_URL   = (email: string) => `${BASE}/api/view/${encodeURIComponent(email)}`;
 const UPDATE_URL = (id: string)    => `${BASE}/api/cartupdate/${id}`;
 const DELETE_URL = (id: string)    => `${BASE}/api/cartdelete/${id}`;
-const IMAGE_BASE = "http://localhost:7000";
+const IMAGE_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 
 // =============================================================================
 //  HELPERS
