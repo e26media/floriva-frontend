@@ -540,7 +540,7 @@ export default function ProductDetailPage() {
             </details>
           )}
           <p className="text-xs text-stone-400 mb-6">
-            Called: <code className="bg-amber-50 px-2 py-0.5 rounded-md">{BASE}/api/productview/{id}</code>
+            Called: <code className="bg-amber-50 px-2 py-0.5 rounded-md">{`${BASE}/api/productview/${id}`}</code>
           </p>
           <button
             onClick={() => window.history.back()}
