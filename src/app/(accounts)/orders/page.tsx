@@ -62,8 +62,7 @@ type FilterKey = "all" | "pending" | "processing" | "shipped" | "delivered" | "c
 const BASE         = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';;
 const USER_ORDERS  = (email: string) => `${BASE}/api/user/${encodeURIComponent(email)}`;
 const CANCEL_ORDER = (id: string)    => `${BASE}/api/orderdelete/${id}`;
-const IMAGE_BASE   = "http://localhost:7000";
-
+const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 // =============================================================================
 //  HELPERS
 // =============================================================================
