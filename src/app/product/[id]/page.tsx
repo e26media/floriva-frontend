@@ -19,7 +19,8 @@ interface Product {
 /* ─────────────────────────────────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────────────────────────────────── */
-const BASE = "http://localhost:7000";
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
+// const BASE = "http://localhost:7000";
 const img  = (p: string) => !p ? "" : p.startsWith("http") ? p : `${BASE}${p}`;
 const pct  = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0;
 
