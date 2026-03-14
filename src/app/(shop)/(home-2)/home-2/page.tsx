@@ -51,7 +51,7 @@ async function PageHome2() {
         </div>
       </div>
 
-      <SectionCollectionSlider collections={featuredCollections} />
+      <SectionCollectionSlider />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-36 lg:gap-y-36">
         <SectionGridFeatureItems data={products} />
