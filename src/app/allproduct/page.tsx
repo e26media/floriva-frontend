@@ -2,7 +2,7 @@
 
 import Header from "@/components/Header/Header";
 import Header2 from "@/components/Header/Header2";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -83,7 +83,6 @@ const IcoCheck = () => (
 );
 
 // ─── CheckboxRow ───────────────────────────────────────────────────────────────
-// Matches the screenshot: square box, label, grey count
 function CheckboxRow({
   checked, onChange, label, count, indent = false,
 }: {
@@ -104,7 +103,6 @@ function CheckboxRow({
         ${indent ? "pl-[10px]" : "pl-[2px]"}
       `}
     >
-      {/* Checkbox square */}
       <span className={`
         w-[17px] h-[17px] flex-shrink-0 rounded-[4px] border-[1.8px] flex items-center justify-center
         transition-all duration-150
@@ -114,8 +112,6 @@ function CheckboxRow({
       `}>
         {checked && <IcoCheck />}
       </span>
-
-      {/* Label */}
       <span className={`
         text-[0.83rem] leading-snug flex-1
         ${checked ? "font-semibold text-[#1e1610]" : "text-[#2d2520] group-hover:text-[#1e1610]"}
@@ -297,7 +293,6 @@ function FiltersSidebar({
 }) {
   const router = useRouter();
 
-  // All unique category names that actually have products
   const catNames = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
   const colorNames = Array.from(new Set(products.map(p => p.color?.name).filter(Boolean))) as string[];
 
@@ -305,11 +300,8 @@ function FiltersSidebar({
   const gMin = prices.length ? Math.min(...prices) : 0;
   const gMax = prices.length ? Math.max(...prices) : 10000;
 
-  // ── Per-category product count ──
   const catCount = (name: string) => products.filter(p => p.category?.name === name).length;
 
-  // ── Build merged subcategory list for a given category name ──
-  // Merge dupes by name → { name, ids[] }
   const getMergedSubs = (catName: string): { name: string; ids: string[] }[] => {
     const apiCat = allCatData.find(c => c.name === catName);
     const merged: { name: string; ids: string[] }[] = [];
@@ -321,17 +313,13 @@ function FiltersSidebar({
     return merged;
   };
 
-  // ── SubCategory product count (within a given category context) ──
   const subCount = (catName: string, ids: string[]) =>
     products.filter(p => p.category?.name === catName && ids.includes(getSubId(p))).length;
 
-  // ── Toggle a category (multi) ──
   const toggleCat = (name: string) => {
     const next = filters.categories.includes(name)
       ? filters.categories.filter(c => c !== name)
       : [...filters.categories, name];
-
-    // Also clean up any subCategory ids that belong to the deselected category
     let nextSubs = filters.subCategories;
     if (!next.includes(name)) {
       const removedSubs = (allCatData.find(c => c.name === name)?.subCategories ?? []).map(s => s._id);
@@ -340,7 +328,6 @@ function FiltersSidebar({
     setFilters({ ...filters, categories: next, subCategories: nextSubs });
   };
 
-  // ── Toggle a sub-category group (multi) ──
   const toggleSub = (ids: string[]) => {
     const anyOn = ids.some(id => filters.subCategories.includes(id));
     const next = anyOn
@@ -378,7 +365,6 @@ function FiltersSidebar({
         ${mobileOpen ? "max-md:left-0" : "max-md:-left-[280px]"}
       `}>
 
-        {/* ── Sidebar header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e6ddd3]">
           <div className="flex items-center gap-2">
             <span className="font-serif text-[1.06rem] font-semibold text-[#1e1610]">Filters</span>
@@ -403,7 +389,7 @@ function FiltersSidebar({
 
         <div className="px-4 py-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-120px)]">
 
-          {/* ── Search ── */}
+          {/* Search */}
           <div>
             <p className="sidebar-label">Search</p>
             <div className="flex items-center gap-2 border border-[#ddd5cb] rounded-[8px] px-3 py-[9px] bg-[#faf7f4] focus-within:border-[#b5623b] focus-within:bg-white transition-all">
@@ -423,30 +409,22 @@ function FiltersSidebar({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════
-              CATEGORY + SUBCATEGORY — multi-checkbox list
-              Matches screenshot exactly
-          ══════════════════════════════════════════════ */}
+          {/* Category + SubCategory */}
           <div>
             <p className="sidebar-label">Category</p>
-
             <div className="flex flex-col gap-0.5">
               {catNames.map(catName => {
                 const isCatOn = filters.categories.includes(catName);
                 const mergedSubs = getMergedSubs(catName);
                 const count = catCount(catName);
-
                 return (
                   <div key={catName}>
-                    {/* ── Category checkbox row ── */}
                     <CheckboxRow
                       checked={isCatOn}
                       onChange={() => toggleCat(catName)}
                       label={catName}
                       count={count}
                     />
-
-                    {/* ── SubCategory rows — shown while category is checked ── */}
                     {isCatOn && mergedSubs.length > 0 && (
                       <div
                         className="ml-[26px] border-l-2 border-[#ece5dd] pl-[10px] mb-1 flex flex-col gap-0.5"
@@ -470,11 +448,10 @@ function FiltersSidebar({
             </div>
           </div>
 
-          {/* ── Colour swatches ── */}
+          {/* Colour swatches */}
           <div>
             <p className="sidebar-label">Colour</p>
             <div className="flex flex-wrap gap-x-[10px] gap-y-3">
-              {/* All */}
               <button type="button"
                 onClick={() => filters.color && handleColor(filters.color)}
                 className="flex flex-col items-center gap-[3px] cursor-pointer bg-transparent border-none p-0 group/sw">
@@ -504,7 +481,7 @@ function FiltersSidebar({
             </div>
           </div>
 
-          {/* ── Price range ── */}
+          {/* Price range */}
           <div>
             <p className="sidebar-label flex justify-between">
               Max Price
@@ -522,7 +499,6 @@ function FiltersSidebar({
         </div>
       </aside>
 
-      {/* Scoped styles */}
       <style>{`
         .sidebar-label {
           font-size: .67rem;
@@ -575,8 +551,8 @@ function Pagination({ page, total, perPage, onChange }: {
   );
 }
 
-// ─── AllProductsPage ───────────────────────────────────────────────────────────
-export default function page() {
+// ─── AllProductsPageInner (contains all the real logic) ───────────────────────
+function AllProductsPageInner() {
   const searchParams = useSearchParams();
   const urlColor = searchParams.get("color") ?? "";
 
@@ -597,13 +573,11 @@ export default function page() {
     search:        "",
   });
 
-  // Sync URL colour param on change
   useEffect(() => {
     setFilters(f => ({ ...f, color: urlColor }));
     setPage(1);
   }, [urlColor]);
 
-  // Fetch products
   useEffect(() => {
     fetch(`${BASE}/api/productview`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -617,7 +591,6 @@ export default function page() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Fetch categories (with subcategories)
   useEffect(() => {
     fetch(`${BASE}/api/categoryview`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -630,7 +603,6 @@ export default function page() {
 
   const handleFilters = useCallback((f: Filters) => { setFilters(f); setPage(1); }, []);
 
-  // ── Filter pipeline ──
   const filtered = products
     .filter(p => filters.categories.length === 0 || filters.categories.includes(p.category?.name))
     .filter(p => filters.subCategories.length === 0 || filters.subCategories.includes(getSubId(p)))
@@ -650,8 +622,6 @@ export default function page() {
 
   const paginated = sorted.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  // ── Active pill helpers ──
-  // Resolve selected sub-cat display names for pills
   const selectedSubNames = (() => {
     const seen = new Set<string>();
     return filters.subCategories
@@ -667,7 +637,6 @@ export default function page() {
 
   const totalActive = filters.categories.length + selectedSubNames.length + (filters.color ? 1 : 0);
 
-  // Heading text
   const headingText =
     selectedSubNames.length === 1 ? selectedSubNames[0]
     : filters.categories.length  === 1 ? filters.categories[0]
@@ -689,7 +658,6 @@ export default function page() {
       <div className="bg-[#f7f3ee] min-h-screen text-[#1e1610]">
         <div className="flex max-w-[1440px] mx-auto px-5 py-9 gap-0 items-start">
 
-          {/* ── Sidebar ── */}
           {!loading && !error && (
             <FiltersSidebar
               products={products}
@@ -701,7 +669,6 @@ export default function page() {
             />
           )}
 
-          {/* ── Main ── */}
           <main className="flex-1 md:pl-8">
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-[360px] gap-4">
@@ -714,9 +681,7 @@ export default function page() {
               </div>
             ) : (
               <>
-                {/* ── Header ── */}
                 <div className="fade-up mt-10 mb-6">
-                  {/* Breadcrumb */}
                   <nav className="flex items-center gap-2 text-[.77rem] text-[#b0a090] mb-3 flex-wrap">
                     <a href="/" className="hover:text-[#1e1610] transition-colors">Home</a>
                     <span>/</span>
@@ -735,7 +700,6 @@ export default function page() {
                     )}
                   </nav>
 
-                  {/* Title row */}
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                       <h1 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight">
@@ -752,7 +716,6 @@ export default function page() {
                       </p>
                     </div>
 
-                    {/* Controls */}
                     <div className="flex items-center gap-3 flex-wrap">
                       <button type="button" onClick={() => setMobSb(true)}
                         className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
@@ -771,67 +734,8 @@ export default function page() {
                       </select>
                     </div>
                   </div>
-
-                  {/* ── Active filter pills ── */}
-                  {/* {totalActive > 0 && (
-                    <div className="mt-3 flex items-center gap-2 flex-wrap">
-                      <span className="text-[.7rem] text-[#b0a090] uppercase tracking-[.08em]">Filtering:</span>
-
-                      {filters.categories.map(cat => (
-                        <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-[#1e1610] text-white px-3 py-1 text-[.72rem] font-semibold">
-                          {cat}
-                          <button type="button"
-                            onClick={() => {
-                              const removedSubs = (allCatData.find(c => c.name === cat)?.subCategories ?? []).map(s => s._id);
-                              handleFilters({
-                                ...filters,
-                                categories: filters.categories.filter(c => c !== cat),
-                                subCategories: filters.subCategories.filter(id => !removedSubs.includes(id)),
-                              });
-                            }}
-                            className="ml-0.5 opacity-70 hover:opacity-100 bg-transparent border-none cursor-pointer text-white flex items-center">
-                            <IcoX/>
-                          </button>
-                        </span>
-                      ))}
-
-                      {selectedSubNames.map(name => (
-                        <span key={name} className="inline-flex items-center gap-1 rounded-full bg-[#b5623b] text-white px-3 py-1 text-[.72rem] font-semibold">
-                          {name}
-                          <button type="button"
-                            onClick={() => {
-                              const idsToRemove: string[] = [];
-                              allCatData.forEach(cat => cat.subCategories.forEach(sc => { if (sc.name === name) idsToRemove.push(sc._id); }));
-                              handleFilters({ ...filters, subCategories: filters.subCategories.filter(id => !idsToRemove.includes(id)) });
-                            }}
-                            className="ml-0.5 opacity-70 hover:opacity-100 bg-transparent border-none cursor-pointer text-white flex items-center">
-                            <IcoX/>
-                          </button>
-                        </span>
-                      ))}
-
-                      {filters.color && (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1e1610] text-white px-3 py-1 text-[.72rem] font-semibold">
-                          <span className="w-2.5 h-2.5 rounded-full border border-white/20"
-                            style={{ background: COLOR_MAP[filters.color.toLowerCase()] ?? "#e5e7eb" }}/>
-                          <span className="capitalize">{filters.color}</span>
-                          <button type="button" onClick={() => handleFilters({ ...filters, color: "" })}
-                            className="ml-0.5 opacity-70 hover:opacity-100 bg-transparent border-none cursor-pointer text-white flex items-center">
-                            <IcoX/>
-                          </button>
-                        </span>
-                      )}
-
-                      <button type="button"
-                        onClick={() => handleFilters({ categories: [], subCategories: [], color: "", maxPrice: 999999, search: "" })}
-                        className="text-[.7rem] text-[#b5623b] underline underline-offset-2 bg-transparent border-none cursor-pointer font-medium hover:text-[#7a3e22]">
-                        Clear all
-                      </button>
-                    </div>
-                  )} */}
                 </div>
 
-                {/* ── Grid ── */}
                 {paginated.length === 0 ? (
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
                     <div className="text-5xl">🌸</div>
@@ -859,5 +763,23 @@ export default function page() {
         {quickView && <QuickViewModal product={quickView} onClose={() => setQuickView(null)}/>}
       </div>
     </>
+  );
+}
+
+// ─── AllProductsPage — default export with Suspense wrapper ───────────────────
+export default function AllProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-[#f7f3ee] min-h-screen flex flex-col items-center justify-center gap-4">
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          <div style={{ animation: "spin .75s linear infinite" }}
+            className="w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full"/>
+          <p className="text-[#7a6b5e] text-[.9rem]">Loading products…</p>
+        </div>
+      }
+    >
+      <AllProductsPageInner />
+    </Suspense>
   );
 }
