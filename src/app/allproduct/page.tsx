@@ -576,7 +576,7 @@ function Pagination({ page, total, perPage, onChange }: {
 }
 
 // ─── AllProductsPage ───────────────────────────────────────────────────────────
-export default function AllProductsPage() {
+export default function page() {
   const searchParams = useSearchParams();
   const urlColor = searchParams.get("color") ?? "";
 
