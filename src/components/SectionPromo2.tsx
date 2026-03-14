@@ -1,6 +1,6 @@
 import Logo from '@/components/Logo'
 import backgroundLineSvg from '@/images/Moon.svg'
-import rightImgDemo from '@/images/promo2.png'
+import rightImgDemo from '@/images/floriva/banner/4.png'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
 
 import clsx from 'clsx'
@@ -13,7 +13,7 @@ export interface SectionPromo2Props {
 
 const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
   return (
-    <div className={clsx(className, 'xl:pt-10 2xl:pt-24')}>
+    <div className={clsx(className, 'xl:pt-10 2xl:pt-12')}>
       <div className="relative flex flex-col rounded-2xl bg-yellow-50 p-4 pb-0 sm:rounded-[40px] sm:p-5 sm:pb-0 lg:flex-row lg:justify-end lg:p-14 xl:px-20 xl:py-24 2xl:py-32 dark:bg-neutral-800">
         <div className="absolute inset-5">
           <Image fill className="object-contain dark:opacity-5" src={backgroundLineSvg} alt="backgroundLineSvg" />
@@ -29,7 +29,7 @@ const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
             Fashion is a form of self-expression and autonomy at a particular period and place.
           </span>
           <div className="mt-6 flex space-x-2 sm:mt-12 sm:space-x-5">
-            <ButtonPrimary href="/search">Discover more</ButtonPrimary>
+            <ButtonPrimary href="/allproduct">Discover more</ButtonPrimary>
           </div>
         </div>
 

@@ -4,10 +4,11 @@ import { UserCircle02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { Divider } from '../Divider'
 import { Link } from '../Link'
+import backgroundLineSvg from '@/images/floriva/Primary Logo.png'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
-const API_BASE =process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 interface Props { className?: string }
 
 // ─── Google popup ─────────────────────────────────────────────────────────────
@@ -41,33 +42,27 @@ function openGooglePopup(
   }, 500)
 }
 
-// ─── UserAvatar: real image → letter initial fallback ────────────────────────
+// ─── UserAvatar ────────────────────────────────────────────────────────────────
 function UserAvatar({ imgUrl, name, email, size = 48 }: {
   imgUrl?: string; name?: string; email?: string; size?: number
 }) {
   const [imgError, setImgError] = useState(false)
   const displayName = name || email || ''
   const initial = displayName.trim()[0]?.toUpperCase() || '?'
-  const gradients = [
-    'from-amber-400 to-orange-500',
-    'from-emerald-400 to-green-600',
-    'from-blue-400 to-indigo-600',
-    'from-pink-400 to-rose-600',
-    'from-violet-400 to-purple-600',
-    'from-orange-400 to-red-600',
-    'from-teal-400 to-cyan-600',
-  ]
-  const grad = gradients[(initial.charCodeAt(0) || 0) % gradients.length]
   const canShowImage = imgUrl && !imgError
 
-  const sizeClass = size <= 36 ? 'w-9 h-9 text-sm' : size <= 48 ? 'w-12 h-12 text-base' : 'w-16 h-16 text-xl'
-
   return (
-    <div className={`${sizeClass} rounded-full overflow-hidden flex-shrink-0 relative flex items-center justify-center shadow-md bg-gradient-to-br ${canShowImage ? 'bg-transparent' : grad}`}>
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      overflow: 'hidden', flexShrink: 0, position: 'relative',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 2px 8px rgba(124,76,163,0.25)',
+      background: canShowImage ? 'transparent' : 'linear-gradient(135deg, #EA5A7B, #7C4CA3)',
+    }}>
       {canShowImage ? (
-        <img src={imgUrl} alt={displayName} onError={() => setImgError(true)} className="w-full h-full object-cover" />
+        <img src={imgUrl} alt={displayName} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       ) : (
-        <span className="text-white font-extrabold leading-none select-none" style={{ fontFamily: 'Georgia, serif' }}>
+        <span style={{ color: 'white', fontWeight: 800, fontSize: size * 0.38, fontFamily: 'Georgia, serif', lineHeight: 1, userSelect: 'none' }}>
           {initial}
         </span>
       )}
@@ -75,15 +70,15 @@ function UserAvatar({ imgUrl, name, email, size = 48 }: {
   )
 }
 
-// ─── SVGs ─────────────────────────────────────────────────────────────────────
+// ─── SVGs ──────────────────────────────────────────────────────────────────────
 const FlorivaFlower = ({ size = 46 }: { size?: number }) => (
   <svg viewBox="0 0 52 52" width={size} height={size} fill="none">
-    <circle cx="26" cy="16" r="8" fill="#fbbf24" opacity="0.92"/>
-    <circle cx="36" cy="26" r="8" fill="#34d399" opacity="0.92"/>
-    <circle cx="16" cy="26" r="8" fill="#f97316" opacity="0.92"/>
-    <circle cx="26" cy="36" r="8" fill="#a78bfa" opacity="0.92"/>
+    <circle cx="26" cy="16" r="8" fill="#EA5A7B" opacity="0.92"/>
+    <circle cx="36" cy="26" r="8" fill="#7C4CA3" opacity="0.92"/>
+    <circle cx="16" cy="26" r="8" fill="#EA5A7B" opacity="0.75"/>
+    <circle cx="26" cy="36" r="8" fill="#7C4CA3" opacity="0.75"/>
     <circle cx="26" cy="26" r="7" fill="white"/>
-    <circle cx="26" cy="26" r="4" fill="#fbbf24"/>
+    <circle cx="26" cy="26" r="4" fill="#EA5A7B"/>
   </svg>
 )
 
@@ -97,13 +92,13 @@ const GoogleG = ({ size = 20 }: { size?: number }) => (
 )
 
 const Spinner = ({ color = 'white' }: { color?: string }) => (
-  <svg className="animate-spin flex-shrink-0" width="17" height="17" viewBox="0 0 24 24" fill="none">
+  <svg className="animate-spin" style={{ flexShrink: 0, animation: 'spin 1s linear infinite' }} width="17" height="17" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke={color === 'white' ? 'rgba(255,255,255,0.25)' : '#e5e7eb'} strokeWidth="3"/>
     <path d="M12 2a10 10 0 0 1 10 10" stroke={color} strokeWidth="3" strokeLinecap="round"/>
   </svg>
 )
 
-// ─── Google Loading Screen ─────────────────────────────────────────────────────
+// ─── Google Loading Screen ──────────────────────────────────────────────────────
 function GoogleLoadingScreen({ user, onDone }: { user: { name: string; email: string }; onDone: () => void }) {
   const [visible, setVisible] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'success'>('loading')
@@ -117,42 +112,91 @@ function GoogleLoadingScreen({ user, onDone }: { user: { name: string; email: st
   }, [onDone])
 
   return (
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/55 backdrop-blur-xl transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}>
-      <div className={`bg-white rounded-3xl px-8 sm:px-12 py-10 sm:py-12 text-center shadow-2xl w-full max-w-xs transition-all duration-400 ${visible ? 'scale-100 translate-y-0' : 'scale-90 translate-y-7'}`}>
-        <div className="flex justify-center mb-4"><FlorivaFlower size={44}/></div>
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-green-500 mx-auto mb-3 flex items-center justify-center text-white text-2xl font-extrabold shadow-lg" style={{ fontFamily: 'Georgia,serif', animation: 'floraPopIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
+    <div style={{
+      position: 'fixed', 
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 9999,
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      padding: '16px',
+      background: 'rgba(0,0,0,0.55)', 
+      backdropFilter: 'blur(12px)',
+      transition: 'opacity 0.3s', 
+      opacity: visible ? 1 : 0,
+    }}>
+      <div style={{
+        background: 'white', 
+        borderRadius: '28px', 
+        padding: '40px 32px',
+        textAlign: 'center', 
+        boxShadow: '0 30px 80px rgba(0,0,0,0.25)',
+        width: '100%', 
+        maxWidth: '320px',
+        transition: 'transform 0.4s cubic-bezier(0.34,1.3,0.64,1)',
+        transform: visible ? 'scale(1)' : 'scale(0.88)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><FlorivaFlower size={44}/></div>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #EA5A7B, #7C4CA3)',
+          margin: '0 auto 12px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          color: 'white', 
+          fontSize: '26px', 
+          fontWeight: 800, 
+          fontFamily: 'Georgia,serif',
+          boxShadow: '0 4px 16px rgba(234,90,123,0.4)',
+          animation: 'floraPopIn 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+        }}>
           {initial}
         </div>
-        <div className="text-base font-bold text-gray-900" style={{ fontFamily: 'Georgia,serif' }}>{user.name || 'Welcome back'}</div>
-        <div className="text-xs text-gray-400 mt-1 mb-6">{user.email}</div>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', fontFamily: 'Georgia,serif' }}>{user.name || 'Welcome back'}</div>
+        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', marginBottom: '24px' }}>{user.email}</div>
         {phase === 'loading' ? (
           <>
-            <div className="flex justify-center gap-2 mb-3">
-              {['#4285F4','#EA4335','#FBBC05','#34A853'].map((c,i) => (
-                <div key={i} className="w-2.5 h-2.5 rounded-full" style={{ background: c, animation: `floraBounce 1.2s ease-in-out infinite`, animationDelay: `${i*0.14}s` }}/>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
+              {['#EA5A7B','#7C4CA3','#EA5A7B','#7C4CA3'].map((c,i) => (
+                <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: c, animation: `floraBounce 1.2s ease-in-out infinite`, animationDelay: `${i*0.14}s` }}/>
               ))}
             </div>
-            <p className="text-xs text-gray-400">Signing you in to Floriva…</p>
+            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Signing you in to Floriva…</p>
           </>
         ) : (
           <>
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 mx-auto mb-3 flex items-center justify-center shadow-lg" style={{ animation: 'floraPopIn 0.42s cubic-bezier(0.34,1.56,0.64,1)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #EA5A7B, #7C4CA3)',
+              margin: '0 auto 12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(234,90,123,0.4)',
+              animation: 'floraPopIn 0.42s cubic-bezier(0.34,1.56,0.64,1)',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12l5 5L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
-            <p className="text-sm font-bold text-emerald-500">Welcome to Floriva! 🌸</p>
+            <p style={{ fontSize: '14px', fontWeight: 700, color: '#EA5A7B', margin: 0 }}>Welcome to Floriva! 🌸</p>
           </>
         )}
       </div>
       <style>{`
         @keyframes floraBounce{0%,80%,100%{transform:scale(0.6);opacity:0.35}40%{transform:scale(1.1);opacity:1}}
         @keyframes floraPopIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-        @keyframes floraSlide{0%{background-position:0% 0%}100%{background-position:200% 0%}}
+        @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
     </div>
   )
 }
 
-// ─── Auth Modal ───────────────────────────────────────────────────────────────
+// ─── Auth Modal ────────────────────────────────────────────────────────────────
 function FlorivaAuthModal({ onClose, onSuccess }: {
   onClose: () => void
   onSuccess: (user: any, token: string) => void
@@ -171,11 +215,27 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden'
     requestAnimationFrame(() => setVisible(true))
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+    return () => {
+      document.body.style.overflow = 'unset'
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }, [])
 
-  const closeModal = () => { setVisible(false); setTimeout(onClose, 260) }
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [])
+
+  const closeModal = () => { 
+    setVisible(false); 
+    setTimeout(() => {
+      document.body.style.overflow = 'unset'
+      onClose()
+    }, 260) 
+  }
 
   const startTimer = () => {
     setTimer(30)
@@ -222,9 +282,11 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     const n = [...otp]; n[i] = v; setOtp(n)
     if (v && i < 5) otpRefs.current[i+1]?.focus()
   }
+  
   const keyOtp = (i: number, e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !otp[i] && i > 0) otpRefs.current[i-1]?.focus()
   }
+  
   const pasteOtp = (e: React.ClipboardEvent) => {
     e.preventDefault()
     const d = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6)
@@ -245,42 +307,109 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     if (googleUser) onSuccess({ username: googleUser.name, email: googleUser.email }, googleUser.token)
   }, [googleUser, onSuccess])
 
+  // FIXED: Perfectly centered overlay
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9998,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+    background: 'rgba(124,76,163,0.15)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+    transition: 'opacity 0.25s',
+    opacity: visible ? 1 : 0,
+  }
+
+  const cardStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '420px',
+    margin: 'auto', // This ensures centering
+    background: 'linear-gradient(145deg, #fff5f8 0%, #ffffff 50%, #f7f3ff 100%)',
+    borderRadius: '28px',
+    overflow: 'hidden',
+    boxShadow: '0 32px 80px rgba(124,76,163,0.22), 0 10px 32px rgba(234,90,123,0.14)',
+    transition: 'transform 0.35s cubic-bezier(0.34,1.3,0.64,1), opacity 0.25s',
+    transform: visible ? 'scale(1) translateY(0)' : 'scale(0.88) translateY(28px)',
+    opacity: visible ? 1 : 0,
+    position: 'relative',
+  }
+
   return (
     <>
-      {/* ── Backdrop + centering ── */}
-      <div
-        className={`  lg:mt-[320px] fixed inset-0 z-50 flex items-center justify-center p-4  backdrop-blur-xl transition-opacity duration-250 ${visible ? 'opacity-100' : 'opacity-0'}`}
-        onClick={e => e.target === e.currentTarget && closeModal()}
-      >
-        {/* ── Card ── */}
-        <div className={` w-full max-w-sm sm:max-w-md relative bg-gradient-to-br from-amber-50 via-white to-green-50 rounded-3xl overflow-hidden shadow-2xl transition-all duration-350 ${visible ? 'scale-100 translate-y-0' : 'scale-90 translate-y-6'}`}>
-
+      <div style={overlayStyle} onClick={e => e.target === e.currentTarget && closeModal()}>
+        <div style={cardStyle}>
           {/* Rainbow bar */}
-          <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg,#fbbf24,#f97316,#34d399,#a78bfa,#fbbf24)', backgroundSize: '200% 100%', animation: 'floraSlide 3s linear infinite' }}/>
+          <div style={{
+            height: '5px', 
+            width: '100%',
+            background: 'linear-gradient(90deg,#EA5A7B,#c0397a,#7C4CA3,#9b6fd4,#EA5A7B)',
+            backgroundSize: '200% 100%',
+            animation: 'floraSlide 3s linear infinite',
+          }}/>
 
-          {/* Close */}
-          <button onClick={closeModal} className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center text-gray-400 transition-colors cursor-pointer border-0 bg-transparent">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
+          {/* Close button */}
+          <button
+            onClick={closeModal}
+            style={{
+              position: 'absolute', 
+              top: '14px', 
+              right: '14px',
+              width: '32px', 
+              height: '32px', 
+              borderRadius: '50%',
+              border: 'none', 
+              background: 'rgba(0,0,0,0.06)',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              cursor: 'pointer', 
+              color: '#9ca3af',
+              zIndex: 1,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+            </svg>
           </button>
 
-          <div className="px-7 pt-8 pb-7 sm:px-9 ">
+          <div style={{ padding: '28px 28px 32px' }}>
             {/* Header */}
-            <div className="text-center mb-6">
-              <div className="flex justify-center mb-2.5"><FlorivaFlower size={46}/></div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight m-0" style={{ fontFamily: 'Georgia,serif' }}>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                {/* <FlorivaFlower size={46}/> */}
+                <img src={backgroundLineSvg.src} alt="Floriva" style={{margin: '0 12px' }} className='h-10'/>
+              </div>
+              <h2 style={{ fontFamily: 'Georgia,serif', fontSize: '20px', fontWeight: 700, color: '#111827', margin: 0 }}>
                 {step === 'email' ? 'Sign Up / Login to Floriva!' : 'Check your inbox'}
               </h2>
-              <p className="mt-2 text-xs sm:text-sm text-gray-500 leading-relaxed">
+              <p style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280', lineHeight: 1.6, marginBottom: 0 }}>
                 {step === 'email' ? 'Enter your email address to continue' : (
-                  <><span>We emailed a 6-digit code to</span><br/><strong className="text-orange-500">{email}</strong></>
+                  <><span>We emailed a 6-digit code to</span><br/><strong style={{ color: '#EA5A7B' }}>{email}</strong></>
                 )}
               </p>
             </div>
 
-            {/* Error */}
+            {/* Error message */}
             {error && (
-              <div className="mb-3.5 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+              <div style={{ 
+                marginBottom: '14px', 
+                padding: '10px 14px', 
+                background: '#fef2f2', 
+                border: '1px solid #fecaca', 
+                borderRadius: '12px', 
+                fontSize: '12px', 
+                color: '#dc2626', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px' 
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
@@ -288,92 +417,222 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
               </div>
             )}
 
-            {/* ══ EMAIL STEP ══ */}
+            {/* EMAIL STEP */}
             {step === 'email' && (
               <>
-                <div className="mb-3.5">
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: '11px', 
+                    fontWeight: 700, 
+                    color: '#9ca3af', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.1em', 
+                    marginBottom: '6px' 
+                  }}>
                     Email Address
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none">
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ 
+                      position: 'absolute', 
+                      left: '14px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)', 
+                      color: '#d1d5db', 
+                      pointerEvents: 'none' 
+                    }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         <path d="M22 6l-10 7L2 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </span>
                     <input
-                      type="email" value={email} autoFocus placeholder="you@example.com"
+                      type="email"
+                      value={email}
+                      autoFocus
+                      placeholder="you@example.com"
                       onChange={e => { setEmail(e.target.value); setError('') }}
                       onKeyDown={e => e.key === 'Enter' && sendOtp()}
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-200 box-border"
+                      style={{
+                        width: '100%', 
+                        boxSizing: 'border-box',
+                        paddingLeft: '42px', 
+                        paddingRight: '16px',
+                        paddingTop: '13px', 
+                        paddingBottom: '13px',
+                        borderRadius: '16px', 
+                        border: '1.5px solid #e5e7eb',
+                        background: 'white', 
+                        fontSize: '16px',
+                        outline: 'none', 
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                      }}
+                      onFocus={e => { 
+                        e.target.style.borderColor = '#EA5A7B'; 
+                        e.target.style.boxShadow = '0 0 0 3px rgba(234,90,123,0.15)' 
+                      }}
+                      onBlur={e => { 
+                        e.target.style.borderColor = '#e5e7eb'; 
+                        e.target.style.boxShadow = 'none' 
+                      }}
                     />
                   </div>
                 </div>
 
+                {/* Continue button */}
                 <button
-                  onClick={sendOtp} disabled={loading}
-                  className={`w-full py-3.5 rounded-2xl border-0 text-sm font-bold flex items-center justify-center gap-2 transition-all ${loading ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-200 hover:shadow-orange-300 hover:scale-[1.01] active:scale-[0.99] cursor-pointer'}`}
+                  onClick={sendOtp}
+                  disabled={loading}
+                  style={{
+                    width: '100%', 
+                    padding: '14px', 
+                    borderRadius: '16px', 
+                    border: 'none',
+                    fontSize: '14px', 
+                    fontWeight: 700,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    background: loading ? '#e5e7eb' : 'linear-gradient(135deg, #EA5A7B 0%, #7C4CA3 100%)',
+                    color: loading ? '#9ca3af' : 'white',
+                    boxShadow: loading ? 'none' : '0 6px 24px rgba(234,90,123,0.38)',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                  }}
                 >
                   {loading && <Spinner/>}
                   {loading ? 'Sending OTP…' : 'Continue →'}
                 </button>
 
-                <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-gray-100"/>
-                  <span className="text-xs text-gray-400 font-semibold">or</span>
-                  <div className="flex-1 h-px bg-gray-100"/>
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '18px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>or</span>
+                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
                 </div>
 
+                {/* Google button */}
                 <button
-                  onClick={handleGoogleLogin} disabled={gLoading}
-                  className={`w-full py-3 rounded-2xl border border-gray-200 bg-white text-sm font-semibold flex items-center justify-center gap-2.5 transition-all shadow-sm ${gLoading ? 'opacity-70 cursor-wait' : 'hover:border-blue-400 hover:shadow-md hover:shadow-blue-100 cursor-pointer'}`}
+                  onClick={handleGoogleLogin}
+                  disabled={gLoading}
+                  style={{
+                    width: '100%', 
+                    padding: '13px', 
+                    borderRadius: '16px',
+                    border: '1.5px solid #e5e7eb', 
+                    background: 'white',
+                    fontSize: '14px', 
+                    fontWeight: 600,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '10px',
+                    cursor: gLoading ? 'wait' : 'pointer', 
+                    color: '#374151',
+                    opacity: gLoading ? 0.7 : 1,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    transition: 'border-color 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={e => { 
+                    if (!gLoading) { 
+                      e.currentTarget.style.borderColor = '#7C4CA3'; 
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,76,163,0.15)' 
+                    }
+                  }}
+                  onMouseLeave={e => { 
+                    e.currentTarget.style.borderColor = '#e5e7eb'; 
+                    e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)' 
+                  }}
                 >
-                  {gLoading ? <Spinner color="#4285F4"/> : <GoogleG size={20}/>}
-                  <span className="text-gray-700">{gLoading ? 'Opening Google…' : 'Login with Google'}</span>
+                  {gLoading ? <Spinner color="#7C4CA3"/> : <GoogleG size={20}/>}
+                  <span>{gLoading ? 'Opening Google…' : 'Login with Google'}</span>
                 </button>
 
-                <p className="mt-2.5 text-center text-xs text-gray-400">
+                <p style={{ marginTop: '10px', textAlign: 'center', fontSize: '11px', color: '#9ca3af', marginBottom: 0 }}>
                   Google's account picker will open in a popup window
                 </p>
-                <p className="mt-3.5 text-center text-xs text-gray-300">
+                <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '11px', color: '#d1d5db', marginBottom: 0 }}>
                   By continuing you agree to our{' '}
-                  <a href="#" className="text-orange-500 no-underline hover:underline">Terms</a>{' '}&{' '}
-                  <a href="#" className="text-orange-500 no-underline hover:underline">Privacy</a>
+                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Terms</a>
+                  {' '}& {' '}
+                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Privacy</a>
                 </p>
               </>
             )}
 
-            {/* ══ OTP STEP ══ */}
+            {/* OTP STEP */}
             {step === 'otp' && (
               <>
-                <div className="flex justify-center gap-2 sm:gap-3 mb-6" onPaste={pasteOtp}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '22px' }} onPaste={pasteOtp}>
                   {otp.map((d, i) => (
                     <input
                       key={i}
                       ref={el => { otpRefs.current[i] = el }}
-                      type="text" inputMode="numeric" maxLength={1} value={d}
+                      type="text" 
+                      inputMode="numeric" 
+                      maxLength={1} 
+                      value={d}
                       autoFocus={i === 0}
                       onChange={e => changeOtp(i, e.target.value)}
                       onKeyDown={e => keyOtp(i, e)}
-                      className={`w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-extrabold rounded-2xl outline-none transition-all border-2 ${d ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-200' : 'border-gray-200 bg-white'}`}
-                      style={{ fontFamily: 'Georgia,serif', color: '#1a1a1a' }}
+                      style={{
+                        width: '48px', 
+                        height: '56px',
+                        textAlign: 'center', 
+                        fontSize: '22px', 
+                        fontWeight: 800,
+                        fontFamily: 'Georgia,serif', 
+                        color: '#111827',
+                        borderRadius: '14px', 
+                        outline: 'none',
+                        border: `2px solid ${d ? '#EA5A7B' : '#e5e7eb'}`,
+                        background: d ? '#fff5f8' : 'white',
+                        boxShadow: d ? '0 0 0 3px rgba(234,90,123,0.15)' : 'none',
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                      }}
                     />
                   ))}
                 </div>
 
                 <button
-                  onClick={verifyOtp} disabled={loading || otp.join('').length < 6}
-                  className={`w-full py-3.5 rounded-2xl border-0 text-sm font-bold flex items-center justify-center gap-2 transition-all ${(loading || otp.join('').length < 6) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg shadow-orange-200 hover:scale-[1.01] cursor-pointer'}`}
+                  onClick={verifyOtp}
+                  disabled={loading || otp.join('').length < 6}
+                  style={{
+                    width: '100%', 
+                    padding: '14px', 
+                    borderRadius: '16px', 
+                    border: 'none',
+                    fontSize: '14px', 
+                    fontWeight: 700,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px',
+                    cursor: (loading || otp.join('').length < 6) ? 'not-allowed' : 'pointer',
+                    background: (loading || otp.join('').length < 6) ? '#e5e7eb' : 'linear-gradient(135deg, #EA5A7B 0%, #7C4CA3 100%)',
+                    color: (loading || otp.join('').length < 6) ? '#9ca3af' : 'white',
+                    boxShadow: (loading || otp.join('').length < 6) ? 'none' : '0 6px 24px rgba(234,90,123,0.38)',
+                  }}
                 >
                   {loading && <Spinner/>}
                   {loading ? 'Verifying…' : 'Verify & Sign In ✓'}
                 </button>
 
-                <div className="mt-4 flex items-center justify-between text-xs sm:text-sm">
+                <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
                   <button
                     onClick={() => { setStep('email'); setOtp(['','','','','','']); setError('') }}
-                    className="flex items-center gap-1 text-gray-400 hover:text-gray-600 bg-transparent border-0 cursor-pointer p-0 transition-colors"
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      color: '#9ca3af', 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      padding: 0, 
+                      fontSize: '13px' 
+                    }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                       <path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -381,8 +640,17 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
                     Change email
                   </button>
                   <button
-                    onClick={timer === 0 ? sendOtp : undefined} disabled={timer > 0 || loading}
-                    className={`bg-transparent border-0 p-0 font-semibold transition-colors ${timer > 0 ? 'text-gray-300 cursor-default' : 'text-orange-500 hover:text-orange-600 cursor-pointer'}`}
+                    onClick={timer === 0 ? sendOtp : undefined}
+                    disabled={timer > 0 || loading}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      padding: 0, 
+                      fontSize: '13px', 
+                      fontWeight: 600, 
+                      color: timer > 0 ? '#d1d5db' : '#EA5A7B', 
+                      cursor: timer > 0 ? 'default' : 'pointer' 
+                    }}
                   >
                     {timer > 0 ? `Resend in ${timer}s` : 'Resend OTP'}
                   </button>
@@ -397,29 +665,31 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
 
       <style>{`
         @keyframes floraSlide{0%{background-position:0% 0%}100%{background-position:200% 0%}}
-        @keyframes floraBounce{0%,80%,100%{transform:scale(0.6);opacity:0.35}40%{transform:scale(1.1);opacity:1}}
-        @keyframes floraPopIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+        @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
     </>
   )
 }
 
-// ─── User Panel — perfectly centered on mobile + laptop ──────────────────────
+// ─── User Panel ────────────────────────────────────────────────────────────────
 function UserPanel({ user, onLogout, onClose }: { user: any; onLogout: () => void; onClose: () => void }) {
   const [visible, setVisible] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true))
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = 'unset' }
+  }, [])
 
   useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose()
+    const handle = (e: MouseEvent) => { 
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose() 
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [onClose])
 
-  // Close on Escape
   useEffect(() => {
     const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handle)
@@ -430,50 +700,100 @@ function UserPanel({ user, onLogout, onClose }: { user: any; onLogout: () => voi
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-[90] bg-black/30 backdrop-blur-sm transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
+        style={{
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          zIndex: 9990,
+          background: 'rgba(124,76,163,0.15)', 
+          backdropFilter: 'blur(6px)',
+          transition: 'opacity 0.2s', 
+          opacity: visible ? 1 : 0,
+        }}
       />
 
-      {/* Panel — fixed, centered via translate */}
+      {/* Panel - perfectly centered */}
       <div
         ref={panelRef}
-        className={`fixed z-[100] transition-all duration-300`}
         style={{
+          position: 'fixed',
           top: '100%',
           left: '50%',
+          transform: visible ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.92)',
           width: 'min(calc(100vw - 2rem), 360px)',
-          transform: visible
-            ? 'translate(-50%, -50%) scale(1)'
-            : 'translate(-50%, -50%) scale(0.94)',
+          zIndex: 9991,
+          transition: 'transform 0.3s cubic-bezier(0.34,1.3,0.64,1), opacity 0.2s',
           opacity: visible ? 1 : 0,
         }}
       >
-        <div className="bg-white dark:bg-neutral-800 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/5">
+        <div style={{ 
+          background: 'white', 
+          borderRadius: '24px', 
+          overflow: 'hidden', 
+          boxShadow: '0 30px 80px rgba(124,76,163,0.25), 0 8px 24px rgba(234,90,123,0.15)' 
+        }}>
+          <div style={{ 
+            height: '5px', 
+            width: '100%', 
+            background: 'linear-gradient(90deg,#EA5A7B,#c0397a,#7C4CA3,#9b6fd4,#EA5A7B)', 
+            backgroundSize: '200% 100%', 
+            animation: 'floraSlide 3s linear infinite' 
+          }}/>
 
-          {/* Rainbow bar */}
-          <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg,#fbbf24,#f97316,#34d399,#a78bfa,#fbbf24)', backgroundSize: '200% 100%', animation: 'floraSlide 3s linear infinite' }}/>
-
-          <div className="p-5">
+          <div style={{ padding: '20px' }}>
             {/* User row */}
-            <div className="flex items-center gap-3 mb-4">
-              <UserAvatar
-                imgUrl={user.avatar || user.picture || user.photo}
-                name={user.username || user.name}
-                email={user.email}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <UserAvatar 
+                imgUrl={user.avatar || user.picture || user.photo} 
+                name={user.username || user.name} 
+                email={user.email} 
                 size={48}
               />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ 
+                  fontWeight: 700, 
+                  fontSize: '14px', 
+                  color: '#111827', 
+                  margin: 0, 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap' 
+                }}>
                   {user.username || user.name || 'User'}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{user.email || ''}</p>
+                <p style={{ 
+                  fontSize: '12px', 
+                  color: '#9ca3af', 
+                  margin: '2px 0 0', 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap' 
+                }}>
+                  {user.email || ''}
+                </p>
               </div>
-              {/* Close */}
               <button
                 onClick={onClose}
-                className="ml-1 flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 dark:bg-neutral-700 flex items-center justify-center text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-600 transition-colors border-0 cursor-pointer"
+                style={{ 
+                  flexShrink: 0, 
+                  width: '28px', 
+                  height: '28px', 
+                  borderRadius: '50%', 
+                  background: '#f3f4f6', 
+                  border: 'none', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  color: '#9ca3af', 
+                  cursor: 'pointer' 
+                }}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
 
@@ -481,11 +801,22 @@ function UserPanel({ user, onLogout, onClose }: { user: any; onLogout: () => voi
 
             {/* My Orders */}
             <Link
-              href="/orders"
+              href="/orders" 
               onClick={onClose}
-              className="flex items-center gap-3 px-2 py-2.5 rounded-xl mt-2 hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors no-underline group"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '10px 8px', 
+                borderRadius: '12px', 
+                marginTop: '8px', 
+                textDecoration: 'none', 
+                color: '#1f2937' 
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#fff5f8' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
             >
-              <span className="text-gray-400 group-hover:text-orange-500 transition-colors">
+              <span style={{ color: '#9ca3af' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M8 12.2H15" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M8 16.2H12.38" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
@@ -493,26 +824,38 @@ function UserPanel({ user, onLogout, onClose }: { user: any; onLogout: () => voi
                   <path d="M16 4.02C19.33 4.2 21 5.43 21 10V16C21 20 20 22 15 22H9C4 22 3 20 3 16V10C3 5.44 4.67 4.2 8 4.02" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </span>
-              <span className="text-sm font-medium text-gray-800 dark:text-white group-hover:text-orange-500 transition-colors">
-                My Orders
-              </span>
+              <span style={{ fontSize: '14px', fontWeight: 500 }}>My Orders</span>
             </Link>
 
             {/* Logout */}
             <button
               onClick={() => { onLogout(); onClose() }}
-              className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl mt-1 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-0 bg-transparent cursor-pointer group text-left"
+              style={{ 
+               
+                width: '100%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '12px', 
+                padding: '10px 8px', 
+                borderRadius: '12px', 
+                marginTop: '4px', 
+                border: 'none', 
+                background: 'transparent', 
+                cursor: 'pointer', 
+                color: '#1f2937', 
+                textAlign: 'left' ,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#fff5f8' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
             >
-              <span className="text-gray-400 group-hover:text-red-500 transition-colors">
+              <span style={{ color: '#9ca3af' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M8.9 7.56C9.21 3.96 11.06 2.49 15.11 2.49H15.24C19.71 2.49 21.5 4.28 21.5 8.75V15.27C21.5 19.74 19.71 21.53 15.24 21.53H15.11C11.09 21.53 9.24 20.08 8.91 16.54" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M15 12H3.62" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M5.85 8.65L2.5 12L5.85 15.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </span>
-              <span className="text-sm font-medium text-gray-800 dark:text-white group-hover:text-red-500 transition-colors">
-                Log out
-              </span>
+              <span style={{ fontSize: '14px', fontWeight: 500 }}>Log out</span>
             </button>
           </div>
         </div>
@@ -523,7 +866,7 @@ function UserPanel({ user, onLogout, onClose }: { user: any; onLogout: () => voi
   )
 }
 
-// ─── AvatarDropdown — main export ─────────────────────────────────────────────
+// ─── AvatarDropdown — main export ──────────────────────────────────────────────
 export default function AvatarDropdown({ className }: Props) {
   const [showAuth,  setShowAuth]  = useState(false)
   const [showPanel, setShowPanel] = useState(false)
@@ -532,7 +875,11 @@ export default function AvatarDropdown({ className }: Props) {
   useEffect(() => {
     const saved = localStorage.getItem('floriva_user')
     const token = localStorage.getItem('floriva_token')
-    if (saved && token) { try { setUser(JSON.parse(saved)) } catch (_) {} }
+    if (saved && token) { 
+      try { 
+        setUser(JSON.parse(saved)) 
+      } catch (_) {}
+    }
   }, [])
 
   useEffect(() => {
@@ -566,48 +913,54 @@ export default function AvatarDropdown({ className }: Props) {
     setShowPanel(false)
   }
 
-  // ── Not logged in ──────────────────────────────────────────────────────────
   if (!user) {
     return (
       <div className={className}>
         <button
           onClick={() => setShowAuth(true)}
-          className="-m-2.5  flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 border-0 bg-transparent transition-colors"
+          style={{ 
+            margin: '-10px', 
+            display: 'flex', 
+            cursor: 'pointer', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            borderRadius: '50%', 
+            padding: '10px', 
+            border: 'none', 
+            background: 'transparent' 
+          }}
         >
           <HugeiconsIcon icon={UserCircle02Icon} size={24} color="currentColor" strokeWidth={1.5}/>
         </button>
-        {showAuth && (
-          <FlorivaAuthModal onClose={() => setShowAuth(false)} onSuccess={handleSuccess}/>
-        )}
+        {showAuth && <FlorivaAuthModal onClose={() => setShowAuth(false)} onSuccess={handleSuccess}/>}
       </div>
     )
   }
 
-  // ── Logged in ──────────────────────────────────────────────────────────────
   return (
-    <div className={className} >
-      {/* Avatar button */}
+    <div className={className}>
       <button
         onClick={() => setShowPanel(v => !v)}
-        className=" border-0 bg-transparent cursor-pointer p-0.5 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+        style={{ 
+          border: 'none', 
+          background: 'transparent', 
+          cursor: 'pointer', 
+          padding: '2px', 
+          borderRadius: '50%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center' 
+        }}
         aria-label="Open user menu"
       >
-        <UserAvatar
-          imgUrl={user.avatar || user.picture || user.photo}
-          name={user.username || user.name}
-          email={user.email}
+        <UserAvatar 
+          imgUrl={user.avatar || user.picture || user.photo} 
+          name={user.username || user.name} 
+          email={user.email} 
           size={36}
         />
       </button>
-
-      {/* Centered user panel */}
-      {showPanel && (
-        <UserPanel
-          user={user}
-          onLogout={handleLogout}
-          onClose={() => setShowPanel(false)}
-        />
-      )}
+      {showPanel && <UserPanel user={user} onLogout={handleLogout} onClose={() => setShowPanel(false)}/>}
     </div>
   )
 }

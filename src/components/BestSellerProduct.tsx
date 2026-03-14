@@ -26,12 +26,72 @@ export interface TApiProduct {
 }
 export interface TCartItem { product: TApiProduct; qty: number }
 
+// Order API types
+interface TOrderProduct {
+  product: string
+  quantity: number
+  _id: string
+}
+interface TOrder {
+  _id: string
+  products: TOrderProduct[]
+  totalAmount: number
+  status: string
+  userEmail: string
+  createdAt: string
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Best Sellers Logic
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetches orders, tallies product quantities, returns sorted product IDs
+ * Falls back to empty map on any error.
+ */
+async function fetchBestSellerMap(): Promise<Map<string, number>> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/orderview`, { cache: 'no-store' })
+    if (!res.ok) return new Map()
+    const json = await res.json()
+    const orders: TOrder[] = Array.isArray(json) ? json : (json.data ?? [])
+    const tally = new Map<string, number>()
+    for (const order of orders) {
+      for (const item of order.products ?? []) {
+        if (item.product) {
+          tally.set(item.product, (tally.get(item.product) ?? 0) + item.quantity)
+        }
+      }
+    }
+    return tally
+  } catch {
+    return new Map()
+  }
+}
+
+/**
+ * Sort products by total units sold (desc).
+ * If no order data, returns products sorted by newest first.
+ */
+function sortByBestSelling(products: TApiProduct[], tally: Map<string, number>): TApiProduct[] {
+  if (tally.size === 0) {
+    return [...products].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }
+  return [...products].sort((a, b) => {
+    const bSales = tally.get(b._id) ?? 0
+    const aSales = tally.get(a._id) ?? 0
+    if (bSales !== aSales) return bSales - aSales
+    // tie-break: newer product wins
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Get user email from localStorage
@@ -155,10 +215,6 @@ function calcDiscount(exact: number, discounted: number) {
   return Math.round(((exact - discounted) / exact) * 100)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Color hex map — maps a color name to a hex value
-// ─────────────────────────────────────────────────────────────────────────────
-
 function colorHex(name: string): string {
   const map: Record<string, string> = {
     red:'#dc2626', crimson:'#b91c1c', blue:'#2563eb', navy:'#1e3a5f',
@@ -173,10 +229,6 @@ function colorHex(name: string): string {
   }
   return map[name.toLowerCase()] ?? '#9ca3af'
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// getSwatches — returns ONLY the real product color, nothing extra
-// ─────────────────────────────────────────────────────────────────────────────
 
 function getSwatches(product: TApiProduct): Array<{ hex: string; name: string }> {
   if (!product.color?.name) return []
@@ -300,7 +352,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 // Quick View Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
+function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct; onClose: () => void; soldCount?: number }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const thumbsRef = useRef<HTMLDivElement>(null)
@@ -311,7 +363,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
   const outOfStock = product.stock === 0
   const categoryName = product.category?.name ?? null
   const colorName = product.color?.name ?? null
-  // ✅ Only the real color swatch — no extra fake colors
   const swatches = getSwatches(product)
   const hasImages = product.images.length > 0
 
@@ -355,7 +406,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 
           {/* LEFT — Image */}
           <div className="w-full flex-shrink-0 lg:w-[48%]">
-            {/* Main image */}
             <div className="relative aspect-square w-full overflow-hidden bg-gray-50 rounded-tl-3xl rounded-tr-3xl lg:rounded-tr-none lg:rounded-bl-3xl">
               {hasImages ? (
                 <img key={activeImg} src={imgSrc(product.images[activeImg])} alt={product.name}
@@ -370,12 +420,16 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               )}
               {/* Badges */}
               <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-                {isNewIn(product.createdAt) && (
+                {soldCount && soldCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                 Best Seller
+                  </span>
+                ) : isNewIn(product.createdAt) ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
                     <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     New in
                   </span>
-                )}
+                ) : null}
                 {discount >= 10 && (
                   <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
                 )}
@@ -410,21 +464,26 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
           {/* RIGHT — Details */}
           <div className="flex w-full flex-col overflow-y-auto border-l border-gray-100 p-6 lg:w-[52%] lg:max-h-[90vh]">
 
-            {/* Category */}
             {categoryName && (
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
             )}
 
-            {/* Name */}
             <h2 className="text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
             {product.title && product.title !== product.name && (
               <p className="text-sm text-gray-400 mb-3">{product.title}</p>
             )}
 
-            {/* Rating */}
             <div className="mb-4">
               <StarRating rating={rating} reviews={reviews}/>
             </div>
+
+            {/* Sold count badge */}
+            {soldCount && soldCount > 0 && (
+              <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-600 w-fit">
+                <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                {soldCount} sold · trending now
+              </div>
+            )}
 
             {/* Price */}
             <div className="flex items-center gap-3 mb-5">
@@ -439,7 +498,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               )}
             </div>
 
-            {/* ✅ Only real color swatch — no fake extras */}
             {swatches.length > 0 && (
               <div className="mb-5">
                 <p className="mb-2 text-xs font-semibold text-gray-500">
@@ -447,12 +505,9 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                 </p>
                 <div className="flex items-center gap-2">
                   {swatches.map((swatch, i) => (
-                    <span
-                      key={i}
-                      title={swatch.name}
+                    <span key={i} title={swatch.name}
                       className="h-6 w-6 rounded-full border-2 border-gray-900 ring-2 ring-gray-900 ring-offset-1 cursor-default"
-                      style={{ backgroundColor: swatch.hex }}
-                    />
+                      style={{ backgroundColor: swatch.hex }}/>
                   ))}
                 </div>
               </div>
@@ -497,7 +552,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 
             <hr className="border-gray-100 mb-4"/>
 
-            {/* Accordion */}
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
             <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100">
@@ -517,15 +571,25 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 // Product Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
+function ProductCard({
+  data,
+  onQuickView,
+  soldCount,
+  rank,
+}: {
+  data: TApiProduct
+  onQuickView: (p: TApiProduct) => void
+  soldCount: number
+  rank: number // 1-based position in best-seller list
+}) {
   const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
   const colorName = data.color?.name ?? null
   const discount = calcDiscount(data.exactPrice, data.discountPrice)
   const { rating, reviews } = fakeRating(data._id)
   const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
-  // ✅ Only the real color swatch — no fake extras
   const swatches = getSwatches(data)
+  const isBestSeller = soldCount > 0
 
   const { addToCart, loading, added } = useAddToCart(data)
 
@@ -555,22 +619,26 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           )}
         </div>
 
-        {/* Top-left: New in badge */}
-        {newIn && !outOfStock && (
-          <div className="absolute left-3 top-3">
+        {/* Top-left badge: Best Seller > New In */}
+        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+          {isBestSeller && !outOfStock ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EA597A] px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm">
+               Best Seller
+            </span>
+          ) :null}
+           {/* newIn && !outOfStock ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
               <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
               New in
             </span>
-          </div>
-        )}
+          ) : null} */}
 
-        {/* Top-right: Wishlist heart */}
-        {/* <div className="absolute right-3 top-3">
-          <WishlistBtn/>
-        </div> */}
+          {discount >= 10 && (
+            <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
+          )}
+        </div>
 
         {/* Hover overlay — Quick View + Add to Bag */}
         <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0">
@@ -602,29 +670,30 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
       {/* ── Info below card ── */}
       <div className="mt-3 px-0.5">
 
-        {/* ✅ Only 1 real color swatch dot with tooltip */}
         {swatches.length > 0 && (
           <div className="flex items-center gap-1.5 mb-2">
             {swatches.map((swatch, i) => (
-              <span
-                key={i}
-                title={swatch.name}
+              <span key={i} title={swatch.name}
                 className="h-4 w-4 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
-                style={{ backgroundColor: swatch.hex }}
-              />
+                style={{ backgroundColor: swatch.hex }}/>
             ))}
           </div>
         )}
 
-        {/* Product name */}
         <h3 className="text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
           {data.name}
         </h3>
 
-        {/* Color / category subtitle */}
         <p className="text-[13px] text-gray-400 mb-2">
           {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
         </p>
+
+        {/* Sold count indicator */}
+        {/* {isBestSeller && (
+          <p className="text-[11px] font-semibold text-orange-500 mb-1.5">
+            🔥 {soldCount} sold
+          </p>
+        )} */}
 
         {/* Price row */}
         <div className="flex items-center justify-between gap-2">
@@ -680,7 +749,7 @@ export interface SectionSliderProductCardProps {
   userEmail?: string
 }
 
-const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
+const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
   className = '',
   headingFontClassName,
   headingClassName,
@@ -690,6 +759,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   pollInterval = POLL_INTERVAL,
 }) => {
   const [products, setProducts] = useState<TApiProduct[]>([])
+  const [salesTally, setSalesTally] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -704,12 +774,25 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
     try {
       if (!isBackground) setLoading(true)
       setError(null)
-      const res = await fetch(`${BASE_URL}/api/productview`, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      const json = await res.json()
+
+      // Fetch both APIs in parallel — orderview failure is non-fatal
+      const [productsRes, tally] = await Promise.all([
+        fetch(`${BASE_URL}/api/productview`, { cache: 'no-store' }),
+        fetchBestSellerMap(),
+      ])
+
+      if (!productsRes.ok) throw new Error(`Server error ${productsRes.status}`)
+      const json = await productsRes.json()
       const list: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      if (isMounted.current) { setProducts(list); setLastUpdated(new Date()) }
+
+      // Sort: best sellers first (by tally), then newest
+      const sorted = sortByBestSelling(list, tally)
+
+      if (isMounted.current) {
+        setProducts(sorted)
+        setSalesTally(tally)
+        setLastUpdated(new Date())
+      }
     } catch (err: any) {
       if (isMounted.current) setError(err.message ?? 'Failed to load products')
     } finally {
@@ -733,6 +816,10 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
     setQuickViewProduct(product)
   }, [])
 
+  // Determine heading — show "Best Sellers" if order data exists, else "New Arrivals"
+  const hasOrderData = salesTally.size > 0
+  const displayHeading = heading ?? (hasOrderData ? 'Best Sellers' : 'New Arrivals')
+
   return (
     <>
       <CartToastContainer/>
@@ -749,19 +836,13 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
             onClickPrev={onPrevButtonClick}
             onClickNext={onNextButtonClick}
           >
-            {heading || 'New Arrivals'}
+            {displayHeading}
           </Heading>
 
           {/* Live dot */}
           {pollInterval > 0 && lastUpdated && !loading && (
             <div className="absolute right-28 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 lg:flex">
-              {/* <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"/>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"/>
-              </span> */}
-              {/* <span className="text-xs text-gray-400">
-                Live · {lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-              </span> */}
+              {/* optionally show last updated time */}
             </div>
           )}
         </div>
@@ -793,9 +874,14 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
         {!loading && !error && products.length > 0 && (
           <div className="embla" ref={emblaRef}>
             <div className="-ms-5 embla__container sm:-ms-7">
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <div key={product._id} className="embla__slide basis-[80%] ps-5 sm:ps-7 sm:basis-1/2 md:basis-1/3 xl:basis-1/4">
-                  <ProductCard data={product} onQuickView={handleQuickView}/>
+                  <ProductCard
+                    data={product}
+                    onQuickView={handleQuickView}
+                    soldCount={salesTally.get(product._id) ?? 0}
+                    rank={index + 1}
+                  />
                 </div>
               ))}
             </div>
@@ -812,10 +898,14 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
       {/* Quick View Modal */}
       {quickViewProduct && (
-        <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)}/>
+        <QuickViewModal
+          product={quickViewProduct}
+          onClose={() => setQuickViewProduct(null)}
+          soldCount={salesTally.get(quickViewProduct._id) ?? 0}
+        />
       )}
     </>
   )
 }
 
-export default SectionSliderProductCard
+export default BestSellerProduct;

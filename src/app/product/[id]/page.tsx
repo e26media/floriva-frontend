@@ -307,7 +307,7 @@ function TopBar({ name, cat, onShare, shared }: {
   id: string; name: string; cat?: string; onShare?: () => void; shared?: boolean
 }) {
   return (
-    <nav className="sticky top-0 z-50 bg-amber-50/95 backdrop-blur-md border-b border-amber-100 shadow-sm">
+    <nav className="sticky top-0  bg-amber-50/95 backdrop-blur-md border-b border-amber-100 shadow-sm z-1">
       <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
         <button
           onClick={() => window.history.back()}
@@ -743,7 +743,7 @@ export default function ProductDetailPage() {
             )}
 
             {/* Stock status */}
-            <div className="inline-flex items-center gap-2.5 mb-6 px-4 py-2.5 bg-white rounded-xl border border-stone-100 shadow-sm">
+            {/* <div className="inline-flex items-center gap-2.5 mb-6 px-4 py-2.5 bg-white rounded-xl border border-stone-100 shadow-sm">
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{
@@ -760,7 +760,7 @@ export default function ProductDetailPage() {
                   ? `Only ${product.stock} left — order soon!`
                   : `In stock · ${product.stock} units available`}
               </span>
-            </div>
+            </div> */}
 
             {/* ── CTA: Qty + Add to Cart ── */}
             {product.stock > 0 && (
@@ -892,7 +892,7 @@ export default function ProductDetailPage() {
                     {[
                       { label: "Name",       value: product.name },
                       { label: "Category",   value: product.category?.name },
-                      { label: "Sub Cat",    value: product.subCategory || "—" },
+                      // { label: "Sub Cat",    value: product.subCategory || "—" },
                       { label: "Color",      value: product.color?.name, swatch: true },
                       { label: "Stock",      value: `${product.stock} units` },
                       { label: "MRP",        value: `₹${product.exactPrice?.toLocaleString()}` },

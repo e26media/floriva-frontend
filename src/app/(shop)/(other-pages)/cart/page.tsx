@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -45,11 +45,14 @@ interface CheckoutData {
 // =============================================================================
 //  API CONFIG
 // =============================================================================
-const BASE       =process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+const BASE       = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 const VIEW_URL   = (email: string) => `${BASE}/api/view/${encodeURIComponent(email)}`;
 const UPDATE_URL = (id: string)    => `${BASE}/api/cartupdate/${id}`;
 const DELETE_URL = (id: string)    => `${BASE}/api/cartdelete/${id}`;
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+
+// Auto-refresh interval in milliseconds (5 seconds)
+const REFRESH_INTERVAL = 5000;
 
 // =============================================================================
 //  HELPERS
@@ -205,6 +208,12 @@ const IcoTag    = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
     <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+);
+const IcoRefresh = ({ cls }: { cls: string }) => (
+  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
   </svg>
 );
 
@@ -569,7 +578,7 @@ function NotLoggedIn() {
         You need to be logged in to view your cart.
       </p>
       <Link
-        href="/login"
+        href="/"
         className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-7 py-3.5 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] dark:bg-white dark:text-neutral-900"
       >
         Go to Login <IcoArrowR cls="h-4 w-4" />
@@ -584,12 +593,18 @@ function NotLoggedIn() {
 export default function CartPage() {
   const router = useRouter();
 
-  const [userEmail,   setUserEmail]   = useState<string>("");
-  const [cartItems,   setCartItems]   = useState<CartItem[]>([]);
-  const [loading,     setLoading]     = useState<boolean>(true);
-  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
-  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
-  const [toast,       setToast]       = useState<ToastState | null>(null);
+  const [userEmail,    setUserEmail]    = useState<string>("");
+  const [cartItems,    setCartItems]    = useState<CartItem[]>([]);
+  const [loading,      setLoading]      = useState<boolean>(true);
+  const [refreshing,   setRefreshing]   = useState<boolean>(false);
+  const [lastRefresh,  setLastRefresh]  = useState<Date | null>(null);
+  const [updatingIds,  setUpdatingIds]  = useState<Set<string>>(new Set());
+  const [removingIds,  setRemovingIds]  = useState<Set<string>>(new Set());
+  const [toast,        setToast]        = useState<ToastState | null>(null);
+
+  // Ref to track ongoing mutations — skip auto-refresh while user is interacting
+  const isMutating = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const email = getUserEmail();
@@ -602,6 +617,22 @@ export default function CartPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  // ── Silent background fetch (no full loading spinner) ──────────────────────
+  const silentFetch = useCallback(async (email: string) => {
+    if (!email || isMutating.current) return;
+    try {
+      const { ok, status, json } = await apiFetch(VIEW_URL(email));
+      if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
+      if (json.success && Array.isArray(json.data)) {
+        setCartItems(json.data as CartItem[]);
+        setLastRefresh(new Date());
+      }
+    } catch {
+      // Silent fail for background refresh — don't spam the user with toasts
+    }
+  }, []);
+
+  // ── Initial full fetch ──────────────────────────────────────────────────────
   const fetchCart = useCallback(async (email: string) => {
     if (!email) return;
     setLoading(true);
@@ -609,6 +640,7 @@ export default function CartPage() {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
       setCartItems(json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : []);
+      setLastRefresh(new Date());
     } catch (err) {
       showToast(`Failed to load cart: ${(err as Error).message}`, "error");
       setCartItems([]);
@@ -617,14 +649,46 @@ export default function CartPage() {
     }
   }, [showToast]);
 
+  // ── Manual refresh with spinner ─────────────────────────────────────────────
+  const manualRefresh = useCallback(async () => {
+    if (!userEmail || refreshing) return;
+    setRefreshing(true);
+    try {
+      const { ok, status, json } = await apiFetch(VIEW_URL(userEmail));
+      if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
+      setCartItems(json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : []);
+      setLastRefresh(new Date());
+      showToast("Cart refreshed");
+    } catch (err) {
+      showToast(`Failed to refresh: ${(err as Error).message}`, "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userEmail, refreshing, showToast]);
+
+  // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (userEmail) fetchCart(userEmail);
   }, [userEmail, fetchCart]);
+
+  // ── setInterval auto-refresh every REFRESH_INTERVAL ms ─────────────────────
+  useEffect(() => {
+    if (!userEmail) return;
+
+    intervalRef.current = setInterval(() => {
+      silentFetch(userEmail);
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [userEmail, silentFetch]);
 
   // ── Update quantity ─────────────────────────────────────────────────────────
   const handleUpdateQty = useCallback(async (cartId: string, newQty: number) => {
     if (!cartId || newQty < 1) return;
 
+    isMutating.current = true;
     setCartItems((prev) =>
       prev.map((i) => i._id === cartId ? { ...i, quantity: newQty } : i)
     );
@@ -649,6 +713,7 @@ export default function CartPage() {
         next.delete(cartId);
         return next;
       });
+      isMutating.current = false;
     }
   }, [userEmail, fetchCart, showToast]);
 
@@ -656,6 +721,7 @@ export default function CartPage() {
   const handleRemove = useCallback(async (cartId: string) => {
     if (!cartId) return;
 
+    isMutating.current = true;
     setRemovingIds((prev) => new Set(prev).add(cartId));
 
     const timer = setTimeout(() => {
@@ -681,6 +747,7 @@ export default function CartPage() {
         next.delete(cartId);
         return next;
       });
+      isMutating.current = false;
     }
   }, [userEmail, fetchCart, showToast]);
 
@@ -729,15 +796,49 @@ export default function CartPage() {
               )}
             </div>
 
-            {!loading && cartItems.length > 0 && (
-              <Link
-                href="/"
-                className="hidden shrink-0 items-center gap-1.5 text-sm font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 sm:flex"
-              >
-                <IcoArrowL cls="h-3.5 w-3.5" /> Continue Shopping
-              </Link>
-            )}
+            <div className="flex shrink-0 items-center gap-3">
+              {/* Auto-refresh indicator + manual refresh button */}
+              {!loading && userEmail && (
+                <div className="flex items-center gap-2">
+                  {/* {lastRefresh && (
+                    <span className="hidden text-[10px] text-neutral-400 dark:text-neutral-600 sm:block">
+                      Updated {lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={manualRefresh}
+                    disabled={refreshing}
+                    title="Refresh cart"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                  >
+                    <IcoRefresh cls={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </button> */}
+                </div>
+              )}
+
+              {!loading && cartItems.length > 0 && (
+                <Link
+                  href="/"
+                  className="hidden shrink-0 items-center gap-1.5 text-sm font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 sm:flex"
+                >
+                  <IcoArrowL cls="h-3.5 w-3.5" /> Continue Shopping
+                </Link>
+              )}
+            </div>
           </div>
+
+          {/* Auto-refresh progress bar */}
+          {/* {userEmail && !loading && (
+            <div className="mt-4 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800" style={{ height: 2 }}>
+              <div
+                className="h-full rounded-full bg-emerald-400 dark:bg-emerald-600"
+                style={{
+                  animation: `progress ${REFRESH_INTERVAL}ms linear infinite`,
+                }}
+              />
+            </div>
+          )} */}
         </div>
 
         {/* Content */}
@@ -784,6 +885,14 @@ export default function CartPage() {
       </main>
 
       <Toast t={toast} />
+
+      {/* Progress bar keyframe animation */}
+      <style jsx global>{`
+        @keyframes progress {
+          from { width: 0%; }
+          to   { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

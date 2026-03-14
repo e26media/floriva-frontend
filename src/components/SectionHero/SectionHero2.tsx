@@ -1,9 +1,9 @@
 'use client'
 
 import backgroundLineSvg from '@/images/Moon.svg'
-import heroImage1 from '@/images/hero-right-1.png'
-import heroImage2 from '@/images/hero-right-2.png'
-import heroImage3 from '@/images/hero-right-3.png'
+import heroImage1 from '@/images/floriva/aboutbanneer.png'
+import heroImage2 from '@/images/floriva/banner/2.png'
+import heroImage3 from '@/images/floriva/banner/5.png'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -21,7 +21,7 @@ const data = [
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/collections/all',
+    btnHref: '/allproduct',
   },
   {
     id: 2,
@@ -29,7 +29,7 @@ const data = [
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/collections/all',
+    btnHref: '/allproduct',
   },
   {
     id: 3,
@@ -37,7 +37,7 @@ const data = [
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/collections/all',
+    btnHref: '/allproduct',
   },
 ]
 

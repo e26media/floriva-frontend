@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -59,10 +59,14 @@ type FilterKey = "all" | "pending" | "processing" | "shipped" | "delivered" | "c
 // =============================================================================
 //  API CONFIG
 // =============================================================================
-const BASE         = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';;
+const BASE         = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 const USER_ORDERS  = (email: string) => `${BASE}/api/user/${encodeURIComponent(email)}`;
 const CANCEL_ORDER = (id: string)    => `${BASE}/api/orderdelete/${id}`;
 const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+
+// Auto-refresh interval in milliseconds (5 seconds)
+const REFRESH_INTERVAL = 5000;
+
 // =============================================================================
 //  HELPERS
 // =============================================================================
@@ -130,56 +134,56 @@ const PAYMENT_CONFIG: Record<string, { label: string; cls: string }> = {
 // =============================================================================
 //  SVG ICONS
 // =============================================================================
-const IcoSpin  = ({ c }: { c?: string }) => (
+const IcoSpin    = ({ c }: { c?: string }) => (
   <svg className={`animate-spin ${c ?? ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
     <path d="M21 12a9 9 0 11-6.219-8.56" />
   </svg>
 );
-const IcoCheck  = ({ c }: { c: string }) => (
+const IcoCheck   = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-const IcoX      = ({ c }: { c: string }) => (
+const IcoX       = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
-const IcoBag    = ({ c }: { c: string }) => (
+const IcoBag     = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.2} viewBox="0 0 24 24">
     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
     <line x1="3" y1="6" x2="21" y2="6" />
     <path d="M16 10a4 4 0 01-8 0" />
   </svg>
 );
-const IcoTruck  = ({ c }: { c: string }) => (
+const IcoTruck   = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="1" y="3" width="15" height="13" rx="1" />
     <path d="M16 8h4l3 5v3h-7V8z" />
     <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
   </svg>
 );
-const IcoCash   = ({ c }: { c: string }) => (
+const IcoCash    = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="2" y="6" width="20" height="12" rx="2" />
     <circle cx="12" cy="12" r="3" />
     <path d="M6 12h.01M18 12h.01" />
   </svg>
 );
-const IcoCard   = ({ c }: { c: string }) => (
+const IcoCard    = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="1" y="4" width="22" height="16" rx="2" />
     <line x1="1" y1="10" x2="23" y2="10" />
   </svg>
 );
-const IcoImg    = ({ c }: { c: string }) => (
+const IcoImg     = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
     <rect x="3" y="3" width="18" height="18" rx="2" />
     <circle cx="8.5" cy="8.5" r="1.5" />
     <polyline points="21 15 16 10 5 21" />
   </svg>
 );
-const IcoTrash  = ({ c }: { c: string }) => (
+const IcoTrash   = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
@@ -187,14 +191,20 @@ const IcoTrash  = ({ c }: { c: string }) => (
     <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
   </svg>
 );
-const IcoChevD  = ({ c }: { c: string }) => (
+const IcoChevD   = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
-const IcoChevU  = ({ c }: { c: string }) => (
+const IcoChevU   = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
     <polyline points="18 15 12 9 6 15" />
+  </svg>
+);
+const IcoRefresh = ({ c }: { c: string }) => (
+  <svg className={c} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
   </svg>
 );
 
@@ -210,7 +220,7 @@ function Toast({ t }: { t: ToastState | null }) {
     >
       {t.type === "success"
         ? <IcoCheck c="h-4 w-4 text-emerald-400 shrink-0" />
-        : <IcoX c="h-4 w-4 text-red-400 shrink-0" />
+        : <IcoX     c="h-4 w-4 text-red-400 shrink-0" />
       }
       <span className="max-w-xs leading-snug">{t.message}</span>
     </div>
@@ -363,7 +373,7 @@ interface OrderCardProps {
 function OrderCard({ order, onCancel }: OrderCardProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const statusCfg  = STATUS_CONFIG[order.status]        ?? STATUS_CONFIG.pending;
+  const statusCfg  = STATUS_CONFIG[order.status]         ?? STATUS_CONFIG.pending;
   const paymentCfg = PAYMENT_CONFIG[order.paymentStatus] ?? PAYMENT_CONFIG.unpaid;
 
   const canCancel = ["pending", "processing"].includes(order.status);
@@ -572,10 +582,16 @@ export default function OrdersPage() {
   const [userEmail,     setUserEmail]     = useState<string>("");
   const [orders,        setOrders]        = useState<Order[]>([]);
   const [loading,       setLoading]       = useState<boolean>(true);
+  const [refreshing,    setRefreshing]    = useState<boolean>(false);
+  const [lastRefresh,   setLastRefresh]   = useState<Date | null>(null);
   const [toast,         setToast]         = useState<ToastState | null>(null);
   const [cancelTarget,  setCancelTarget]  = useState<Order | null>(null);
   const [cancelLoading, setCancelLoading] = useState<boolean>(false);
   const [filter,        setFilter]        = useState<FilterKey>("all");
+
+  // Ref to pause auto-refresh while cancel modal is open
+  const isMutating = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const showToast = useCallback((message: string, type: ToastState["type"] = "success") => {
     setToast({ message, type });
@@ -588,12 +604,13 @@ export default function OrdersPage() {
     if (!email) setLoading(false);
   }, []);
 
+  // ── Initial full fetch ──────────────────────────────────────────────────────
   const fetchOrders = useCallback(async (email: string) => {
     if (!email) return;
     setLoading(true);
     try {
-      const res = await fetch(USER_ORDERS(email));
-      const ct  = res.headers.get("content-type") ?? "";
+      const res  = await fetch(USER_ORDERS(email));
+      const ct   = res.headers.get("content-type") ?? "";
       if (ct.includes("text/html")) {
         throw new Error(`Backend returned HTML — check server is running at ${USER_ORDERS(email)}`);
       }
@@ -603,6 +620,7 @@ export default function OrdersPage() {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       setOrders(sorted);
+      setLastRefresh(new Date());
     } catch (err) {
       showToast((err as Error).message, "error");
     } finally {
@@ -610,16 +628,78 @@ export default function OrdersPage() {
     }
   }, [showToast]);
 
+  // ── Silent background fetch (no loading spinner, no error toast spam) ───────
+  const silentFetch = useCallback(async (email: string) => {
+    if (!email || isMutating.current) return;
+    try {
+      const res  = await fetch(USER_ORDERS(email));
+      const ct   = res.headers.get("content-type") ?? "";
+      if (ct.includes("text/html")) return; // silent fail
+      const json = (await res.json()) as { success?: boolean; orders?: Order[]; message?: string };
+      if (!res.ok || !json.success) return;
+      const sorted = (json.orders ?? []).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
+      setLastRefresh(new Date());
+    } catch {
+      // Silent fail — don't spam user with background errors
+    }
+  }, []);
+
+  // ── Manual refresh ──────────────────────────────────────────────────────────
+  const manualRefresh = useCallback(async () => {
+    if (!userEmail || refreshing) return;
+    setRefreshing(true);
+    try {
+      const res  = await fetch(USER_ORDERS(userEmail));
+      const ct   = res.headers.get("content-type") ?? "";
+      if (ct.includes("text/html")) throw new Error("Backend error");
+      const json = (await res.json()) as { success?: boolean; orders?: Order[]; message?: string };
+      if (!res.ok || !json.success) throw new Error(json.message ?? `HTTP ${res.status}`);
+      const sorted = (json.orders ?? []).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setOrders(sorted);
+      setLastRefresh(new Date());
+      showToast("Orders refreshed");
+    } catch (err) {
+      showToast((err as Error).message, "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userEmail, refreshing, showToast]);
+
+  // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (userEmail) fetchOrders(userEmail);
   }, [userEmail, fetchOrders]);
 
+  // ── setInterval auto-refresh every REFRESH_INTERVAL ms ─────────────────────
+  useEffect(() => {
+    if (!userEmail) return;
+
+    intervalRef.current = setInterval(() => {
+      silentFetch(userEmail);
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [userEmail, silentFetch]);
+
+  // ── Pause auto-refresh when cancel modal is open ────────────────────────────
+  useEffect(() => {
+    isMutating.current = cancelTarget !== null;
+  }, [cancelTarget]);
+
+  // ── Cancel order ────────────────────────────────────────────────────────────
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
     setCancelLoading(true);
     try {
-      const res = await fetch(CANCEL_ORDER(cancelTarget._id), { method: "DELETE" });
-      const ct  = res.headers.get("content-type") ?? "";
+      const res  = await fetch(CANCEL_ORDER(cancelTarget._id), { method: "DELETE" });
+      const ct   = res.headers.get("content-type") ?? "";
       if (ct.includes("text/html")) throw new Error("Server error — check backend");
       const json = (await res.json()) as { success?: boolean; message?: string };
       if (!res.ok || !json.success) throw new Error(json.message ?? `HTTP ${res.status}`);
@@ -662,17 +742,51 @@ export default function OrdersPage() {
 
         {/* Page Header */}
         <div className="mb-8 border-b border-neutral-200 pb-8 dark:border-neutral-800">
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl">
-            Order History
-          </h1>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-            {loading
-              ? "Loading your orders…"
-              : userEmail
-              ? `${orders.length} total order${orders.length !== 1 ? "s" : ""} for ${userEmail}`
-              : "Log in to view your orders"
-            }
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl">
+                Order History
+              </h1>
+              <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+                {loading
+                  ? "Loading your orders…"
+                  : userEmail
+                  ? `${orders.length} total order${orders.length !== 1 ? "s" : ""} for ${userEmail}`
+                  : "Log in to view your orders"
+                }
+              </p>
+            </div>
+
+            {/* Manual refresh button + last updated time */}
+            {/* {!loading && userEmail && (
+              <div className="flex shrink-0 items-center gap-2">
+                {lastRefresh && (
+                  <span className="hidden text-[10px] text-neutral-400 dark:text-neutral-600 sm:block">
+                    Updated {lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={manualRefresh}
+                  disabled={refreshing}
+                  title="Refresh orders"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                >
+                  <IcoRefresh c={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            )} */}
+          </div>
+
+          {/* Auto-refresh progress bar */}
+          {/* {userEmail && !loading && (
+            <div className="mt-4 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800" style={{ height: 2 }}>
+              <div
+                className="h-full rounded-full bg-emerald-400 dark:bg-emerald-600"
+                style={{ animation: `ordersProgress ${REFRESH_INTERVAL}ms linear infinite` }}
+              />
+            </div>
+          )} */}
         </div>
 
         {loading ? (
@@ -745,6 +859,14 @@ export default function OrdersPage() {
       )}
 
       <Toast t={toast} />
+
+      {/* Progress bar keyframe */}
+      <style jsx global>{`
+        @keyframes ordersProgress {
+          from { width: 0%; }
+          to   { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

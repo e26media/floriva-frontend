@@ -1,7 +1,7 @@
 import { Link } from '@/components/Link'
 import Image from 'next/image'
 import React from 'react'
-import backgroundLineSvg from '@/images/floriva/floriva logo.png'
+import backgroundLineSvg from '@/images/floriva/Primary Logo.png'
 
 export interface LogoProps extends React.ComponentPropsWithoutRef<'svg'> {
   className?: string
@@ -43,7 +43,7 @@ const Logo: React.FC<LogoProps> = ({ className = 'shrink-0', ...props }) => {
             
             // sizes="(max-width: 768px) 100vw, 50vw"
             src={backgroundLineSvg}
-            className='w-[112px]'
+        className="!w-40 md:!w-70"
             alt="hero"
           />
       {/* <img src="" alt="Logo" className="h-8 w-auto" /> */}

@@ -12,7 +12,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Floriva',
+    template: '%s - Floriva Gift',
     default: 'Floriva',
   },
   description:
@@ -22,8 +22,7 @@ export const metadata: Metadata = {
   'Online Flower Store',
   'Bouquets',
   'Floral Arrangements',
-  'Next.js',
- 
+  'Floriva Gift',
   'Florist Website',
   'E-commerce Flowers'],
 }

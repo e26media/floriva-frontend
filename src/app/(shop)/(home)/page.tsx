@@ -1,4 +1,5 @@
 import BackgroundSection from '@/components/BackgroundSection/BackgroundSection'
+import BestSellerProduct from '@/components/BestSellerProduct'
 import { Divider } from '@/components/Divider'
 import Heading from '@/components/Heading/Heading'
 import SectionClientSay from '@/components/SectionClientSay'
@@ -12,6 +13,7 @@ import SectionPromo1 from '@/components/SectionPromo1'
 import SectionPromo2 from '@/components/SectionPromo2'
 import SectionSliderLargeProduct from '@/components/SectionSliderLargeProduct'
 import SectionSliderProductCard from '@/components/SectionSliderProductCard'
+import SectionSliderProductCard1 from '@/components/Sectionsliderproductcard1'
 import SectionMagazine5 from '@/components/blog/SectionMagazine5'
 import { getBlogPosts, getCollections, getGroupCollections, getProducts } from '@/data/data'
 import { Button } from '@/shared/Button/Button'
@@ -39,30 +41,38 @@ async function PageHome() {
   return (
     <div className="nc-PageHome relative overflow-hidden">
       <SectionHero2 />
-      <SectionCollectionSlider className="mt-24 lg:mt-32" collections={featuredCollections} />
+      <SectionCollectionSlider className="mt-24 lg:mt-32"  />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
         <SectionSliderProductCard 
         // data={carouselProducts1}
          />
-        <Divider />
-        <div className="pb-16">
+        {/* <Divider /> */}
+         <div className="pb-16">
           <SectionHowItWork />
         </div>
+       
+       <BestSellerProduct/>
         {/* <SectionPromo1 /> */}
         {/* <div className="relative pt-24 pb-20 lg:pt-28">
           <BackgroundSection />
           <SectionGridMoreExplore groupCollections={groupCollections} />
         </div> */}
-        <SectionSliderProductCard 
-        // products={carouselProducts2} subHeading="New Sports equipment" 
-        />
+        {/* <SectionSliderProductCard 
+        products={carouselProducts2} subHeading="New Sports equipment" 
+        /> */}
+        
+
         <SectionPromo2 />
+        <SectionSliderProductCard1
+        // products={carouselProducts3} subHeading="New Fashion items" 
+        />
+        
         {/* <SectionSliderLargeProduct products={carouselProducts3} /> */}
         {/* <SectionGridFeatureItems data={products} /> */}
         {/* <Divider /> */}
-        <SectionCollectionSlider2 collections={departmentCollections} />
-        <Divider />
+        {/* <SectionCollectionSlider2 collections={departmentCollections} />
+        <Divider /> */}
         {/* <div>
           <Heading headingDim="From the Ciseco blog">The latest news</Heading>
           <SectionMagazine5 posts={blogPosts} />
@@ -74,8 +84,8 @@ async function PageHome() {
           </div>
         </div> */}
 
-        <Divider />
-        <SectionClientSay />
+        {/* <Divider /> */}
+        {/* <SectionClientSay /> */}
       </div>
     </div>
   )

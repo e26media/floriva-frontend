@@ -2,123 +2,254 @@
 
 import { Divider } from '@/components/Divider'
 import { TNavigationItem } from '@/data/navigation'
-import ButtonPrimary from '@/shared/Button/ButtonPrimary'
-import SocialsList from '@/shared/SocialsList/SocialsList'
 import { Link } from '@/shared/link'
-import { Disclosure, DisclosureButton, DisclosurePanel, useClose } from '@headlessui/react'
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  useClose,
+} from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/24/solid'
-import { Search01Icon } from '@hugeicons/core-free-icons'
-import { HugeiconsIcon } from '@hugeicons/react'
 import clsx from 'clsx'
-import { redirect } from 'next/navigation'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SubCategory {
+  _id: string
+  name: string
+}
+
+interface Category {
+  _id: string
+  name: string
+  subCategories: SubCategory[]
+  createdAt: string
+  updatedAt: string
+}
+
+interface ApiResponse {
+  categories: Category[]
+}
 
 interface SidebarNavigationProps {
   data: TNavigationItem[]
 }
 
+// ─── API URL ──────────────────────────────────────────────────────────────────
+
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+  ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categoryview`
+  : 'http://localhost:7000/api/categoryview'
+
+// ─── Sub-component: Static nav link ───────────────────────────────────────────
+
+const StaticNavItem: React.FC<{ href: string; label: string; onClose: () => void }> = ({
+  href,
+  label,
+  onClose,
+}) => (
+  <li className="text-neutral-900 dark:text-white">
+    <Link
+      href={href}
+      onClick={onClose}
+      className="flex w-full rounded-lg px-3 py-2.5 text-start text-sm font-medium tracking-wide uppercase hover:bg-neutral-100 dark:hover:bg-neutral-800"
+    >
+      {label}
+    </Link>
+  </li>
+)
+
+// ─── Sub-component: Category item with subcategory disclosure ─────────────────
+
+const CategoryNavItem: React.FC<{ category: Category; onClose: () => void }> = ({
+  category,
+  onClose,
+}) => {
+  const hasChildren = category.subCategories.length > 0
+
+  // Build a slug-style href from category name
+  const categoryHref = `/category/${category._id}`
+
+  return (
+    <Disclosure as="li" className="text-neutral-900 dark:text-white">
+      <DisclosureButton className="flex w-full cursor-pointer rounded-lg px-3 text-start text-sm font-medium tracking-wide uppercase hover:bg-neutral-100 dark:hover:bg-neutral-800">
+        <Link
+          href={categoryHref}
+          className={clsx(!hasChildren && 'flex-1', 'block py-2.5')}
+          onClick={onClose}
+        >
+          {category.name}
+        </Link>
+        {hasChildren && (
+          <div className="flex flex-1 justify-end">
+            <ChevronDownIcon
+              className="ml-2 h-4 w-4 self-center text-neutral-500 transition-transform ui-open:rotate-180"
+              aria-hidden="true"
+            />
+          </div>
+        )}
+      </DisclosureButton>
+
+      {hasChildren && (
+        <DisclosurePanel>
+          <ul className="pb-1 pl-6 text-base">
+            {category.subCategories.map((sub) => (
+              <li key={sub._id}>
+                <Link
+                  href={`/category/${category._id}/sub/${sub._id}`}
+                  onClick={onClose}
+                  className="mt-0.5 flex rounded-lg py-2.5 pr-4 pl-3 text-sm font-medium text-neutral-900 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  {sub.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </DisclosurePanel>
+      )}
+    </Disclosure>
+  )
+}
+
+// ─── Sub-component: Static TNavigationItem (existing data prop) ───────────────
+
+const StaticMenuChild = (
+  item: TNavigationItem,
+  itemClass = 'pl-3 text-neutral-900 dark:text-neutral-200 font-medium',
+  onClose: () => void
+): React.ReactNode => {
+  return (
+    <ul className="nav-mobile-sub-menu pb-1 pl-6 text-base">
+      {item.children?.map((childMenu, index) => (
+        <Disclosure key={index} as="li">
+          <Link
+            href={childMenu.href || '#'}
+            className={`mt-0.5 flex rounded-lg pr-4 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 ${itemClass}`}
+          >
+            <span className={`py-2.5 ${!childMenu.children ? 'block w-full' : ''}`}>
+              {childMenu.name}
+            </span>
+            {childMenu.children && (
+              <span className="flex grow items-center" onClick={(e) => e.preventDefault()}>
+                <DisclosureButton as="span" className="flex grow justify-end">
+                  <ChevronDownIcon className="ml-2 h-4 w-4 text-neutral-500" aria-hidden="true" />
+                </DisclosureButton>
+              </span>
+            )}
+          </Link>
+          {childMenu.children && (
+            <DisclosurePanel>
+              {StaticMenuChild(childMenu, 'pl-3 text-neutral-600 dark:text-neutral-400', onClose)}
+            </DisclosurePanel>
+          )}
+        </Disclosure>
+      ))}
+    </ul>
+  )
+}
+
+const StaticNavItemWithChildren: React.FC<{
+  menu: TNavigationItem
+  index: number
+  onClose: () => void
+}> = ({ menu, index, onClose }) => (
+  <Disclosure key={index} as="li" className="text-neutral-900 dark:text-white">
+    <DisclosureButton className="flex w-full cursor-pointer rounded-lg px-3 text-start text-sm font-medium tracking-wide uppercase hover:bg-neutral-100 dark:hover:bg-neutral-800">
+      <Link
+        href={menu.href || '#'}
+        className={clsx(!menu.children?.length && 'flex-1', 'block py-2.5')}
+        onClick={onClose}
+      >
+        {menu.name}
+      </Link>
+      {menu.children?.length && (
+        <div className="flex flex-1 justify-end">
+          <ChevronDownIcon
+            className="ml-2 h-4 w-4 self-center text-neutral-500 transition-transform ui-open:rotate-180"
+            aria-hidden="true"
+          />
+        </div>
+      )}
+    </DisclosureButton>
+    {menu.children && (
+      <DisclosurePanel>{StaticMenuChild(menu, undefined, onClose)}</DisclosurePanel>
+    )}
+  </Disclosure>
+)
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ data }) => {
   const handleClose = useClose()
 
-  const _renderMenuChild = (
-    item: TNavigationItem,
-    itemClass = 'pl-3 text-neutral-900 dark:text-neutral-200 font-medium'
-  ) => {
-    return (
-      <ul className="nav-mobile-sub-menu pb-1 pl-6 text-base">
-        {item.children?.map((childMenu, index) => (
-          <Disclosure key={index} as="li">
-            <Link
-              href={childMenu.href || '#'}
-              className={`mt-0.5 flex rounded-lg pr-4 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 ${itemClass}`}
-            >
-              <span className={`py-2.5 ${!childMenu.children ? 'block w-full' : ''}`}>{childMenu.name}</span>
-              {childMenu.children && (
-                <span className="flex grow items-center" onClick={(e) => e.preventDefault()}>
-                  <DisclosureButton as="span" className="flex grow justify-end">
-                    <ChevronDownIcon className="ml-2 h-4 w-4 text-neutral-500" aria-hidden="true" />
-                  </DisclosureButton>
-                </span>
-              )}
-            </Link>
-            {childMenu.children && (
-              <DisclosurePanel>
-                {_renderMenuChild(childMenu, 'pl-3 text-neutral-600 dark:text-neutral-400')}
-              </DisclosurePanel>
-            )}
-          </Disclosure>
-        ))}
-      </ul>
-    )
-  }
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const _renderItem = (menu: TNavigationItem, index: number) => {
-    return (
-      <Disclosure key={index} as="li" className="text-neutral-900 dark:text-white">
-        <DisclosureButton className="flex w-full cursor-pointer rounded-lg px-3 text-start text-sm font-medium tracking-wide uppercase hover:bg-neutral-100 dark:hover:bg-neutral-800">
-          <Link
-            href={menu.href || '#'}
-            className={clsx(!menu.children?.length && 'flex-1', 'block py-2.5')}
-            onClick={handleClose}
-          >
-            {menu.name}
-          </Link>
-          {menu.children?.length && (
-            <div className="flex flex-1 justify-end">
-              <ChevronDownIcon className="ml-2 h-4 w-4 self-center text-neutral-500" aria-hidden="true" />
-            </div>
-          )}
-        </DisclosureButton>
-        {menu.children && <DisclosurePanel>{_renderMenuChild(menu)}</DisclosurePanel>}
-      </Disclosure>
-    )
-  }
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch(API_URL, { cache: 'no-store' })
+        if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`)
+        const json: ApiResponse = await res.json()
+        setCategories(json.categories ?? [])
+      } catch (err) {
+        console.error(err)
+        setError('Could not load categories.')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const renderSearchForm = () => {
-    return (
-      <form
-        action="#"
-        method="POST"
-        className="flex-1 text-neutral-900 dark:text-neutral-200"
-        onSubmit={(e) => {
-          e.preventDefault()
-          handleClose()
-          redirect('/search')
-        }}
-      >
-        <div className="flex h-full items-center gap-x-2.5 rounded-xl bg-neutral-50 px-3 py-3 dark:bg-neutral-800">
-          <HugeiconsIcon icon={Search01Icon} size={24} color="currentColor" strokeWidth={1.5} />
-          <input
-            type="search"
-            placeholder="Type and press enter"
-            className="w-full border-none bg-transparent text-sm focus:ring-0 focus:outline-hidden"
-          />
-        </div>
-        <input type="submit" hidden value="" />
-      </form>
-    )
-  }
+    fetchCategories()
+  }, [])
 
   return (
     <div>
-      <span>Discover the most outstanding articles on all topics of life. Write your stories and share them</span>
+      {/* ── Static nav items from `data` prop ── */}
+      {/* <ul className="flex flex-col gap-y-1 px-2 pt-6">
+        {data?.map((menu, index) => (
+          <StaticNavItemWithChildren
+            key={index}
+            menu={menu}
+            index={index}
+            onClose={handleClose}
+          />
+        ))}
+      </ul> */}
 
-      <div className="mt-4 flex items-center justify-between">
-        <SocialsList />
-      </div>
-      <div className="mt-5">{renderSearchForm()}</div>
-      <ul className="flex flex-col gap-y-1 px-2 py-6">{data?.map(_renderItem)}</ul>
-      <Divider className="mb-6" />
+      {/* <Divider className="my-4" /> */}
 
-      {/* FOR OUR DEMO */}
-      <ButtonPrimary
-        href="https://themeforest.net/item/ciseco-shop-ecommerce-nextjs-template/44210635"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="px-8!"
-      >
-        Buy this template
-      </ButtonPrimary>
+      {/* ── Fixed static links ── */}
+      <ul className="flex flex-col gap-y-1 px-2">
+        <StaticNavItem href="/" label="Home" onClose={handleClose} />
+        <StaticNavItem href="/allproduct" label="All Products" onClose={handleClose} />
+      </ul>
+
+      {/* <Divider className="my-4" /> */}
+
+      {/* ── API-driven category links ── */}
+      <ul className="flex flex-col gap-y-1 px-2 pb-6">
+        {loading && (
+          <li className="px-3 py-2 text-sm text-neutral-400 dark:text-neutral-500 animate-pulse">
+            Loading categories…
+          </li>
+        )}
+        {error && (
+          <li className="px-3 py-2 text-sm text-red-500">{error}</li>
+        )}
+        {!loading &&
+          !error &&
+          categories.map((category) => (
+            <CategoryNavItem
+              key={category._id}
+              category={category}
+              onClose={handleClose}
+            />
+          ))}
+      </ul>
     </div>
   )
 }

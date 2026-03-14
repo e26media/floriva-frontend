@@ -11,6 +11,7 @@ import HamburgerBtnMenu from './HamburgerBtnMenu'
 import Navigation from './Navigation/Navigation'
 import SearchBtnPopover from './SearchBtnPopover'
 import CategoryNav from './Navigation/CategoryNav'
+import { AddTeamIcon, VegetarianFoodIcon } from '@hugeicons/core-free-icons'
 
 export interface Props {
   hasBorder?: boolean
@@ -86,6 +87,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           {/* Mobile hamburger */}
           <div className="flex flex-1 items-center lg:hidden">
             <HamburgerBtnMenu />
+            
           </div>
 
           {/* Logo */}
@@ -105,6 +107,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           {/* Actions */}
          <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5">
             {/* <SearchBtnPopover /> */}
+             {/* <AddTeamIcon/> */}
              <CartBtn />
             <AvatarDropdown />
            
