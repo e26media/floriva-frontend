@@ -355,10 +355,11 @@ function FiltersSidebar({
 
   return (
     <>
+   
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-[199] backdrop-blur-sm md:hidden" onClick={onClose}/>}
 
       <aside className={`
-        w-[252px] flex-shrink-0 bg-white rounded-[14px] border border-[#e6ddd3] sticky top-6
+        w-[252px] flex-shrink-0 bg-white rounded-[14px] border border-[#e6ddd3] sticky top-6  mt-10
         max-md:fixed max-md:top-0 max-md:bottom-0 max-md:z-[200]
         max-md:w-[272px] max-md:rounded-none max-md:overflow-y-auto
         max-md:shadow-[4px_0_30px_rgba(0,0,0,.14)] max-md:transition-[left_.3s_ease]
