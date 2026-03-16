@@ -104,7 +104,7 @@ function CartToastContainer() {
   }, [])
   if (_toastItems.length === 0) return null
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-2rem)]">
       <style>{`
         @keyframes toastSlide {
           from { opacity:0; transform:translateX(80px) scale(0.9); }
@@ -115,21 +115,24 @@ function CartToastContainer() {
         const imageUrl = toast.product.images?.[0] ? imgSrc(toast.product.images[0]) : null
         const isError = toast.type === 'error'
         return (
-          <div key={toast.id} className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-4 py-3"
-            style={{ animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards', minWidth: 300, maxWidth: 360 }}>
-            <div className={`h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
+          <div
+            key={toast.id}
+            className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5 sm:px-4 sm:py-3"
+            style={{ animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards', minWidth: 240, maxWidth: 340 }}
+          >
+            <div className={`h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
               {!isError && imageUrl
                 ? <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-                : <span className="text-xl">{isError ? '⚠️' : '🛍️'}</span>}
+                : <span className="text-lg sm:text-xl">{isError ? '⚠️' : '🛍️'}</span>}
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-xs font-bold mb-0.5 ${isError ? 'text-red-600' : 'text-emerald-600'}`}>
                 {isError ? 'Error' : '✓ Added to Bag!'}
               </p>
               {isError
-                ? <p className="text-sm text-gray-700">{toast.message}</p>
+                ? <p className="text-xs sm:text-sm text-gray-700 line-clamp-2">{toast.message}</p>
                 : <>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{toast.product.name}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{toast.product.name}</p>
                     <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
                   </>}
             </div>
@@ -155,10 +158,6 @@ function calcDiscount(exact: number, discounted: number) {
   return Math.round(((exact - discounted) / exact) * 100)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Color hex map — maps a color name to a hex value
-// ─────────────────────────────────────────────────────────────────────────────
-
 function colorHex(name: string): string {
   const map: Record<string, string> = {
     red:'#dc2626', crimson:'#b91c1c', blue:'#2563eb', navy:'#1e3a5f',
@@ -173,10 +172,6 @@ function colorHex(name: string): string {
   }
   return map[name.toLowerCase()] ?? '#9ca3af'
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// getSwatches — returns ONLY the real product color, nothing extra
-// ─────────────────────────────────────────────────────────────────────────────
 
 function getSwatches(product: TApiProduct): Array<{ hex: string; name: string }> {
   if (!product.color?.name) return []
@@ -227,7 +222,7 @@ function useAddToCart(product: TApiProduct) {
 function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
   return (
     <div className="flex items-center gap-1.5">
-      <svg className="h-3.5 w-3.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+      <svg className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
       </svg>
       <span className="text-xs font-medium text-gray-500">
@@ -238,37 +233,23 @@ function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WishlistBtn
-// ─────────────────────────────────────────────────────────────────────────────
-
-function WishlistBtn() {
-  const [wished, setWished] = useState(false)
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setWished((w) => !w) }}
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100 transition-all duration-200 hover:scale-110"
-    >
-      {wished
-        ? <svg className="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        : <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>}
-    </button>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Qty Stepper (for modal)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
   return (
     <div className="flex h-11 items-center overflow-hidden rounded-full border border-gray-200 bg-white">
-      <button onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50">
+      <button
+        onClick={() => onChange(Math.max(1, value - 1))}
+        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
+      >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
       </button>
       <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50">
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
+      >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
       </button>
     </div>
@@ -283,11 +264,15 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-gray-100">
-      <button onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800"
+      >
         {title}
-        <svg className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
         </svg>
       </button>
@@ -297,7 +282,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal
+// Quick View Modal — FULLY RESPONSIVE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
@@ -311,7 +296,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
   const outOfStock = product.stock === 0
   const categoryName = product.category?.name ?? null
   const colorName = product.color?.name ?? null
-  // ✅ Only the real color swatch — no extra fake colors
   const swatches = getSwatches(product)
   const hasImages = product.images.length > 0
 
@@ -333,73 +317,140 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
   }, [activeImg])
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div
+      className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+      style={{ padding: '0' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
       <style>{`
-        @keyframes modalIn { from{opacity:0;transform:scale(0.94) translateY(24px);}to{opacity:1;transform:scale(1) translateY(0);} }
+        @keyframes modalInMobile {
+          from { opacity:0; transform:translateY(100%); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes modalIn {
+          from { opacity:0; transform:scale(0.94) translateY(24px); }
+          to   { opacity:1; transform:scale(1) translateY(0); }
+        }
         @keyframes imgIn { from{opacity:0;}to{opacity:1;} }
+        @media (max-width: 639px) {
+          .modal-animated { animation: modalInMobile 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards !important; }
+        }
+        @media (min-width: 640px) {
+          .modal-animated { animation: modalIn 0.3s cubic-bezier(0.34,1.1,0.64,1) forwards !important; }
+        }
+        .thumbs-scroll::-webkit-scrollbar { display: none; }
+        .details-scroll::-webkit-scrollbar { width: 4px; }
+        .details-scroll::-webkit-scrollbar-track { background: transparent; }
+        .details-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
-        style={{ animation: 'modalIn 0.3s cubic-bezier(0.34,1.1,0.64,1) forwards' }}
-        onClick={(e) => e.stopPropagation()}>
 
-        {/* Close */}
-        <button onClick={onClose}
-          className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200">
+      {/* Modal container — bottom sheet on mobile, centered on sm+ */}
+      <div
+        className="modal-animated relative flex w-full flex-col overflow-hidden bg-white shadow-2xl
+          rounded-t-3xl
+          sm:rounded-3xl sm:max-w-3xl sm:mx-4 sm:max-h-[90vh]
+          max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle — mobile only */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+          <div className="h-1 w-10 rounded-full bg-gray-200"/>
+        </div>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 active:scale-95"
+        >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
 
-        <div className="flex flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        {/* Scrollable body */}
+        <div className="flex flex-col overflow-y-auto sm:flex-row sm:overflow-hidden flex-1 min-h-0">
 
-          {/* LEFT — Image */}
-          <div className="w-full flex-shrink-0 lg:w-[48%]">
+          {/* LEFT — Image section */}
+          <div className="w-full flex-shrink-0 sm:w-[45%]">
+
             {/* Main image */}
-            <div className="relative aspect-square w-full overflow-hidden bg-gray-50 rounded-tl-3xl rounded-tr-3xl lg:rounded-tr-none lg:rounded-bl-3xl">
-              {hasImages ? (
-                <img key={activeImg} src={imgSrc(product.images[activeImg])} alt={product.name}
-                  className="h-full w-full object-cover" style={{ animation: 'imgIn 0.2s ease' }}/>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-gray-300">
-                  <svg className="h-20 w-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                </div>
-              )}
-              {/* Badges */}
-              <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-                {isNewIn(product.createdAt) && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
-                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    New in
-                  </span>
+            <div className="relative overflow-hidden bg-gray-50"
+              style={{ aspectRatio: '1/1', width: '100%', maxHeight: '50vw' }}
+            >
+              {/* On mobile, cap the image height */}
+              <div className="relative w-full h-full sm:aspect-square sm:max-h-none"
+                style={{ height: '100%' }}>
+                {hasImages ? (
+                  <img
+                    key={activeImg}
+                    src={imgSrc(product.images[activeImg])}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                    style={{ animation: 'imgIn 0.2s ease' }}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-gray-300">
+                    <svg className="h-16 w-16 sm:h-20 sm:w-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
                 )}
-                {discount >= 10 && (
-                  <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
+
+                {/* Badges */}
+                <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
+                  {isNewIn(product.createdAt) && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
+                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      New in
+                    </span>
+                  )}
+                  {discount >= 10 && (
+                    <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
+                  )}
+                </div>
+
+                {/* Prev/Next arrows */}
+                {product.images.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                    >
+                      <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                    >
+                      <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                  </>
                 )}
               </div>
-              {/* Prev/Next */}
-              {product.images.length > 1 && (
-                <>
-                  <button onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                    className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg">
-                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
-                  </button>
-                  <button onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg">
-                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                  </button>
-                </>
-              )}
             </div>
+
             {/* Thumbnails */}
             {product.images.length > 1 && (
-              <div ref={thumbsRef} className="flex gap-2 overflow-x-auto p-3 bg-white" style={{ scrollbarWidth: 'none' }}>
+              <div
+                ref={thumbsRef}
+                className="thumbs-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
+                style={{ scrollbarWidth: 'none' }}
+              >
                 {product.images.map((img, idx) => (
-                  <button key={idx} onClick={() => setActiveImg(idx)}
-                    className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'}`}>
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImg(idx)}
+                    className={`h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                      activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'
+                    }`}
+                  >
                     <img src={imgSrc(img)} alt="" className="h-full w-full object-cover"/>
                   </button>
                 ))}
@@ -408,27 +459,27 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
           </div>
 
           {/* RIGHT — Details */}
-          <div className="flex w-full flex-col overflow-y-auto border-l border-gray-100 p-6 lg:w-[52%] lg:max-h-[90vh]">
+          <div className="details-scroll flex w-full flex-col border-t border-gray-100 sm:border-t-0 sm:border-l overflow-y-auto p-4 sm:p-6 sm:w-[55%] sm:max-h-[90vh]">
 
             {/* Category */}
             {categoryName && (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
             )}
 
             {/* Name */}
-            <h2 className="text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
             {product.title && product.title !== product.name && (
-              <p className="text-sm text-gray-400 mb-3">{product.title}</p>
+              <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
 
             {/* Rating */}
-            <div className="mb-4">
+            <div className="mb-3 sm:mb-4">
               <StarRating rating={rating} reviews={reviews}/>
             </div>
 
             {/* Price */}
-            <div className="flex items-center gap-3 mb-5">
-              <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-lg font-bold text-emerald-700">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5 flex-wrap">
+              <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base sm:text-lg font-bold text-emerald-700">
                 {formatPrice(product.discountPrice)}
               </span>
               {product.exactPrice > product.discountPrice && (
@@ -439,9 +490,9 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               )}
             </div>
 
-            {/* ✅ Only real color swatch — no fake extras */}
+            {/* Color swatch */}
             {swatches.length > 0 && (
-              <div className="mb-5">
+              <div className="mb-4">
                 <p className="mb-2 text-xs font-semibold text-gray-500">
                   Colour: <span className="capitalize text-gray-800">{colorName}</span>
                 </p>
@@ -458,12 +509,13 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               </div>
             )}
 
-            {/* Stock */}
-            <div className="mb-5">
+            {/* Stock badge */}
+            <div className="mb-4">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                 product.stock > 5 ? 'bg-emerald-50 text-emerald-700'
                   : product.stock > 0 ? 'bg-amber-50 text-amber-600'
-                  : 'bg-red-50 text-red-600'}`}>
+                  : 'bg-red-50 text-red-600'
+              }`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-current"/>
                 {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
               </span>
@@ -471,8 +523,8 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 
             {/* Qty + Add to Bag */}
             <div className="mb-4">
-              <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
-              <div className="flex gap-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
+              <div className="flex gap-2 sm:gap-3">
                 <QtyStepper value={qty} onChange={setQty} max={product.stock || 1}/>
                 <button
                   onClick={() => addToCart(qty)}
@@ -481,31 +533,38 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                     outOfStock ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                       : adding ? 'cursor-wait bg-gray-800 text-white'
                       : added ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
-                      : 'bg-gray-900 text-white hover:bg-gray-700 hover:shadow-lg'}`}
+                      : 'bg-gray-900 text-white hover:bg-gray-700 hover:shadow-lg'
+                  }`}
                 >
                   {adding ? (
                     <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
                   ) : added ? (
                     <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
                   ) : (
-                    <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                    {outOfStock ? 'Out of Stock' : 'Add to Bag'}</>
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                      </svg>
+                      {outOfStock ? 'Out of Stock' : 'Add to Bag'}
+                    </>
                   )}
                 </button>
               </div>
             </div>
 
-            <hr className="border-gray-100 mb-4"/>
+            <hr className="border-gray-100 mb-3"/>
 
             {/* Accordion */}
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
-            <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400"></p>
+            <div className="mt-auto flex items-center justify-end pt-4 border-t border-gray-100">
               <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
                 View full page →
               </a>
             </div>
+
+            {/* Bottom safe area padding on mobile */}
+            <div className="h-2 sm:h-0 flex-shrink-0"/>
           </div>
         </div>
       </div>
@@ -514,7 +573,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card
+// Product Card — FULLY RESPONSIVE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
@@ -524,8 +583,8 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
   const { rating, reviews } = fakeRating(data._id)
   const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
-  // ✅ Only the real color swatch — no fake extras
   const swatches = getSwatches(data)
+  const [showActions, setShowActions] = useState(false)
 
   const { addToCart, loading, added } = useAddToCart(data)
 
@@ -533,14 +592,23 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
     <div className="group flex flex-col">
 
       {/* ── Image box ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gray-100">
+      <div
+        className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100"
+        // On mobile: tap to toggle hover actions
+        onTouchStart={() => setShowActions(true)}
+        onMouseEnter={() => setShowActions(true)}
+        onMouseLeave={() => setShowActions(false)}
+      >
         <div className="relative aspect-square w-full">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+            <img
+              src={imageUrl}
+              alt={data.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-gray-300">
-              <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-12 w-12 sm:h-16 sm:w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
@@ -549,16 +617,16 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
 
           {/* Out of stock overlay */}
           {outOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-3xl">
-              <span className="rounded-full bg-gray-800/80 px-4 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-2xl sm:rounded-3xl">
+              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
             </div>
           )}
         </div>
 
         {/* Top-left: New in badge */}
         {newIn && !outOfStock && (
-          <div className="absolute left-3 top-3">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
+          <div className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
               <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
@@ -567,16 +635,24 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           </div>
         )}
 
-        {/* Top-right: Wishlist heart */}
-        {/* <div className="absolute right-3 top-3">
-          <WishlistBtn/>
-        </div> */}
-
-        {/* Hover overlay — Quick View + Add to Bag */}
-        <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0">
+        {/* Hover/tap overlay — Quick View + Add to Bag */}
+        {/* On desktop: slide up on hover. On mobile: always visible when showActions */}
+        <div
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-2 p-2.5 sm:p-3 transition-transform duration-300
+            ${showActions ? 'translate-y-0' : 'translate-y-full group-hover:translate-y-0'}`}
+        >
+          {/* Quick View — hidden on mobile to save space, tap goes straight to add to cart */}
           <button
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
-            className="w-full rounded-2xl bg-white/95 py-2.5 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
+            className="hidden sm:block w-full rounded-xl sm:rounded-2xl bg-white/95 py-2.5 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
+          >
+            Quick View
+          </button>
+
+          {/* On mobile, show both buttons stacked */}
+          <button
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
+            className="sm:hidden w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition active:scale-[0.97]"
           >
             Quick View
           </button>
@@ -584,32 +660,34 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           <button
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
             disabled={outOfStock || loading}
-            className={`w-full rounded-2xl py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
+            className={`w-full rounded-xl sm:rounded-2xl py-2 sm:py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
               outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
                 : added ? 'bg-emerald-500 text-white shadow-md'
-                : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'}`}
+                : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'
+            }`}
           >
             {loading
               ? <><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
               : added ? <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
               : outOfStock ? 'Out of Stock'
-              : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>}
+              : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>
+            }
           </button>
         </div>
       </div>
 
       {/* ── Info below card ── */}
-      <div className="mt-3 px-0.5">
+      <div className="mt-2.5 sm:mt-3 px-0.5">
 
-        {/* ✅ Only 1 real color swatch dot with tooltip */}
+        {/* Color swatch dot */}
         {swatches.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2">
             {swatches.map((swatch, i) => (
               <span
                 key={i}
                 title={swatch.name}
-                className="h-4 w-4 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
+                className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
                 style={{ backgroundColor: swatch.hex }}
               />
             ))}
@@ -617,25 +695,23 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         )}
 
         {/* Product name */}
-        <h3 className="text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
+        <h3 className="text-[13px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
           {data.name}
         </h3>
 
         {/* Color / category subtitle */}
-        <p className="text-[13px] text-gray-400 mb-2">
+        <p className="text-[12px] sm:text-[13px] text-gray-400 mb-1.5 sm:mb-2">
           {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
         </p>
 
         {/* Price row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700">
-              {formatPrice(data.discountPrice)}
-            </span>
-            {data.exactPrice > data.discountPrice && (
-              <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
-            )}
-          </div>
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <span className="rounded-full bg-emerald-100 px-2.5 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-bold text-emerald-700">
+            {formatPrice(data.discountPrice)}
+          </span>
+          {data.exactPrice > data.discountPrice && (
+            <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
+          )}
         </div>
       </div>
     </div>
@@ -649,16 +725,16 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
 function ProductCardSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="aspect-square w-full animate-pulse rounded-3xl bg-gray-200"/>
+      <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200"/>
       <div className="mt-3 space-y-2 px-0.5">
         <div className="flex gap-1.5">
-          {[0,1,2].map((i) => <div key={i} className="h-4 w-4 animate-pulse rounded-full bg-gray-200"/>)}
+          {[0, 1, 2].map((i) => <div key={i} className="h-4 w-4 animate-pulse rounded-full bg-gray-200"/>)}
         </div>
         <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
         <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
-        <div className="flex items-center justify-between">
-          <div className="h-7 w-20 animate-pulse rounded-full bg-gray-200"/>
-          <div className="h-3 w-24 animate-pulse rounded-full bg-gray-200"/>
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200"/>
+          <div className="h-3 w-14 animate-pulse rounded-full bg-gray-200"/>
         </div>
       </div>
     </div>
@@ -696,7 +772,12 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
   const isMounted = useRef(true)
 
-  const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions)
+  // Responsive embla options — 1 slide on mobile, auto on larger
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    ...emblaOptions,
+    align: 'start',
+  })
+
   const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
     useCarouselArrowButtons(emblaApi)
 
@@ -751,26 +832,13 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
           >
             {heading || 'New Arrivals'}
           </Heading>
-
-          {/* Live dot */}
-          {pollInterval > 0 && lastUpdated && !loading && (
-            <div className="absolute right-28 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 lg:flex">
-              {/* <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"/>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"/>
-              </span> */}
-              {/* <span className="text-xs text-gray-400">
-                Live · {lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-              </span> */}
-            </div>
-          )}
         </div>
 
         {/* Loading skeletons */}
         {loading && (
-          <div className="flex gap-6 overflow-hidden">
-            {[0,1,2,3].map((i) => (
-              <div key={i} className="w-[80%] flex-shrink-0 sm:w-1/2 md:w-1/3 xl:w-1/4">
+          <div className="flex gap-4 sm:gap-6 overflow-hidden">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="w-[47%] flex-shrink-0 sm:w-1/2 md:w-1/3 xl:w-1/4">
                 <ProductCardSkeleton/>
               </div>
             ))}
@@ -779,11 +847,13 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
         {/* Error */}
         {error && !loading && (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-red-100 bg-red-50 py-14 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-red-100 bg-red-50 py-12 sm:py-14 text-center px-4">
             <p className="text-sm font-semibold text-red-600">Failed to load products</p>
             <p className="mt-1 text-xs text-gray-400">{error}</p>
-            <button onClick={() => fetchProducts(false)}
-              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700">
+            <button
+              onClick={() => fetchProducts(false)}
+              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95"
+            >
               Retry
             </button>
           </div>
@@ -791,10 +861,18 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
         {/* Carousel */}
         {!loading && !error && products.length > 0 && (
-          <div className="embla" ref={emblaRef}>
-            <div className="-ms-5 embla__container sm:-ms-7">
+          <div className="embla overflow-hidden" ref={emblaRef}>
+            <div className="embla__container flex -ms-3 sm:-ms-5 md:-ms-7">
               {products.map((product) => (
-                <div key={product._id} className="embla__slide basis-[80%] ps-5 sm:ps-7 sm:basis-1/2 md:basis-1/3 xl:basis-1/4">
+                <div
+                  key={product._id}
+                  // 2 per row on mobile, 2 on sm, 3 on md, 4 on xl
+                  className="embla__slide flex-shrink-0 ps-3 sm:ps-5 md:ps-7
+                    basis-[47%]
+                    sm:basis-1/2
+                    md:basis-1/3
+                    xl:basis-1/4"
+                >
                   <ProductCard data={product} onQuickView={handleQuickView}/>
                 </div>
               ))}
@@ -804,7 +882,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
         {/* Empty */}
         {!loading && !error && products.length === 0 && (
-          <div className="flex items-center justify-center rounded-3xl bg-gray-50 py-14">
+          <div className="flex items-center justify-center rounded-2xl sm:rounded-3xl bg-gray-50 py-12 sm:py-14">
             <p className="text-sm text-gray-400">No products available.</p>
           </div>
         )}

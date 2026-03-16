@@ -52,10 +52,6 @@ const POLL_INTERVAL = 30_000
 // Best Sellers Logic
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Fetches orders, tallies product quantities, returns sorted product IDs
- * Falls back to empty map on any error.
- */
 async function fetchBestSellerMap(): Promise<Map<string, number>> {
   try {
     const res = await fetch(`${BASE_URL}/api/orderview`, { cache: 'no-store' })
@@ -76,10 +72,6 @@ async function fetchBestSellerMap(): Promise<Map<string, number>> {
   }
 }
 
-/**
- * Sort products by total units sold (desc).
- * If no order data, returns products sorted by newest first.
- */
 function sortByBestSelling(products: TApiProduct[], tally: Map<string, number>): TApiProduct[] {
   if (tally.size === 0) {
     return [...products].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -88,7 +80,6 @@ function sortByBestSelling(products: TApiProduct[], tally: Map<string, number>):
     const bSales = tally.get(b._id) ?? 0
     const aSales = tally.get(a._id) ?? 0
     if (bSales !== aSales) return bSales - aSales
-    // tie-break: newer product wins
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 }
@@ -164,19 +155,20 @@ function CartToastContainer() {
   }, [])
   if (_toastItems.length === 0) return null
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+    <div className="fixed bottom-4 right-4 left-4 z-[9999] flex flex-col gap-2 pointer-events-none sm:left-auto sm:right-6 sm:bottom-6 sm:w-auto">
       <style>{`
         @keyframes toastSlide {
-          from { opacity:0; transform:translateX(80px) scale(0.9); }
-          to   { opacity:1; transform:translateX(0) scale(1); }
+          from { opacity:0; transform:translateY(20px) scale(0.95); }
+          to   { opacity:1; transform:translateY(0) scale(1); }
         }
       `}</style>
       {_toastItems.map((toast) => {
         const imageUrl = toast.product.images?.[0] ? imgSrc(toast.product.images[0]) : null
         const isError = toast.type === 'error'
         return (
-          <div key={toast.id} className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-4 py-3"
-            style={{ animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards', minWidth: 300, maxWidth: 360 }}>
+          <div key={toast.id}
+            className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-4 py-3 w-full sm:min-w-[300px] sm:max-w-[360px]"
+            style={{ animation: 'toastSlide 0.35s cubic-bezier(0.34,1.2,0.64,1) forwards' }}>
             <div className={`h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
               {!isError && imageUrl
                 ? <img src={imageUrl} alt="" className="h-full w-full object-cover" />
@@ -187,7 +179,7 @@ function CartToastContainer() {
                 {isError ? 'Error' : '✓ Added to Bag!'}
               </p>
               {isError
-                ? <p className="text-sm text-gray-700">{toast.message}</p>
+                ? <p className="text-sm text-gray-700 line-clamp-2">{toast.message}</p>
                 : <>
                     <p className="text-sm font-semibold text-gray-900 truncate">{toast.product.name}</p>
                     <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
@@ -279,11 +271,11 @@ function useAddToCart(product: TApiProduct) {
 function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
   return (
     <div className="flex items-center gap-1.5">
-      <svg className="h-3.5 w-3.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+      <svg className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
       </svg>
       <span className="text-xs font-medium text-gray-500">
-        {rating.toFixed(1)} <span className="text-gray-400 font-normal">({reviews} reviews)</span>
+        {rating.toFixed(1)} <span className="text-gray-400 font-normal">({reviews})</span>
       </span>
     </div>
   )
@@ -298,7 +290,8 @@ function WishlistBtn() {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); e.preventDefault(); setWished((w) => !w) }}
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100 transition-all duration-200 hover:scale-110"
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm border border-gray-100 transition-all duration-200 hover:scale-110 active:scale-95"
+      aria-label="Add to wishlist"
     >
       {wished
         ? <svg className="h-4 w-4 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
@@ -308,19 +301,25 @@ function WishlistBtn() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Qty Stepper (for modal)
+// Qty Stepper
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
   return (
-    <div className="flex h-11 items-center overflow-hidden rounded-full border border-gray-200 bg-white">
-      <button onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50">
+    <div className="flex h-11 items-center overflow-hidden rounded-full border border-gray-200 bg-white flex-shrink-0">
+      <button
+        onClick={() => onChange(Math.max(1, value - 1))}
+        className="flex h-full w-10 sm:w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
+        aria-label="Decrease quantity"
+      >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
       </button>
-      <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50">
+      <span className="w-9 sm:w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
+      <button
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="flex h-full w-10 sm:w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
+        aria-label="Increase quantity"
+      >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
       </button>
     </div>
@@ -335,8 +334,10 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-gray-100">
-      <button onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800"
+      >
         {title}
         <svg className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +350,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal
+// Quick View Modal — FULLY RESPONSIVE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct; onClose: () => void; soldCount?: number }) {
@@ -384,76 +385,143 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
   }, [activeImg])
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div
+      className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
+      style={{ padding: '0' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
       <style>{`
-        @keyframes modalIn { from{opacity:0;transform:scale(0.94) translateY(24px);}to{opacity:1;transform:scale(1) translateY(0);} }
+        @keyframes modalInMobile {
+          from { opacity:0; transform:translateY(100%); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes modalIn {
+          from { opacity:0; transform:scale(0.94) translateY(24px); }
+          to   { opacity:1; transform:scale(1) translateY(0); }
+        }
         @keyframes imgIn { from{opacity:0;}to{opacity:1;} }
+        @media (max-width: 639px) {
+          .modal-container { animation: modalInMobile 0.35s cubic-bezier(0.32,0.72,0,1) forwards !important; }
+        }
+        @media (min-width: 640px) {
+          .modal-container { animation: modalIn 0.3s cubic-bezier(0.34,1.1,0.64,1) forwards !important; }
+        }
+        .thumbs-scroll::-webkit-scrollbar { display: none; }
+        .details-scroll::-webkit-scrollbar { width: 4px; }
+        .details-scroll::-webkit-scrollbar-track { background: transparent; }
+        .details-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 99px; }
       `}</style>
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
-        style={{ animation: 'modalIn 0.3s cubic-bezier(0.34,1.1,0.64,1) forwards' }}
-        onClick={(e) => e.stopPropagation()}>
 
-        {/* Close */}
-        <button onClick={onClose}
-          className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200">
+      {/* Modal container — bottom sheet on mobile, centered modal on sm+ */}
+      <div
+        className="modal-container relative flex w-full flex-col bg-white overflow-hidden
+          rounded-t-[28px] max-h-[92vh]
+          sm:rounded-3xl sm:max-w-2xl sm:max-h-[88vh] sm:mx-4
+          lg:max-w-4xl lg:flex-row lg:max-h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle (mobile only) */}
+        <div className="flex sm:hidden justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="h-1 w-10 rounded-full bg-gray-300"/>
+        </div>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 active:scale-95"
+          aria-label="Close"
+        >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
 
-        <div className="flex flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        {/* ── SCROLLABLE CONTENT WRAPPER ── */}
+        <div className="flex flex-col overflow-y-auto lg:flex-row lg:overflow-hidden flex-1 min-h-0">
 
-          {/* LEFT — Image */}
-          <div className="w-full flex-shrink-0 lg:w-[48%]">
-            <div className="relative aspect-square w-full overflow-hidden bg-gray-50 rounded-tl-3xl rounded-tr-3xl lg:rounded-tr-none lg:rounded-bl-3xl">
-              {hasImages ? (
-                <img key={activeImg} src={imgSrc(product.images[activeImg])} alt={product.name}
-                  className="h-full w-full object-cover" style={{ animation: 'imgIn 0.2s ease' }}/>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-gray-300">
-                  <svg className="h-20 w-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
+          {/* LEFT — Image section */}
+          <div className="w-full flex-shrink-0 lg:w-[46%]">
+            {/* Main image */}
+            <div className="relative bg-gray-50 overflow-hidden"
+              style={{ aspectRatio: '1/1', maxHeight: '50vw' }}
+              // On mobile keep image shorter; on tablet/desktop full square
+            >
+              {/* Use a responsive aspect ratio approach */}
+              <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+                <div className="absolute inset-0">
+                  {hasImages ? (
+                    <img
+                      key={activeImg}
+                      src={imgSrc(product.images[activeImg])}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                      style={{ animation: 'imgIn 0.2s ease' }}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-gray-300">
+                      <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* Badges */}
+                  <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+                    {soldCount && soldCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+                        Best Seller
+                      </span>
+                    ) : isNewIn(product.createdAt) ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
+                        <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        New in
+                      </span>
+                    ) : null}
+                    {discount >= 10 && (
+                      <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
+                    )}
+                  </div>
+
+                  {/* Prev/Next arrows */}
+                  {product.images.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                        className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                        aria-label="Previous image"
+                      >
+                        <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+                      </button>
+                      <button
+                        onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                        aria-label="Next image"
+                      >
+                        <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
-              {/* Badges */}
-              <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-                {soldCount && soldCount > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
-                 Best Seller
-                  </span>
-                ) : isNewIn(product.createdAt) ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
-                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                    New in
-                  </span>
-                ) : null}
-                {discount >= 10 && (
-                  <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
-                )}
               </div>
-              {/* Prev/Next */}
-              {product.images.length > 1 && (
-                <>
-                  <button onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                    className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg">
-                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
-                  </button>
-                  <button onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg">
-                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                  </button>
-                </>
-              )}
             </div>
+
             {/* Thumbnails */}
             {product.images.length > 1 && (
-              <div ref={thumbsRef} className="flex gap-2 overflow-x-auto p-3 bg-white" style={{ scrollbarWidth: 'none' }}>
+              <div
+                ref={thumbsRef}
+                className="thumbs-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
+                style={{ scrollbarWidth: 'none' }}
+              >
                 {product.images.map((img, idx) => (
-                  <button key={idx} onClick={() => setActiveImg(idx)}
-                    className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'}`}>
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImg(idx)}
+                    className={`h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                      activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'
+                    }`}
+                    aria-label={`View image ${idx + 1}`}
+                  >
                     <img src={imgSrc(img)} alt="" className="h-full w-full object-cover"/>
                   </button>
                 ))}
@@ -461,33 +529,33 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
             )}
           </div>
 
-          {/* RIGHT — Details */}
-          <div className="flex w-full flex-col overflow-y-auto border-l border-gray-100 p-6 lg:w-[52%] lg:max-h-[90vh]">
+          {/* RIGHT — Product details */}
+          <div className="details-scroll flex w-full flex-col border-t border-gray-100 p-4 sm:p-6 overflow-y-auto lg:w-[54%] lg:border-t-0 lg:border-l">
 
             {categoryName && (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
             )}
 
-            <h2 className="text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight mb-1 pr-8">{product.name}</h2>
             {product.title && product.title !== product.name && (
-              <p className="text-sm text-gray-400 mb-3">{product.title}</p>
+              <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
 
-            <div className="mb-4">
+            <div className="mb-3">
               <StarRating rating={rating} reviews={reviews}/>
             </div>
 
             {/* Sold count badge */}
             {soldCount && soldCount > 0 && (
-              <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-600 w-fit">
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-600 w-fit">
                 <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 {soldCount} sold · trending now
               </div>
             )}
 
             {/* Price */}
-            <div className="flex items-center gap-3 mb-5">
-              <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-lg font-bold text-emerald-700">
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-base sm:text-lg font-bold text-emerald-700">
                 {formatPrice(product.discountPrice)}
               </span>
               {product.exactPrice > product.discountPrice && (
@@ -498,23 +566,27 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
               )}
             </div>
 
+            {/* Color swatches */}
             {swatches.length > 0 && (
-              <div className="mb-5">
+              <div className="mb-4">
                 <p className="mb-2 text-xs font-semibold text-gray-500">
                   Colour: <span className="capitalize text-gray-800">{colorName}</span>
                 </p>
                 <div className="flex items-center gap-2">
                   {swatches.map((swatch, i) => (
-                    <span key={i} title={swatch.name}
+                    <span
+                      key={i}
+                      title={swatch.name}
                       className="h-6 w-6 rounded-full border-2 border-gray-900 ring-2 ring-gray-900 ring-offset-1 cursor-default"
-                      style={{ backgroundColor: swatch.hex }}/>
+                      style={{ backgroundColor: swatch.hex }}
+                    />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Stock */}
-            <div className="mb-5">
+            {/* Stock status */}
+            <div className="mb-4">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                 product.stock > 5 ? 'bg-emerald-50 text-emerald-700'
                   : product.stock > 0 ? 'bg-amber-50 text-amber-600'
@@ -524,15 +596,15 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
               </span>
             </div>
 
-            {/* Qty + Add to Bag */}
+            {/* Quantity + Add to Bag — stack on very small, row on sm+ */}
             <div className="mb-4">
               <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-2 xs:flex-row sm:flex-row">
                 <QtyStepper value={qty} onChange={setQty} max={product.stock || 1}/>
                 <button
                   onClick={() => addToCart(qty)}
                   disabled={outOfStock || adding}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] min-h-[44px] ${
                     outOfStock ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                       : adding ? 'cursor-wait bg-gray-800 text-white'
                       : added ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
@@ -550,12 +622,11 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
               </div>
             </div>
 
-            <hr className="border-gray-100 mb-4"/>
+            <hr className="border-gray-100 mb-3"/>
 
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
-            <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400"></p>
+            <div className="mt-auto flex items-center justify-end pt-4 border-t border-gray-100">
               <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
                 View full page →
               </a>
@@ -568,7 +639,7 @@ function QuickViewModal({ product, onClose, soldCount }: { product: TApiProduct;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card
+// Product Card — FULLY RESPONSIVE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({
@@ -580,131 +651,132 @@ function ProductCard({
   data: TApiProduct
   onQuickView: (p: TApiProduct) => void
   soldCount: number
-  rank: number // 1-based position in best-seller list
+  rank: number
 }) {
   const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
   const colorName = data.color?.name ?? null
   const discount = calcDiscount(data.exactPrice, data.discountPrice)
-  const { rating, reviews } = fakeRating(data._id)
-  const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
   const swatches = getSwatches(data)
   const isBestSeller = soldCount > 0
 
   const { addToCart, loading, added } = useAddToCart(data)
 
+  // On mobile: show action buttons always (no hover). On desktop: show on hover.
+  // We use a state for touch detection
+  const [isTouched, setIsTouched] = useState(false)
+
   return (
     <div className="group flex flex-col">
 
       {/* ── Image box ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gray-100">
-        <div className="relative aspect-square w-full">
-          {imageUrl ? (
-            <img src={imageUrl} alt={data.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"/>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-gray-300">
-              <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100">
+        <div className="relative w-full" style={{ paddingBottom: '100%' }}>
+          <div className="absolute inset-0">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={data.name}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-gray-300">
+                <svg className="h-12 w-12 sm:h-16 sm:w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+            )}
+
+            {/* Out of stock overlay */}
+            {outOfStock && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-2xl sm:rounded-3xl">
+                <span className="rounded-full bg-gray-800/80 px-4 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
+              </div>
+            )}
+
+            {/* Top-left badges */}
+            <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
+              {isBestSeller && !outOfStock && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#EA597A] px-2 py-1 text-[10px] sm:text-[11px] font-bold text-white shadow-sm">
+                  Best Seller
+                </span>
+              )}
+              {discount >= 10 && (
+                <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
+              )}
             </div>
-          )}
 
-          {/* Out of stock overlay */}
-          {outOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-3xl">
-              <span className="rounded-full bg-gray-800/80 px-4 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
+            {/* ── MOBILE: always-visible action buttons at bottom ── */}
+            {/* ── DESKTOP: hover reveal ── */}
+            <div
+              className={`
+                absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5
+                transition-all duration-300
+                sm:translate-y-full sm:p-3 sm:gap-2 sm:group-hover:translate-y-0
+              `}
+            >
+              {/* Quick View — visible on mobile always, hover on desktop */}
+              <button
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
+                className="w-full rounded-xl sm:rounded-2xl bg-white/95 py-2 sm:py-2.5 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
+              >
+                Quick View
+              </button>
+
+              {/* Add to Bag */}
+              <button
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
+                disabled={outOfStock || loading}
+                className={`w-full rounded-xl sm:rounded-2xl py-2 sm:py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
+                  outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
+                    : added ? 'bg-emerald-500 text-white shadow-md'
+                    : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'}`}
+              >
+                {loading
+                  ? <><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
+                  : added ? <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
+                  : outOfStock ? 'Out of Stock'
+                  : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>}
+              </button>
             </div>
-          )}
-        </div>
-
-        {/* Top-left badge: Best Seller > New In */}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
-          {isBestSeller && !outOfStock ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#EA597A] px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm">
-               Best Seller
-            </span>
-          ) :null}
-           {/* newIn && !outOfStock ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
-              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-              New in
-            </span>
-          ) : null} */}
-
-          {discount >= 10 && (
-            <span className="rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
-          )}
-        </div>
-
-        {/* Hover overlay — Quick View + Add to Bag */}
-        <div className="absolute inset-x-0 bottom-0 flex translate-y-full flex-col gap-2 p-3 transition-transform duration-300 group-hover:translate-y-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
-            className="w-full rounded-2xl bg-white/95 py-2.5 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
-          >
-            Quick View
-          </button>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
-            disabled={outOfStock || loading}
-            className={`w-full rounded-2xl py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
-              outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
-                : added ? 'bg-emerald-500 text-white shadow-md'
-                : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'}`}
-          >
-            {loading
-              ? <><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
-              : added ? <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
-              : outOfStock ? 'Out of Stock'
-              : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>}
-          </button>
+          </div>
         </div>
       </div>
 
       {/* ── Info below card ── */}
-      <div className="mt-3 px-0.5">
+      <div className="mt-2.5 sm:mt-3 px-0.5">
 
         {swatches.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
             {swatches.map((swatch, i) => (
-              <span key={i} title={swatch.name}
+              <span
+                key={i}
+                title={swatch.name}
                 className="h-4 w-4 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
-                style={{ backgroundColor: swatch.hex }}/>
+                style={{ backgroundColor: swatch.hex }}
+              />
             ))}
           </div>
         )}
 
-        <h3 className="text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
+        <h3 className="text-[14px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
           {data.name}
         </h3>
 
-        <p className="text-[13px] text-gray-400 mb-2">
+        <p className="text-[12px] sm:text-[13px] text-gray-400 mb-1.5">
           {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
         </p>
 
-        {/* Sold count indicator */}
-        {/* {isBestSeller && (
-          <p className="text-[11px] font-semibold text-orange-500 mb-1.5">
-            🔥 {soldCount} sold
-          </p>
-        )} */}
-
         {/* Price row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700">
-              {formatPrice(data.discountPrice)}
-            </span>
-            {data.exactPrice > data.discountPrice && (
-              <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
-            )}
-          </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="rounded-full bg-emerald-100 px-2.5 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-bold text-emerald-700">
+            {formatPrice(data.discountPrice)}
+          </span>
+          {data.exactPrice > data.discountPrice && (
+            <span className="text-[11px] sm:text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
+          )}
         </div>
       </div>
     </div>
@@ -718,17 +790,14 @@ function ProductCard({
 function ProductCardSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="aspect-square w-full animate-pulse rounded-3xl bg-gray-200"/>
+      <div className="w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200" style={{ paddingBottom: '100%', position: 'relative' }}/>
       <div className="mt-3 space-y-2 px-0.5">
         <div className="flex gap-1.5">
           {[0,1,2].map((i) => <div key={i} className="h-4 w-4 animate-pulse rounded-full bg-gray-200"/>)}
         </div>
         <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
         <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
-        <div className="flex items-center justify-between">
-          <div className="h-7 w-20 animate-pulse rounded-full bg-gray-200"/>
-          <div className="h-3 w-24 animate-pulse rounded-full bg-gray-200"/>
-        </div>
+        <div className="h-7 w-20 animate-pulse rounded-full bg-gray-200"/>
       </div>
     </div>
   )
@@ -775,7 +844,6 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
       if (!isBackground) setLoading(true)
       setError(null)
 
-      // Fetch both APIs in parallel — orderview failure is non-fatal
       const [productsRes, tally] = await Promise.all([
         fetch(`${BASE_URL}/api/productview`, { cache: 'no-store' }),
         fetchBestSellerMap(),
@@ -784,8 +852,6 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
       if (!productsRes.ok) throw new Error(`Server error ${productsRes.status}`)
       const json = await productsRes.json()
       const list: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
-
-      // Sort: best sellers first (by tally), then newest
       const sorted = sortByBestSelling(list, tally)
 
       if (isMounted.current) {
@@ -816,7 +882,6 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
     setQuickViewProduct(product)
   }, [])
 
-  // Determine heading — show "Best Sellers" if order data exists, else "New Arrivals"
   const hasOrderData = salesTally.size > 0
   const displayHeading = heading ?? (hasOrderData ? 'Best Sellers' : 'New Arrivals')
 
@@ -838,20 +903,14 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
           >
             {displayHeading}
           </Heading>
-
-          {/* Live dot */}
-          {pollInterval > 0 && lastUpdated && !loading && (
-            <div className="absolute right-28 top-1/2 hidden -translate-y-1/2 items-center gap-1.5 lg:flex">
-              {/* optionally show last updated time */}
-            </div>
-          )}
         </div>
 
         {/* Loading skeletons */}
         {loading && (
-          <div className="flex gap-6 overflow-hidden">
+          <div className="flex gap-3 sm:gap-5 md:gap-7 overflow-hidden">
             {[0,1,2,3].map((i) => (
-              <div key={i} className="w-[80%] flex-shrink-0 sm:w-1/2 md:w-1/3 xl:w-1/4">
+              <div key={i} className="flex-shrink-0" style={{ flexBasis: '58%', minWidth: 0 }}>
+                <style>{`.skel-item { flex: 0 0 58%; } @media(min-width:480px){.skel-item{flex:0 0 50%;}} @media(min-width:768px){.skel-item{flex:0 0 33.333%;}} @media(min-width:1280px){.skel-item{flex:0 0 25%;}}`}</style>
                 <ProductCardSkeleton/>
               </div>
             ))}
@@ -860,11 +919,13 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
 
         {/* Error */}
         {error && !loading && (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-red-100 bg-red-50 py-14 text-center">
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-red-100 bg-red-50 py-10 px-4 text-center">
             <p className="text-sm font-semibold text-red-600">Failed to load products</p>
             <p className="mt-1 text-xs text-gray-400">{error}</p>
-            <button onClick={() => fetchProducts(false)}
-              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700">
+            <button
+              onClick={() => fetchProducts(false)}
+              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95"
+            >
               Retry
             </button>
           </div>
@@ -872,20 +933,47 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
 
         {/* Carousel */}
         {!loading && !error && products.length > 0 && (
-          <div className="embla" ref={emblaRef}>
-            <div className="-ms-5 embla__container sm:-ms-7">
-              {products.map((product, index) => (
-                <div key={product._id} className="embla__slide basis-[80%] ps-5 sm:ps-7 sm:basis-1/2 md:basis-1/3 xl:basis-1/4">
-                  <ProductCard
-                    data={product}
-                    onQuickView={handleQuickView}
-                    soldCount={salesTally.get(product._id) ?? 0}
-                    rank={index + 1}
-                  />
-                </div>
-              ))}
+          <>
+            <style>{`
+              .bs-slide {
+                flex: 0 0 58%;
+                padding-left: 12px;
+              }
+              @media (min-width: 480px) {
+                .bs-slide { flex: 0 0 50%; padding-left: 16px; }
+              }
+              @media (min-width: 640px) {
+                .bs-slide { flex: 0 0 50%; padding-left: 20px; }
+              }
+              @media (min-width: 768px) {
+                .bs-slide { flex: 0 0 33.333%; padding-left: 24px; }
+              }
+              @media (min-width: 1280px) {
+                .bs-slide { flex: 0 0 25%; padding-left: 28px; }
+              }
+              .bs-container {
+                margin-left: -12px;
+              }
+              @media (min-width: 480px) { .bs-container { margin-left: -16px; } }
+              @media (min-width: 640px) { .bs-container { margin-left: -20px; } }
+              @media (min-width: 768px) { .bs-container { margin-left: -24px; } }
+              @media (min-width: 1280px) { .bs-container { margin-left: -28px; } }
+            `}</style>
+            <div className="embla overflow-hidden" ref={emblaRef}>
+              <div className="bs-container embla__container flex">
+                {products.map((product, index) => (
+                  <div key={product._id} className="bs-slide embla__slide min-w-0">
+                    <ProductCard
+                      data={product}
+                      onQuickView={handleQuickView}
+                      soldCount={salesTally.get(product._id) ?? 0}
+                      rank={index + 1}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Empty */}
@@ -908,4 +996,4 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
   )
 }
 
-export default BestSellerProduct;
+export default BestSellerProduct

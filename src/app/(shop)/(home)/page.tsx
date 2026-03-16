@@ -45,7 +45,7 @@ async function PageHome() {
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
         <SectionSliderProductCard 
-        // data={carouselProducts1}
+        // data={carouselProducts1} 
          />
         {/* <Divider /> */}
          <div className="pb-16">
