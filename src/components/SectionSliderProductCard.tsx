@@ -104,7 +104,8 @@ function CartToastContainer() {
   }, [])
   if (_toastItems.length === 0) return null
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-2rem)]">
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
+      style={{ maxWidth: 'calc(100vw - 2rem)' }}>
       <style>{`
         @keyframes toastSlide {
           from { opacity:0; transform:translateX(80px) scale(0.9); }
@@ -117,22 +118,26 @@ function CartToastContainer() {
         return (
           <div
             key={toast.id}
-            className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5 sm:px-4 sm:py-3"
-            style={{ animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards', minWidth: 240, maxWidth: 340 }}
+            className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5"
+            style={{
+              animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
+              minWidth: 220,
+              maxWidth: 320,
+            }}
           >
-            <div className={`h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
+            <div className={`h-10 w-10 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
               {!isError && imageUrl
                 ? <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-                : <span className="text-lg sm:text-xl">{isError ? '⚠️' : '🛍️'}</span>}
+                : <span className="text-lg">{isError ? '⚠️' : '🛍️'}</span>}
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-xs font-bold mb-0.5 ${isError ? 'text-red-600' : 'text-emerald-600'}`}>
                 {isError ? 'Error' : '✓ Added to Bag!'}
               </p>
               {isError
-                ? <p className="text-xs sm:text-sm text-gray-700 line-clamp-2">{toast.message}</p>
+                ? <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
                 : <>
-                    <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{toast.product.name}</p>
+                    <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
                     <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
                   </>}
             </div>
@@ -233,7 +238,7 @@ function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Qty Stepper (for modal)
+// Qty Stepper
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
@@ -243,14 +248,18 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: num
         onClick={() => onChange(Math.max(1, value - 1))}
         className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
+        </svg>
       </button>
       <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
       <button
         onClick={() => onChange(Math.min(max, value + 1))}
         className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+        </svg>
       </button>
     </div>
   )
@@ -282,7 +291,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal — FULLY RESPONSIVE
+// Quick View Modal — FULLY RESPONSIVE (FIXED)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
@@ -305,9 +314,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
     return () => window.removeEventListener('keydown', fn)
   }, [onClose])
 
+  // Lock body scroll when modal is open
   useEffect(() => {
+    const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => { document.body.style.overflow = prev }
   }, [])
 
   useEffect(() => {
@@ -319,135 +330,144 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
   return (
     <div
       className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm"
-      style={{ padding: '0' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <style>{`
         @keyframes modalInMobile {
-          from { opacity:0; transform:translateY(100%); }
+          from { opacity:0; transform:translateY(60px); }
           to   { opacity:1; transform:translateY(0); }
         }
-        @keyframes modalIn {
-          from { opacity:0; transform:scale(0.94) translateY(24px); }
+        @keyframes modalInDesktop {
+          from { opacity:0; transform:scale(0.95) translateY(16px); }
           to   { opacity:1; transform:scale(1) translateY(0); }
         }
-        @keyframes imgIn { from{opacity:0;}to{opacity:1;} }
-        @media (max-width: 639px) {
-          .modal-animated { animation: modalInMobile 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards !important; }
+        @keyframes imgFadeIn { from{opacity:0;}to{opacity:1;} }
+
+        .modal-mobile {
+          animation: modalInMobile 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
         }
         @media (min-width: 640px) {
-          .modal-animated { animation: modalIn 0.3s cubic-bezier(0.34,1.1,0.64,1) forwards !important; }
+          .modal-mobile {
+            animation: modalInDesktop 0.28s cubic-bezier(0.34,1.1,0.64,1) forwards;
+          }
         }
-        .thumbs-scroll::-webkit-scrollbar { display: none; }
-        .details-scroll::-webkit-scrollbar { width: 4px; }
-        .details-scroll::-webkit-scrollbar-track { background: transparent; }
-        .details-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+        .thumbs-no-scroll::-webkit-scrollbar { display: none; }
+        .details-panel::-webkit-scrollbar { width: 3px; }
+        .details-panel::-webkit-scrollbar-track { background: transparent; }
+        .details-panel::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
 
-      {/* Modal container — bottom sheet on mobile, centered on sm+ */}
+      {/*
+        MOBILE: bottom sheet — fills most of screen, scrollable internally
+        DESKTOP (sm+): centered card, max 90vh, side-by-side layout
+      */}
       <div
-        className="modal-animated relative flex w-full flex-col overflow-hidden bg-white shadow-2xl
+        className="modal-mobile relative w-full bg-white shadow-2xl flex flex-col
           rounded-t-3xl
-          sm:rounded-3xl sm:max-w-3xl sm:mx-4 sm:max-h-[90vh]
-          max-h-[92vh]"
+          max-h-[93dvh]
+          sm:rounded-3xl sm:max-w-3xl sm:mx-4 sm:max-h-[88vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle — mobile only */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
-          <div className="h-1 w-10 rounded-full bg-gray-200"/>
+        <div className="flex justify-center pt-2.5 pb-1 sm:hidden flex-shrink-0">
+          <div className="h-1 w-10 rounded-full bg-gray-200" />
         </div>
 
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 active:scale-95"
+          className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100/90 text-gray-500 transition hover:bg-gray-200 active:scale-95"
+          aria-label="Close"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
 
-        {/* Scrollable body */}
+        {/*
+          MOBILE: single column, scrollable top-to-bottom
+          DESKTOP: two columns side-by-side, each independently scrollable
+        */}
         <div className="flex flex-col overflow-y-auto sm:flex-row sm:overflow-hidden flex-1 min-h-0">
 
-          {/* LEFT — Image section */}
-          <div className="w-full flex-shrink-0 sm:w-[45%]">
+          {/* ── LEFT: Image panel ── */}
+          {/* On mobile: fixed-ratio image that doesn't overflow. On desktop: sticky/fixed width panel */}
+          <div className="w-full flex-shrink-0 sm:w-[44%] sm:overflow-y-auto sm:flex sm:flex-col">
 
-            {/* Main image */}
-            <div className="relative overflow-hidden bg-gray-50"
-              style={{ aspectRatio: '1/1', width: '100%', maxHeight: '50vw' }}
-            >
-              {/* On mobile, cap the image height */}
-              <div className="relative w-full h-full sm:aspect-square sm:max-h-none"
-                style={{ height: '100%' }}>
-                {hasImages ? (
-                  <img
-                    key={activeImg}
-                    src={imgSrc(product.images[activeImg])}
-                    alt={product.name}
-                    className="h-full w-full object-cover"
-                    style={{ animation: 'imgIn 0.2s ease' }}
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-gray-300">
-                    <svg className="h-16 w-16 sm:h-20 sm:w-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                  </div>
-                )}
-
-                {/* Badges */}
-                <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
-                  {isNewIn(product.createdAt) && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
-                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                      </svg>
-                      New in
-                    </span>
-                  )}
-                  {discount >= 10 && (
-                    <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">{discount}% Off</span>
-                  )}
+            {/* Main image — square on desktop, 80vw max-height on mobile */}
+            <div className="relative bg-gray-50 w-full overflow-hidden"
+              style={{ aspectRatio: '1 / 1' }}>
+              {hasImages ? (
+                <img
+                  key={activeImg}
+                  src={imgSrc(product.images[activeImg])}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                  style={{ animation: 'imgFadeIn 0.18s ease' }}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-gray-300">
+                  <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
                 </div>
+              )}
 
-                {/* Prev/Next arrows */}
-                {product.images.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                    >
-                      <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                    >
-                      <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                      </svg>
-                    </button>
-                  </>
+              {/* Badges */}
+              <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
+                {isNewIn(product.createdAt) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
+                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    New in
+                  </span>
+                )}
+                {discount >= 10 && (
+                  <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
+                    {discount}% Off
+                  </span>
                 )}
               </div>
+
+              {/* Prev/Next arrows */}
+              {product.images.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                    className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                    aria-label="Previous image"
+                  >
+                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
+                    aria-label="Next image"
+                  >
+                    <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Thumbnails */}
             {product.images.length > 1 && (
               <div
                 ref={thumbsRef}
-                className="thumbs-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
+                className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
                 style={{ scrollbarWidth: 'none' }}
               >
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImg(idx)}
-                    className={`h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                    className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
                       activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'
                     }`}
                   >
@@ -458,8 +478,14 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             )}
           </div>
 
-          {/* RIGHT — Details */}
-          <div className="details-scroll flex w-full flex-col border-t border-gray-100 sm:border-t-0 sm:border-l overflow-y-auto p-4 sm:p-6 sm:w-[55%] sm:max-h-[90vh]">
+          {/* ── RIGHT: Details panel ── */}
+          {/*
+            On mobile: continues below the image in the same scroll container (no overflow-hidden).
+            On desktop: its own scrollable panel, full height.
+          */}
+          <div className="details-panel w-full flex flex-col border-t border-gray-100
+            sm:border-t-0 sm:border-l sm:w-[56%] sm:overflow-y-auto
+            p-4 sm:p-6">
 
             {/* Category */}
             {categoryName && (
@@ -467,25 +493,27 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             )}
 
             {/* Name */}
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
             {product.title && product.title !== product.name && (
               <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
 
             {/* Rating */}
-            <div className="mb-3 sm:mb-4">
+            <div className="mb-3">
               <StarRating rating={rating} reviews={reviews}/>
             </div>
 
             {/* Price */}
-            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-5 flex-wrap">
-              <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base sm:text-lg font-bold text-emerald-700">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
                 {formatPrice(product.discountPrice)}
               </span>
               {product.exactPrice > product.discountPrice && (
                 <>
                   <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice)}</span>
-                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">-{discount}%</span>
+                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">
+                    -{discount}%
+                  </span>
                 </>
               )}
             </div>
@@ -524,7 +552,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             {/* Qty + Add to Bag */}
             <div className="mb-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
-              <div className="flex gap-2 sm:gap-3">
+              <div className="flex gap-2">
                 <QtyStepper value={qty} onChange={setQty} max={product.stock || 1}/>
                 <button
                   onClick={() => addToCart(qty)}
@@ -537,9 +565,20 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                   }`}
                 >
                   {adding ? (
-                    <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                      </svg>
+                      Adding…
+                    </>
                   ) : added ? (
-                    <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+                      </svg>
+                      Added!
+                    </>
                   ) : (
                     <>
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -557,14 +596,18 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             {/* Accordion */}
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
-            <div className="mt-auto flex items-center justify-end pt-4 border-t border-gray-100">
-              <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
+            {/* Footer */}
+            <div className="flex items-center justify-end pt-4 mt-auto border-t border-gray-100">
+              <a
+                href={`/product/${product._id}`}
+                className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline"
+              >
                 View full page →
               </a>
             </div>
 
-            {/* Bottom safe area padding on mobile */}
-            <div className="h-2 sm:h-0 flex-shrink-0"/>
+            {/* Safe area bottom on mobile */}
+            <div className="h-safe-bottom sm:h-0 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}/>
           </div>
         </div>
       </div>
@@ -573,7 +616,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card — FULLY RESPONSIVE
+// Product Card — FULLY RESPONSIVE (FIXED)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
@@ -584,9 +627,31 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
   const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
   const swatches = getSwatches(data)
-  const [showActions, setShowActions] = useState(false)
+
+  // Track hover/touch state for the overlay
+  const [overlayVisible, setOverlayVisible] = useState(false)
+  // Track touch so we can dismiss on second tap
+  const touchedRef = useRef(false)
 
   const { addToCart, loading, added } = useAddToCart(data)
+
+  const handleTouchStart = useCallback(() => {
+    if (!touchedRef.current) {
+      touchedRef.current = true
+      setOverlayVisible(true)
+      // Auto-hide after 3 seconds of inactivity
+      const timer = setTimeout(() => {
+        touchedRef.current = false
+        setOverlayVisible(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  const handleTouchOutside = useCallback(() => {
+    touchedRef.current = false
+    setOverlayVisible(false)
+  }, [])
 
   return (
     <div className="group flex flex-col">
@@ -594,10 +659,9 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
       {/* ── Image box ── */}
       <div
         className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100"
-        // On mobile: tap to toggle hover actions
-        onTouchStart={() => setShowActions(true)}
-        onMouseEnter={() => setShowActions(true)}
-        onMouseLeave={() => setShowActions(false)}
+        onMouseEnter={() => setOverlayVisible(true)}
+        onMouseLeave={() => setOverlayVisible(false)}
+        onTouchStart={handleTouchStart}
       >
         <div className="relative aspect-square w-full">
           {imageUrl ? (
@@ -608,7 +672,7 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-gray-300">
-              <svg className="h-12 w-12 sm:h-16 sm:w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
@@ -618,15 +682,17 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           {/* Out of stock overlay */}
           {outOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-2xl sm:rounded-3xl">
-              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
+              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">
+                Out of Stock
+              </span>
             </div>
           )}
         </div>
 
-        {/* Top-left: New in badge */}
+        {/* New in badge */}
         {newIn && !outOfStock && (
-          <div className="absolute left-2.5 top-2.5 sm:left-3 sm:top-3">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 sm:px-2.5 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
+          <div className="absolute left-2.5 top-2.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
               <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
@@ -635,32 +701,33 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           </div>
         )}
 
-        {/* Hover/tap overlay — Quick View + Add to Bag */}
-        {/* On desktop: slide up on hover. On mobile: always visible when showActions */}
+        {/* Action overlay — slides up on hover/touch */}
         <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-2 p-2.5 sm:p-3 transition-transform duration-300
-            ${showActions ? 'translate-y-0' : 'translate-y-full group-hover:translate-y-0'}`}
+          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5 transition-transform duration-300 ease-out ${
+            overlayVisible ? 'translate-y-0' : 'translate-y-full'
+          }`}
         >
-          {/* Quick View — hidden on mobile to save space, tap goes straight to add to cart */}
+          {/* Quick View */}
           <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
-            className="hidden sm:block w-full rounded-xl sm:rounded-2xl bg-white/95 py-2.5 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onQuickView(data)
+            }}
+            className="w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
           >
             Quick View
           </button>
 
-          {/* On mobile, show both buttons stacked */}
+          {/* Add to Bag */}
           <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
-            className="sm:hidden w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition active:scale-[0.97]"
-          >
-            Quick View
-          </button>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              addToCart(1)
+            }}
             disabled={outOfStock || loading}
-            className={`w-full rounded-xl sm:rounded-2xl py-2 sm:py-2.5 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
+            className={`w-full rounded-xl py-2 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
               outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
                 : added ? 'bg-emerald-500 text-white shadow-md'
@@ -668,26 +735,44 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
             }`}
           >
             {loading
-              ? <><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>
-              : added ? <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>
-              : outOfStock ? 'Out of Stock'
-              : <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>
+              ? <>
+                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                  </svg>
+                  Adding…
+                </>
+              : added
+              ? <>
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Added!
+                </>
+              : outOfStock
+              ? 'Out of Stock'
+              : <>
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                  </svg>
+                  Add to Bag
+                </>
             }
           </button>
         </div>
       </div>
 
       {/* ── Info below card ── */}
-      <div className="mt-2.5 sm:mt-3 px-0.5">
+      <div className="mt-2.5 px-0.5">
 
-        {/* Color swatch dot */}
+        {/* Color swatches */}
         {swatches.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
             {swatches.map((swatch, i) => (
               <span
                 key={i}
                 title={swatch.name}
-                className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
+                className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
                 style={{ backgroundColor: swatch.hex }}
               />
             ))}
@@ -700,13 +785,15 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         </h3>
 
         {/* Color / category subtitle */}
-        <p className="text-[12px] sm:text-[13px] text-gray-400 mb-1.5 sm:mb-2">
-          {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
+        <p className="text-[11px] sm:text-[13px] text-gray-400 mb-1.5">
+          {colorName
+            ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}`
+            : data.category?.name ?? ''}
         </p>
 
         {/* Price row */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <span className="rounded-full bg-emerald-100 px-2.5 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-bold text-emerald-700">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
             {formatPrice(data.discountPrice)}
           </span>
           {data.exactPrice > data.discountPrice && (
@@ -728,7 +815,7 @@ function ProductCardSkeleton() {
       <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200"/>
       <div className="mt-3 space-y-2 px-0.5">
         <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => <div key={i} className="h-4 w-4 animate-pulse rounded-full bg-gray-200"/>)}
+          {[0, 1, 2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200"/>)}
         </div>
         <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
         <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
@@ -768,14 +855,14 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   const [products, setProducts] = useState<TApiProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
   const isMounted = useRef(true)
 
-  // Responsive embla options — 1 slide on mobile, auto on larger
   const [emblaRef, emblaApi] = useEmblaCarousel({
     ...emblaOptions,
     align: 'start',
+    // Ensure dragging works well on mobile
+    dragFree: false,
   })
 
   const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
@@ -790,7 +877,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
       const json = await res.json()
       const list: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      if (isMounted.current) { setProducts(list); setLastUpdated(new Date()) }
+      if (isMounted.current) { setProducts(list) }
     } catch (err: any) {
       if (isMounted.current) setError(err.message ?? 'Failed to load products')
     } finally {
@@ -836,18 +923,16 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
         {/* Loading skeletons */}
         {loading && (
-          <div className="flex gap-4 sm:gap-6 overflow-hidden">
+          <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="w-[47%] flex-shrink-0 sm:w-1/2 md:w-1/3 xl:w-1/4">
-                <ProductCardSkeleton/>
-              </div>
+              <ProductCardSkeleton key={i}/>
             ))}
           </div>
         )}
 
         {/* Error */}
         {error && !loading && (
-          <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-red-100 bg-red-50 py-12 sm:py-14 text-center px-4">
+          <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-red-100 bg-red-50 py-12 text-center px-4">
             <p className="text-sm font-semibold text-red-600">Failed to load products</p>
             <p className="mt-1 text-xs text-gray-400">{error}</p>
             <button
@@ -862,16 +947,19 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
         {/* Carousel */}
         {!loading && !error && products.length > 0 && (
           <div className="embla overflow-hidden" ref={emblaRef}>
-            <div className="embla__container flex -ms-3 sm:-ms-5 md:-ms-7">
+            <div className="embla__container flex -ml-3 sm:-ml-5">
               {products.map((product) => (
                 <div
                   key={product._id}
-                  // 2 per row on mobile, 2 on sm, 3 on md, 4 on xl
-                  className="embla__slide flex-shrink-0 ps-3 sm:ps-5 md:ps-7
-                    basis-[47%]
-                    sm:basis-1/2
-                    md:basis-1/3
-                    xl:basis-1/4"
+                  /*
+                   * Mobile  (default): 2 cards visible — each ~50% minus half the gap
+                   * sm:      still 2 cards
+                   * md:      3 cards
+                   * xl:      4 cards
+                   *
+                   * We use calc() so there's a visible peek of the next card on mobile.
+                   */
+                  className="embla__slide flex-[0_0_calc(50%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0"
                 >
                   <ProductCard data={product} onQuickView={handleQuickView}/>
                 </div>
@@ -882,7 +970,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
 
         {/* Empty */}
         {!loading && !error && products.length === 0 && (
-          <div className="flex items-center justify-center rounded-2xl sm:rounded-3xl bg-gray-50 py-12 sm:py-14">
+          <div className="flex items-center justify-center rounded-2xl sm:rounded-3xl bg-gray-50 py-12">
             <p className="text-sm text-gray-400">No products available.</p>
           </div>
         )}
