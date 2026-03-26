@@ -1,80 +1,134 @@
+"use client";
+
 import Logo from '@/components/Logo'
 import { CustomLink } from '@/data/types'
 import SocialsList1 from '@/shared/SocialsList1/SocialsList1'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 
-interface WidgetFooterMenu {
+interface StaticWidgetMenu {
   id: string
   title: string
   menus: CustomLink[]
 }
 
-const widgetMenus: WidgetFooterMenu[] = [
+interface CategoryMenu {
+  href: string
+  label: string
+  id: string
+}
+
+interface CategoryWidgetMenu {
+  id: string
+  title: string
+  menus: CategoryMenu[]
+}
+
+type WidgetFooterMenu = StaticWidgetMenu | CategoryWidgetMenu
+
+interface Category {
+  _id: string
+  name: string
+  subCategories?: any[]
+  createdAt: string
+  updatedAt: string
+  __v: number
+  categoriesimg?: string
+}
+
+const widgetMenus: StaticWidgetMenu[] = [
   {
     id: '5',
-    title: 'Getting started',
+    title: 'Quick Links',
     menus: [
-      { href: '/', label: 'Release Notes' },
-      { href: '/', label: 'Upgrade Guide' },
-      { href: '/', label: 'Browser Support' },
-      { href: '/', label: 'Dark Mode' },
-    ],
-  },
-  {
-    id: '1',
-    title: 'Explore',
-    menus: [
-      { href: '/', label: 'Prototyping' },
-      { href: '/', label: 'Design systems' },
-      { href: '/', label: 'Pricing' },
-      { href: '/', label: 'Security' },
-    ],
-  },
-  {
-    id: '2',
-    title: 'Resources',
-    menus: [
-      { href: '/', label: 'Best practices' },
-      { href: '/', label: 'Support' },
-      { href: '/', label: 'Developers' },
-      { href: '/', label: 'Learn design' },
+      { href: '/', label: 'Home' },
+      { href: '/allproduct', label: 'All Products' },
+      { href: '/contact', label: 'Contact Us' },
     ],
   },
   {
     id: '4',
-    title: 'Community',
+    title: 'Policy Info',
     menus: [
-      { href: '/', label: 'Discussion Forums' },
-      { href: '/', label: 'Code of Conduct' },
-      { href: '/', label: 'Contributing' },
-      { href: '/', label: 'API Reference' },
+      { href: '/Cancellation-Refund', label: 'Cancellation & Refund' },
+      { href: '/PrivacyPolicy', label: 'Shipping Policy' },
+      { href: '/TermsConditions', label: 'Terms & Conditions' },
     ],
   },
 ]
 
 const Footer: React.FC = () => {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesone, setCategoriesone] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7000'
+      const response = await fetch(`${apiBase}/api/categoryview`)
+      const data = await response.json()
+
+      // API returns { categories: [...] }
+      const categoryList: Category[] = data.categories || []
+      setCategories(categoryList.slice(0, 4))
+      setCategoriesone(categoryList.slice(4, 8))
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const renderWidgetMenuItem = (menu: WidgetFooterMenu, index: number) => {
     return (
-      <div key={index} className="text-sm">
-        <h2 className="font-semibold text-neutral-700 dark:text-neutral-200">{menu.title}</h2>
+      <div key={menu.id} className="text-sm">
+        <h2 className="font-semibold text-neutral-700 dark:text-neutral-200">
+          {menu.title}
+        </h2>
         <ul className="mt-5 space-y-4">
-          {menu.menus.map((item, index) => (
-            <li key={index}>
-              <a
-                key={index}
-                className="text-neutral-600 hover:text-black dark:text-neutral-300 dark:hover:text-white"
+          {menu.menus.map((item, idx) => (
+            <li key={idx}>
+              <Link
                 href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
+                className="text-neutral-600 hover:text-black dark:text-neutral-300 dark:hover:text-white"
               >
                 {item.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
       </div>
     )
   }
+
+  const categoriesMenu: CategoryWidgetMenu = {
+    id: 'categories',
+    title: 'Categories',
+    menus: loading
+      ? [{ href: '#', label: 'Loading...', id: 'loading' }]
+      : categories.map((category) => ({
+          href: `/category/${category._id}`,
+          label: category.name,   // only using the name key
+          id: category._id,
+        })),
+  }
+  const categoriesMenuone: CategoryWidgetMenu = {
+    id: 'categories',
+    title: 'Categories',
+    menus: loading
+      ? [{ href: '#', label: 'Loading...', id: 'loading' }]
+      : categoriesone.map((category) => ({
+          href: `/category/${category._id}`,
+          label: category.name,   // only using the name key
+          id: category._id,
+        })),
+  }
+
+  const allMenus: WidgetFooterMenu[] = [...widgetMenus,categoriesMenu, categoriesMenuone]
 
   return (
     <div className="relative border-t py-20 lg:pt-28 lg:pb-24">
@@ -87,7 +141,7 @@ const Footer: React.FC = () => {
             <SocialsList1 />
           </div>
         </div>
-        {widgetMenus.map(renderWidgetMenuItem)}
+        {allMenus.map(renderWidgetMenuItem)}
       </div>
     </div>
   )

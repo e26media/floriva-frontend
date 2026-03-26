@@ -12,6 +12,7 @@ import Navigation from './Navigation/Navigation'
 import SearchBtnPopover from './SearchBtnPopover'
 import CategoryNav from './Navigation/CategoryNav'
 import LocationSelector from './Locationselector'
+import CountryCategory from './Navigation/CountryCategory'
 
 export interface Props {
   hasBorder?: boolean
@@ -118,7 +119,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
 
         {/* ── Category Nav row ── */}
         <div className="mx-4 hidden flex-2 lg:flex">
-          <CategoryNav
+          <CountryCategory
             // menu={navigationMenu}
             // featuredCollection={featuredCollection}
           />
@@ -128,7 +129,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
   )
 }
 
-const Header2: FC<Props> = async ({ hasBorder = true }) => {
+const Header5: FC<Props> = async ({ hasBorder = true }) => {
   const navigationMenu = await getNavigation()
   const allCollections = await getCollections()
 
@@ -145,4 +146,4 @@ const Header2: FC<Props> = async ({ hasBorder = true }) => {
   )
 }
 
-export default Header2
+export default Header5

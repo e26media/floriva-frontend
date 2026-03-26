@@ -1,6 +1,9 @@
 import BackgroundSection from '@/components/BackgroundSection/BackgroundSection'
 import BestSellerProduct from '@/components/BestSellerProduct'
 import BestSellers from '@/components/BestSellers'
+import CountryBestSellers from '@/components/CountryBestSellers'
+import CountryNewarrivals from '@/components/CountryNewarrivals'
+// import CountryNewarrivals from '@/components/CountryNewarrivals'
 import { Divider } from '@/components/Divider'
 import Heading from '@/components/Heading/Heading'
 import NewArrivals from '@/components/NewArrivals'
@@ -42,19 +45,17 @@ async function PageHome() {
 
   return (
     <div className="nc-PageHome relative overflow-hidden">
-      <SectionHero2 />
+      {/* <SectionHero2 /> */}
       <SectionCollectionSlider className="mt-24 lg:mt-32"  />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
-        <SectionSliderProductCard 
-        // data={carouselProducts1} 
-         />
-         <NewArrivals/>
+       
+         <CountryNewarrivals/>
         {/* <Divider /> */}
          <div className="pb-16">
           <SectionHowItWork />
         </div>
-       <BestSellers/>
+       <CountryBestSellers/>
        {/* <BestSellerProduct/> */}
         {/* <SectionPromo1 /> */}
         {/* <div className="relative pt-24 pb-20 lg:pt-28">
@@ -95,3 +96,4 @@ async function PageHome() {
 }
 
 export default PageHome
+

@@ -10,6 +10,7 @@ import type { EmblaOptionsType } from 'embla-carousel'
 interface Category {
   _id: string
   name: string
+  categoriesimg?: string
   img?: string
   image?: string
   photo?: string
@@ -21,7 +22,37 @@ interface Category {
   tag?: string
 }
 
-// ─── Pastel background colors (matching the ref: cream, mint, sky) ────────────
+// ─── API / Image base URL ─────────────────────────────────────────────────────
+
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
+
+const API_URL = `${BASE_URL}/api/categoryview`
+
+// ─── Resolve image — prefix relative paths with BASE_URL ─────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveImage(cat: any): string | null {
+  const raw =
+    cat.categoriesimg ||   // ← your backend field, first priority
+    cat.img ||
+    cat.image ||
+    cat.photo ||
+    cat.thumbnail ||
+    cat.cover ||
+    cat.banner ||
+    cat.picture ||
+    null
+
+  if (!raw) return null
+  if (raw.startsWith('http') || raw.startsWith('blob:') || raw.startsWith('/')) {
+    return raw
+  }
+  // Relative path like "uploads/categories/file.png" → full URL
+  return `${BASE_URL}/${raw}`
+}
+
+// ─── Pastel card palettes ─────────────────────────────────────────────────────
 
 const CARD_PALETTES = [
   { bg: '#FEF6EE', label: 'Explore new arrivals' },
@@ -32,32 +63,14 @@ const CARD_PALETTES = [
   { bg: '#F0FAF9', label: 'Top sellers' },
 ]
 
-// ─── Static fallback product images (transparent/cutout style) ───────────────
-
-const STATIC_IMAGES = [
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/roses-30-01-2026.png',
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/carnations-30-01-2026.png',
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/roses-30-01-2026.png',
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/roses-30-01-2026.png',
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/roses-30-01-2026.png',
-  'https://static-assets-prod.fnp.com/assets/images/custom/new-home-2025/flowers/roses-30-01-2026.png',
-]
-
-// ─── API URL ──────────────────────────────────────────────────────────────────
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL
-    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categoryview`
-    : 'http://localhost:7000/api/categoryview'
-
-// ─── Smart extractor ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractCategories(data: any): Category[] {
   if (!data) return []
   if (Array.isArray(data)) return data
-  if (Array.isArray(data.data)) return data.data
   if (Array.isArray(data.categories)) return data.categories
+  if (Array.isArray(data.data)) return data.data
   if (Array.isArray(data.result)) return data.result
   if (Array.isArray(data.items)) return data.items
   if (Array.isArray(data.payload)) return data.payload
@@ -70,20 +83,11 @@ function extractCategories(data: any): Category[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveImage(cat: any, index: number): string {
-  return (
-    cat.img || cat.image || cat.photo || cat.thumbnail ||
-    cat.cover || cat.banner || cat.picture ||
-    STATIC_IMAGES[index % STATIC_IMAGES.length]
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveId(cat: any): string {
   return String(cat._id || cat.id || cat.slug || Math.random())
 }
 
-// ─── Collection Card  (matches reference design) ─────────────────────────────
+// ─── Collection Card ──────────────────────────────────────────────────────────
 
 function CollectionCard({
   category,
@@ -95,12 +99,10 @@ function CollectionCard({
   index: number
   onClick: () => void
 }) {
-  const imgSrc = resolveImage(category, index)
-  const fallback = STATIC_IMAGES[index % STATIC_IMAGES.length]
+  const imgSrc = resolveImage(category)
   const id = resolveId(category)
   const palette = CARD_PALETTES[index % CARD_PALETTES.length]
 
-  // Build headline — use name, description or discount if present
   const headline = category.name || 'Collection'
   const subLabel = category.subtitle || category.tag || palette.label
 
@@ -111,29 +113,19 @@ function CollectionCard({
       className="group relative flex h-full w-full select-none items-center overflow-hidden rounded-3xl transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)]"
       style={{ backgroundColor: palette.bg, minHeight: '200px' }}
     >
-      {/* ── Left: text content ─────────────────────────────────── */}
+      {/* ── Left: text ── */}
       <div className="relative z-10 flex flex-1 flex-col justify-between self-stretch p-6 sm:p-7">
-        {/* Top text */}
         <div>
-          {/* Eyebrow label */}
           <p className="mb-2 text-xs font-medium tracking-wide text-neutral-500">
             {subLabel}
           </p>
-
-          {/* Main headline */}
           <h3 className="text-xl font-bold leading-snug text-neutral-900 sm:text-2xl">
             {headline}
           </h3>
-
-          {/* Item count or sub-info */}
           {category.count !== undefined && (
-            <p className="mt-1 text-sm text-neutral-500">
-              {category.count}+ items
-            </p>
+            <p className="mt-1 text-sm text-neutral-500">{category.count}+ items</p>
           )}
         </div>
-
-        {/* Bottom: CTA button */}
         <div className="mt-6">
           <span className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-neutral-800 shadow-sm ring-1 ring-neutral-200 transition-all duration-200 group-hover:shadow-md group-hover:ring-neutral-300">
             Show me all
@@ -141,16 +133,27 @@ function CollectionCard({
         </div>
       </div>
 
-      {/* ── Right: floating product image ──────────────────────── */}
+      {/* ── Right: product image ── */}
       <div className="relative flex w-36 flex-shrink-0 items-center justify-center self-stretch overflow-hidden sm:w-44 md:w-52">
-        <img
-          src={imgSrc}
-          alt={headline}
-          className="absolute bottom-0 right-0 h-full max-h-[200px] w-auto max-w-full object-contain object-bottom transition-transform duration-500 group-hover:scale-105"
-          onError={(e) => {
-            ;(e.target as HTMLImageElement).src = fallback
-          }}
-        />
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={headline}
+            className="absolute bottom-0 right-0 h-full max-h-[200px] w-auto max-w-full object-contain object-bottom transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => {
+              // Hide broken image gracefully — show initials fallback
+              ;(e.target as HTMLImageElement).style.display = 'none'
+            }}
+          />
+        ) : (
+          // No image — show initial avatar
+          <div
+            className="flex h-24 w-24 items-center justify-center rounded-2xl text-3xl font-black"
+            style={{ background: 'rgba(0,0,0,0.06)', color: 'rgba(0,0,0,0.25)' }}
+          >
+            {headline.charAt(0).toUpperCase()}
+          </div>
+        )}
       </div>
     </Link>
   )
@@ -184,9 +187,7 @@ function Dot({ active, onClick }: { active: boolean; onClick: () => void }) {
     <button
       onClick={onClick}
       className={`rounded-full transition-all duration-300 ${
-        active
-          ? 'w-6 h-2 bg-neutral-800'
-          : 'w-2 h-2 bg-neutral-300 hover:bg-neutral-400'
+        active ? 'h-2 w-6 bg-neutral-800' : 'h-2 w-2 bg-neutral-300 hover:bg-neutral-400'
       }`}
     />
   )
@@ -255,7 +256,6 @@ const SectionCollectionSlider = ({
   const [progressKey, setProgressKey] = useState(0)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions)
 
   // ── Embla select ──────────────────────────────────────────────────────────
@@ -278,9 +278,7 @@ const SectionCollectionSlider = ({
       setScrollSnaps(emblaApi.scrollSnapList())
       onSelect()
     })
-    return () => {
-      emblaApi.off('select', onSelect)
-    }
+    return () => { emblaApi.off('select', onSelect) }
   }, [emblaApi, onSelect])
 
   // ── Auto-play ─────────────────────────────────────────────────────────────
@@ -305,7 +303,7 @@ const SectionCollectionSlider = ({
 
   const handlePrev = useCallback(() => { emblaApi?.scrollPrev(); stopTimer(); if (!isPaused) startTimer() }, [emblaApi, isPaused, startTimer, stopTimer])
   const handleNext = useCallback(() => { emblaApi?.scrollNext(); stopTimer(); if (!isPaused) startTimer() }, [emblaApi, isPaused, startTimer, stopTimer])
-  const handleDot = useCallback((i: number) => { emblaApi?.scrollTo(i); stopTimer(); if (!isPaused) startTimer() }, [emblaApi, isPaused, startTimer, stopTimer])
+  const handleDot  = useCallback((i: number) => { emblaApi?.scrollTo(i); stopTimer(); if (!isPaused) startTimer() }, [emblaApi, isPaused, startTimer, stopTimer])
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
@@ -390,7 +388,6 @@ const SectionCollectionSlider = ({
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
-            {/* Embla viewport */}
             <div className="overflow-hidden pl-4 sm:pl-6 lg:pl-8" ref={emblaRef}>
               <div className="-ml-4 flex sm:-ml-5">
                 {categories.map((cat, i) => (
@@ -408,16 +405,13 @@ const SectionCollectionSlider = ({
               </div>
             </div>
 
-            {/* ── Dots + progress ── */}
+            {/* ── Dots + progress bar ── */}
             <div className="mt-6 flex flex-col items-center gap-2">
-              {/* Dots row */}
               <div className="flex items-center gap-1.5">
                 {scrollSnaps.map((_, i) => (
                   <Dot key={i} active={i === selectedIndex} onClick={() => handleDot(i)} />
                 ))}
               </div>
-
-              {/* Thin progress bar */}
               <div className="h-[3px] w-24 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
                 <div
                   key={progressKey}
@@ -449,6 +443,7 @@ const SectionCollectionSlider = ({
             </div>
           </div>
         )}
+
       </div>
     </>
   )

@@ -17,14 +17,24 @@ export interface TCategory {
   createdAt: string; updatedAt: string
 }
 export interface TColor { _id: string; name: string; createdAt: string; updatedAt: string }
+
+export interface TFeaturedProduct {
+  _id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface TApiProduct {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: TCategory | null; subCategory: string | null; color: TColor | null
   stock: number; deliveryInfo: string; images: string[]
+  featuredProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
+  FeaturedProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
+  featured_product?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   createdAt: string; updatedAt: string
 }
-export interface TCartItem { product: TApiProduct; qty: number }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -32,6 +42,60 @@ export interface TCartItem { product: TApiProduct; qty: number }
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
+
+// ── Must match the name in your DB exactly (case-insensitive compare is used) ─
+const BEST_SELLER_LABEL = 'Best Seller'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fetch the "Best Seller" _id dynamically from /api/allFeaturedProducts/
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function fetchBestSellerId(): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/allFeaturedProducts/`, { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = await res.json()
+    // Handle both shapes: array at root OR { data: [...] }
+    const list: TFeaturedProduct[] = Array.isArray(json) ? json : (json.data ?? [])
+    console.log('[BestSellers] allFeaturedProducts →', list)
+    const match = list.find(
+      (fp) => fp.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()
+    )
+    console.log('[BestSellers] matched featuredProduct →', match)
+    return match?._id ?? null
+  } catch (e) {
+    console.error('[BestSellers] fetchBestSellerId error:', e)
+    return null
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Robust filter helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getFeaturedProductRaw(product: TApiProduct): unknown {
+  return (
+    (product as any).featuredProduct ??
+    (product as any).FeaturedProduct ??
+    (product as any).featured_product ??
+    null
+  )
+}
+
+function matchesBestSeller(fp: unknown, bestSellerId: string): boolean {
+  if (!fp) return false
+  const arr: unknown[] = Array.isArray(fp) ? fp : [fp]
+  return arr.some((item) => {
+    if (!item) return false
+    if (typeof item === 'string') return item === bestSellerId
+    if (typeof item === 'object') {
+      const obj = item as Record<string, any>
+      if (obj._id === bestSellerId) return true
+      if (obj.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()) return true
+    }
+    return false
+  })
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Get user email from localStorage
@@ -121,8 +185,7 @@ function CartToastContainer() {
             className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5"
             style={{
               animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
-              minWidth: 220,
-              maxWidth: 320,
+              minWidth: 220, maxWidth: 320,
             }}
           >
             <div className={`h-10 w-10 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
@@ -291,7 +354,7 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal — FULLY RESPONSIVE (FIXED)
+// Quick View Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
@@ -314,7 +377,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
     return () => window.removeEventListener('keydown', fn)
   }, [onClose])
 
-  // Lock body scroll when modal is open
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -342,14 +404,9 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
           to   { opacity:1; transform:scale(1) translateY(0); }
         }
         @keyframes imgFadeIn { from{opacity:0;}to{opacity:1;} }
-
-        .modal-mobile {
-          animation: modalInMobile 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
-        }
+        .modal-mobile { animation: modalInMobile 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
         @media (min-width: 640px) {
-          .modal-mobile {
-            animation: modalInDesktop 0.28s cubic-bezier(0.34,1.1,0.64,1) forwards;
-          }
+          .modal-mobile { animation: modalInDesktop 0.28s cubic-bezier(0.34,1.1,0.64,1) forwards; }
         }
         .thumbs-no-scroll::-webkit-scrollbar { display: none; }
         .details-panel::-webkit-scrollbar { width: 3px; }
@@ -357,23 +414,14 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
         .details-panel::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
 
-      {/*
-        MOBILE: bottom sheet — fills most of screen, scrollable internally
-        DESKTOP (sm+): centered card, max 90vh, side-by-side layout
-      */}
       <div
-        className="modal-mobile relative w-full bg-white shadow-2xl flex flex-col
-          rounded-t-3xl
-          max-h-[93dvh]
-          sm:rounded-3xl sm:max-w-3xl sm:mx-4 sm:max-h-[88vh]"
+        className="modal-mobile relative w-full bg-white shadow-2xl flex flex-col rounded-t-3xl max-h-[93dvh] sm:rounded-3xl sm:max-w-3xl sm:mx-4 sm:max-h-[88vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle — mobile only */}
         <div className="flex justify-center pt-2.5 pb-1 sm:hidden flex-shrink-0">
           <div className="h-1 w-10 rounded-full bg-gray-200" />
         </div>
 
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100/90 text-gray-500 transition hover:bg-gray-200 active:scale-95"
@@ -384,19 +432,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
           </svg>
         </button>
 
-        {/*
-          MOBILE: single column, scrollable top-to-bottom
-          DESKTOP: two columns side-by-side, each independently scrollable
-        */}
         <div className="flex flex-col overflow-y-auto sm:flex-row sm:overflow-hidden flex-1 min-h-0">
 
-          {/* ── LEFT: Image panel ── */}
-          {/* On mobile: fixed-ratio image that doesn't overflow. On desktop: sticky/fixed width panel */}
+          {/* LEFT: Image panel */}
           <div className="w-full flex-shrink-0 sm:w-[44%] sm:overflow-y-auto sm:flex sm:flex-col">
-
-            {/* Main image — square on desktop, 80vw max-height on mobile */}
-            <div className="relative bg-gray-50 w-full overflow-hidden"
-              style={{ aspectRatio: '1 / 1' }}>
+            <div className="relative bg-gray-50 w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
               {hasImages ? (
                 <img
                   key={activeImg}
@@ -414,7 +454,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                 </div>
               )}
 
-              {/* Badges */}
               <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
                 {isNewIn(product.createdAt) && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
@@ -431,13 +470,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                 )}
               </div>
 
-              {/* Prev/Next arrows */}
               {product.images.length > 1 && (
                 <>
                   <button
                     onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
                     className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                    aria-label="Previous image"
                   >
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
@@ -446,7 +483,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                   <button
                     onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
                     className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                    aria-label="Next image"
                   >
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
@@ -456,13 +492,8 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               )}
             </div>
 
-            {/* Thumbnails */}
             {product.images.length > 1 && (
-              <div
-                ref={thumbsRef}
-                className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
-                style={{ scrollbarWidth: 'none' }}
-              >
+              <div ref={thumbsRef} className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white" style={{ scrollbarWidth: 'none' }}>
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
@@ -478,32 +509,17 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             )}
           </div>
 
-          {/* ── RIGHT: Details panel ── */}
-          {/*
-            On mobile: continues below the image in the same scroll container (no overflow-hidden).
-            On desktop: its own scrollable panel, full height.
-          */}
-          <div className="details-panel w-full flex flex-col border-t border-gray-100
-            sm:border-t-0 sm:border-l sm:w-[56%] sm:overflow-y-auto
-            p-4 sm:p-6">
-
-            {/* Category */}
+          {/* RIGHT: Details panel */}
+          <div className="details-panel w-full flex flex-col border-t border-gray-100 sm:border-t-0 sm:border-l sm:w-[56%] sm:overflow-y-auto p-4 sm:p-6">
             {categoryName && (
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
             )}
-
-            {/* Name */}
             <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
             {product.title && product.title !== product.name && (
               <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
+            <div className="mb-3"><StarRating rating={rating} reviews={reviews}/></div>
 
-            {/* Rating */}
-            <div className="mb-3">
-              <StarRating rating={rating} reviews={reviews}/>
-            </div>
-
-            {/* Price */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
                 {formatPrice(product.discountPrice)}
@@ -511,14 +527,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               {product.exactPrice > product.discountPrice && (
                 <>
                   <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice)}</span>
-                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">
-                    -{discount}%
-                  </span>
+                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">-{discount}%</span>
                 </>
               )}
             </div>
 
-            {/* Color swatch */}
             {swatches.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 text-xs font-semibold text-gray-500">
@@ -526,9 +539,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                 </p>
                 <div className="flex items-center gap-2">
                   {swatches.map((swatch, i) => (
-                    <span
-                      key={i}
-                      title={swatch.name}
+                    <span key={i} title={swatch.name}
                       className="h-6 w-6 rounded-full border-2 border-gray-900 ring-2 ring-gray-900 ring-offset-1 cursor-default"
                       style={{ backgroundColor: swatch.hex }}
                     />
@@ -537,7 +548,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               </div>
             )}
 
-            {/* Stock badge */}
             <div className="mb-4">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                 product.stock > 5 ? 'bg-emerald-50 text-emerald-700'
@@ -549,7 +559,6 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
               </span>
             </div>
 
-            {/* Qty + Add to Bag */}
             <div className="mb-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
               <div className="flex gap-2">
@@ -564,49 +573,24 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                       : 'bg-gray-900 text-white hover:bg-gray-700 hover:shadow-lg'
                   }`}
                 >
-                  {adding ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                      </svg>
-                      Adding…
-                    </>
-                  ) : added ? (
-                    <>
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
-                      </svg>
-                      Added!
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-                      </svg>
-                      {outOfStock ? 'Out of Stock' : 'Add to Bag'}
-                    </>
-                  )}
+                  {adding
+                    ? (<><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
+                    : added
+                    ? (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
+                    : (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>{outOfStock ? 'Out of Stock' : 'Add to Bag'}</>)
+                  }
                 </button>
               </div>
             </div>
 
             <hr className="border-gray-100 mb-3"/>
-
-            {/* Accordion */}
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
-            {/* Footer */}
             <div className="flex items-center justify-end pt-4 mt-auto border-t border-gray-100">
-              <a
-                href={`/product/${product._id}`}
-                className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline"
-              >
+              <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
                 View full page →
               </a>
             </div>
-
-            {/* Safe area bottom on mobile */}
             <div className="h-safe-bottom sm:h-0 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}/>
           </div>
         </div>
@@ -616,7 +600,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card — FULLY RESPONSIVE (FIXED)
+// Product Card
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
@@ -627,36 +611,21 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
   const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
   const swatches = getSwatches(data)
-
-  // Track hover/touch state for the overlay
   const [overlayVisible, setOverlayVisible] = useState(false)
-  // Track touch so we can dismiss on second tap
   const touchedRef = useRef(false)
-
   const { addToCart, loading, added } = useAddToCart(data)
 
   const handleTouchStart = useCallback(() => {
     if (!touchedRef.current) {
       touchedRef.current = true
       setOverlayVisible(true)
-      // Auto-hide after 3 seconds of inactivity
-      const timer = setTimeout(() => {
-        touchedRef.current = false
-        setOverlayVisible(false)
-      }, 3000)
+      const timer = setTimeout(() => { touchedRef.current = false; setOverlayVisible(false) }, 3000)
       return () => clearTimeout(timer)
     }
   }, [])
 
-  const handleTouchOutside = useCallback(() => {
-    touchedRef.current = false
-    setOverlayVisible(false)
-  }, [])
-
   return (
     <div className="group flex flex-col">
-
-      {/* ── Image box ── */}
       <div
         className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100"
         onMouseEnter={() => setOverlayVisible(true)}
@@ -665,67 +634,40 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
       >
         <div className="relative aspect-square w-full">
           {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={data.name}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
+            <img src={imageUrl} alt={data.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"/>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-gray-300">
               <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
             </div>
           )}
-
-          {/* Out of stock overlay */}
           {outOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-2xl sm:rounded-3xl">
-              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">
-                Out of Stock
-              </span>
+              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
             </div>
           )}
         </div>
 
-        {/* New in badge */}
-        {newIn && !outOfStock && (
+        {/* Best Seller badge */}
+        {!outOfStock && (
           <div className="absolute left-2.5 top-2.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm backdrop-blur-sm">
-              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-1 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+              <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
               </svg>
-              New in
+              Best Seller
             </span>
           </div>
         )}
 
-        {/* Action overlay — slides up on hover/touch */}
-        <div
-          className={`absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5 transition-transform duration-300 ease-out ${
-            overlayVisible ? 'translate-y-0' : 'translate-y-full'
-          }`}
-        >
-          {/* Quick View */}
+        <div className={`absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5 transition-transform duration-300 ease-out ${overlayVisible ? 'translate-y-0' : 'translate-y-full'}`}>
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              onQuickView(data)
-            }}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
             className="w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
-          >
-            Quick View
-          </button>
-
-          {/* Add to Bag */}
+          >Quick View</button>
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              addToCart(1)
-            }}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
             disabled={outOfStock || loading}
             className={`w-full rounded-xl py-2 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
               outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -735,67 +677,30 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
             }`}
           >
             {loading
-              ? <>
-                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                  </svg>
-                  Adding…
-                </>
+              ? (<><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
               : added
-              ? <>
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/>
-                  </svg>
-                  Added!
-                </>
-              : outOfStock
-              ? 'Out of Stock'
-              : <>
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-                  </svg>
-                  Add to Bag
-                </>
+              ? (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
+              : outOfStock ? 'Out of Stock'
+              : (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>)
             }
           </button>
         </div>
       </div>
 
-      {/* ── Info below card ── */}
       <div className="mt-2.5 px-0.5">
-
-        {/* Color swatches */}
         {swatches.length > 0 && (
           <div className="flex items-center gap-1.5 mb-1.5">
             {swatches.map((swatch, i) => (
-              <span
-                key={i}
-                title={swatch.name}
-                className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
-                style={{ backgroundColor: swatch.hex }}
-              />
+              <span key={i} title={swatch.name} className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default" style={{ backgroundColor: swatch.hex }}/>
             ))}
           </div>
         )}
-
-        {/* Product name */}
-        <h3 className="text-[13px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
-          {data.name}
-        </h3>
-
-        {/* Color / category subtitle */}
+        <h3 className="text-[13px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">{data.name}</h3>
         <p className="text-[11px] sm:text-[13px] text-gray-400 mb-1.5">
-          {colorName
-            ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}`
-            : data.category?.name ?? ''}
+          {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
         </p>
-
-        {/* Price row */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
-            {formatPrice(data.discountPrice)}
-          </span>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">{formatPrice(data.discountPrice)}</span>
           {data.exactPrice > data.discountPrice && (
             <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
           )}
@@ -814,9 +719,7 @@ function ProductCardSkeleton() {
     <div className="flex flex-col">
       <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200"/>
       <div className="mt-3 space-y-2 px-0.5">
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200"/>)}
-        </div>
+        <div className="flex gap-1.5">{[0,1,2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200"/>)}</div>
         <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
         <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
         <div className="flex items-center gap-2">
@@ -843,7 +746,7 @@ export interface SectionSliderProductCardProps {
   userEmail?: string
 }
 
-const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
+const BestSellers: FC<SectionSliderProductCardProps> = ({
   className = '',
   headingFontClassName,
   headingClassName,
@@ -856,50 +759,72 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
+
+  // null = not yet resolved | string = resolved ID (empty string = not found in API)
+  const [bestSellerId, setBestSellerId] = useState<string | null>(null)
   const isMounted = useRef(true)
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    ...emblaOptions,
-    align: 'start',
-    // Ensure dragging works well on mobile
-    dragFree: false,
-  })
+  const [emblaRef, emblaApi] = useEmblaCarousel({ ...emblaOptions, align: 'start', dragFree: false })
+  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } = useCarouselArrowButtons(emblaApi)
 
-  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
-    useCarouselArrowButtons(emblaApi)
+  // ── Step 1: resolve "Best Seller" ID from /api/allFeaturedProducts/ ─────────
+  useEffect(() => {
+    isMounted.current = true
+    fetchBestSellerId().then((id) => {
+      if (isMounted.current) setBestSellerId(id ?? '')
+    })
+    return () => { isMounted.current = false }
+  }, [])
 
+  // ── Step 2: fetch & filter products once ID is resolved ────────────────────
   const fetchProducts = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true)
       setError(null)
+
       const res = await fetch(`${BASE_URL}/api/productview`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const json = await res.json()
-      const list: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      if (isMounted.current) { setProducts(list) }
+      const all: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
+
+      // ── DEBUG: see exact field shape from your API in browser console ──────
+      if (all.length > 0) {
+        console.log('[BestSellers] sample product keys:', Object.keys(all[0]))
+        console.log('[BestSellers] sample featuredProduct field:', getFeaturedProductRaw(all[0]))
+        console.log('[BestSellers] bestSellerId being used:', bestSellerId)
+      }
+
+      // Filter: only products tagged as "Best Seller"
+      const filtered = bestSellerId
+        ? all.filter((p) => matchesBestSeller(getFeaturedProductRaw(p), bestSellerId))
+        : []
+
+      console.log(`[BestSellers] total: ${all.length}, filtered (Best Seller): ${filtered.length}`)
+
+      // Keep original order (as entered in admin) — or sort by createdAt if preferred
+      // filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      if (isMounted.current) setProducts(filtered)
     } catch (err: any) {
       if (isMounted.current) setError(err.message ?? 'Failed to load products')
     } finally {
       if (isMounted.current && !isBackground) setLoading(false)
     }
-  }, [])
+  }, [bestSellerId])
 
+  // Run fetch when ID is resolved
   useEffect(() => {
-    isMounted.current = true
-    fetchProducts(false)
-    return () => { isMounted.current = false }
-  }, [fetchProducts])
+    if (bestSellerId !== null) fetchProducts(false)
+  }, [fetchProducts, bestSellerId])
 
+  // Background poll
   useEffect(() => {
-    if (!pollInterval) return
+    if (!pollInterval || bestSellerId === null) return
     const id = setInterval(() => fetchProducts(true), pollInterval)
     return () => clearInterval(id)
-  }, [fetchProducts, pollInterval])
+  }, [fetchProducts, pollInterval, bestSellerId])
 
-  const handleQuickView = useCallback((product: TApiProduct) => {
-    setQuickViewProduct(product)
-  }, [])
+  const handleQuickView = useCallback((product: TApiProduct) => setQuickViewProduct(product), [])
 
   return (
     <>
@@ -917,16 +842,14 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
             onClickPrev={onPrevButtonClick}
             onClickNext={onNextButtonClick}
           >
-            {heading || 'New Arrivals'}
+            {heading || 'Best Sellers'}
           </Heading>
         </div>
 
         {/* Loading skeletons */}
         {loading && (
           <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <ProductCardSkeleton key={i}/>
-            ))}
+            {[0,1,2,3].map((i) => <ProductCardSkeleton key={i}/>)}
           </div>
         )}
 
@@ -935,10 +858,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
           <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-red-100 bg-red-50 py-12 text-center px-4">
             <p className="text-sm font-semibold text-red-600">Failed to load products</p>
             <p className="mt-1 text-xs text-gray-400">{error}</p>
-            <button
-              onClick={() => fetchProducts(false)}
-              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95"
-            >
+            <button onClick={() => fetchProducts(false)} className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95">
               Retry
             </button>
           </div>
@@ -949,18 +869,7 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
           <div className="embla overflow-hidden" ref={emblaRef}>
             <div className="embla__container flex -ml-3 sm:-ml-5">
               {products.map((product) => (
-                <div
-                  key={product._id}
-                  /*
-                   * Mobile  (default): 2 cards visible — each ~50% minus half the gap
-                   * sm:      still 2 cards
-                   * md:      3 cards
-                   * xl:      4 cards
-                   *
-                   * We use calc() so there's a visible peek of the next card on mobile.
-                   */
-                  className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0"
-                >
+                <div key={product._id} className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0">
                   <ProductCard data={product} onQuickView={handleQuickView}/>
                 </div>
               ))}
@@ -971,12 +880,11 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
         {/* Empty */}
         {!loading && !error && products.length === 0 && (
           <div className="flex items-center justify-center rounded-2xl sm:rounded-3xl bg-gray-50 py-12">
-            <p className="text-sm text-gray-400">No products available.</p>
+            <p className="text-sm text-gray-400">No best sellers available.</p>
           </div>
         )}
       </div>
 
-      {/* Quick View Modal */}
       {quickViewProduct && (
         <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)}/>
       )}
@@ -984,4 +892,4 @@ const SectionSliderProductCard: FC<SectionSliderProductCardProps> = ({
   )
 }
 
-export default SectionSliderProductCard
+export default BestSellers
