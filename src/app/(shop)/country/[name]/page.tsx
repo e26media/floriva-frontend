@@ -2,7 +2,9 @@ import BackgroundSection from '@/components/BackgroundSection/BackgroundSection'
 import BestSellerProduct from '@/components/BestSellerProduct'
 import BestSellers from '@/components/BestSellers'
 import CountryBestSellers from '@/components/CountryBestSellers'
+import CountryColorSection from '@/components/CountryColorSection'
 import CountryNewarrivals from '@/components/CountryNewarrivals'
+import CountrySectionCollectionSlider from '@/components/CountrySectionCollectionSlider'
 // import CountryNewarrivals from '@/components/CountryNewarrivals'
 import { Divider } from '@/components/Divider'
 import Heading from '@/components/Heading/Heading'
@@ -46,7 +48,7 @@ async function PageHome() {
   return (
     <div className="nc-PageHome relative overflow-hidden">
       {/* <SectionHero2 /> */}
-      <SectionCollectionSlider className="mt-24 lg:mt-32"  />
+      <CountrySectionCollectionSlider className="mt-24 lg:mt-32"  />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
        
@@ -68,7 +70,7 @@ async function PageHome() {
         
 
         <SectionPromo2 />
-        <SectionSliderProductCard1
+        <CountryColorSection
         // products={carouselProducts3} subHeading="New Fashion items" 
         />
         

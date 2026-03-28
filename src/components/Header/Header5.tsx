@@ -13,6 +13,8 @@ import SearchBtnPopover from './SearchBtnPopover'
 import CategoryNav from './Navigation/CategoryNav'
 import LocationSelector from './Locationselector'
 import CountryCategory from './Navigation/CountryCategory'
+import CountryCart from './CountryCart'
+import CountryNotification from './CountryNotification'
 
 export interface Props {
   hasBorder?: boolean
@@ -111,9 +113,10 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           {/* ── Actions — right side ── */}
           <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5">
             {/* <SearchBtnPopover /> */}
-            <CartBtn />
+            <CountryCart />
             <AvatarDropdown />
           </div>
+            
 
         </div>
 
@@ -123,7 +126,14 @@ const StickyHeader: FC<StickyHeaderProps> = ({
             // menu={navigationMenu}
             // featuredCollection={featuredCollection}
           />
+          
         </div>
+      
+        <div className="mx-4 hidden flex-2 lg:flex">
+          <CountryNotification />
+          
+        </div>
+      
       </div>
     </div>
   )
@@ -142,6 +152,7 @@ const Header5: FC<Props> = async ({ hasBorder = true }) => {
         navigationMenu={navigationMenu}
         featuredCollection={allCollections[10]}
       />
+     
     </>
   )
 }

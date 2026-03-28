@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
 // =============================================================================
 //  TYPES
@@ -16,6 +16,7 @@ interface ResolvedMeta {
   colorName:      string;
   categoryName:   string;
   countryName:    string;
+  countryId:      string;
   currencySymbol: string;
   currencyCode:   string;
 }
@@ -49,6 +50,7 @@ interface CheckoutData {
   items:     CartItem[];
   userEmail: string;
   subtotal:  number;
+  countryName: string;
 }
 
 // =============================================================================
@@ -61,27 +63,17 @@ const DELETE_URL   = (id: string)    => `${BASE}/api/cartdelete/${id}`;
 const COLOR_URL    = (id: string)    => `${BASE}/api/allColors/${id}`;
 const CATEGORY_URL = (id: string)    => `${BASE}/api/allCategories/${id}`;
 const COUNTRY_URL  = (id: string)    => `${BASE}/api/allCountries/${id}`;
+const ALL_COUNTRIES_URL = `${BASE}/api/allCountries`;
 const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 
 const REFRESH_INTERVAL = 5000;
-
-// =============================================================================
-//  ✅ INDIA COUNTRY ID — only items with this country ID are shown in the cart
-// =============================================================================
-const INDIA_COUNTRY_ID = "69c3be966f74fc932c69981e";
-
-// =============================================================================
-//  IN-MEMORY CACHES
-// =============================================================================
-const colorCache:    Record<string, string> = {};
-const categoryCache: Record<string, string> = {};
-const countryCache:  Record<string, string> = {};
 
 // =============================================================================
 //  COUNTRY → CURRENCY MAP
 // =============================================================================
 const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
   india:                    { symbol: "₹",   code: "INR" },
+  australia:                { symbol: "A$",  code: "AUD" },
   "united states":          { symbol: "$",   code: "USD" },
   usa:                      { symbol: "$",   code: "USD" },
   "united kingdom":         { symbol: "£",   code: "GBP" },
@@ -94,7 +86,6 @@ const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
   japan:                    { symbol: "¥",   code: "JPY" },
   china:                    { symbol: "¥",   code: "CNY" },
   canada:                   { symbol: "CA$", code: "CAD" },
-  australia:                { symbol: "A$",  code: "AUD" },
   switzerland:              { symbol: "Fr",  code: "CHF" },
   brazil:                   { symbol: "R$",  code: "BRL" },
   russia:                   { symbol: "₽",   code: "RUB" },
@@ -134,32 +125,7 @@ const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
 
 function currencyFor(countryName: string): { symbol: string; code: string } {
   const key = countryName.trim().toLowerCase();
-  return CURRENCY_MAP[key] ?? { symbol: "₹", code: "INR" };
-}
-
-// =============================================================================
-//  ✅ FILTER — only show cart items whose product.country === INDIA_COUNTRY_ID
-// =============================================================================
-function isIndiaItem(item: CartItem): boolean {
-  const country = item.productId?.country;
-  if (!country) return false;
-  
-  // Raw ObjectId string (most common — API returns unpopulated ID)
-  if (typeof country === "string") {
-    return country === INDIA_COUNTRY_ID;
-  }
-  
-  // Populated object { _id, name }
-  if (country._id) {
-    return country._id === INDIA_COUNTRY_ID;
-  }
-  
-  // Fallback: check name
-  if (country.name) {
-    return country.name.trim().toLowerCase() === "india";
-  }
-  
-  return false;
+  return CURRENCY_MAP[key] ?? { symbol: "$", code: "USD" };
 }
 
 // =============================================================================
@@ -185,8 +151,8 @@ function getImgSrc(images?: (string | ProductImage)[]): string | null {
   return null;
 }
 
-function fmtPrice(n: number, symbol = "₹"): string {
-  const formatted = new Intl.NumberFormat("en-IN", {
+function fmtPrice(n: number, symbol = "$"): string {
+  const formatted = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n ?? 0);
@@ -229,8 +195,12 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 // =============================================================================
-//  ID RESOLVERS  (cached)
+//  ID RESOLVERS (cached)
 // =============================================================================
+const colorCache: Record<string, string> = {};
+const categoryCache: Record<string, string> = {};
+const countryCache: Record<string, { id: string; name: string }> = {};
+
 async function resolveColor(val?: string | { _id?: string; name?: string }): Promise<string> {
   const direct = extractDirectName(val);
   if (direct) return direct;
@@ -263,20 +233,21 @@ async function resolveCategory(val?: string | { _id?: string; name?: string }): 
   } catch { return ""; }
 }
 
-async function resolveCountry(val?: string | { _id?: string; name?: string }): Promise<string> {
+async function resolveCountry(val?: string | { _id?: string; name?: string }): Promise<{ id: string; name: string }> {
   const direct = extractDirectName(val);
-  if (direct) return direct;
+  if (direct) return { id: "", name: direct };
   const id = extractId(val);
-  if (!id) return "";
+  if (!id) return { id: "", name: "" };
   if (countryCache[id]) return countryCache[id];
   try {
     const res  = await fetch(COUNTRY_URL(id));
-    if (!res.ok) return "";
-    const json = (await res.json()) as { success?: boolean; data?: { name?: string } };
+    if (!res.ok) return { id: "", name: "" };
+    const json = (await res.json()) as { success?: boolean; data?: { _id?: string; name?: string } };
     const name = json?.data?.name ?? "";
-    if (name) countryCache[id] = name;
-    return name;
-  } catch { return ""; }
+    const countryId = json?.data?._id ?? id;
+    if (name) countryCache[id] = { id: countryId, name };
+    return { id: countryId, name };
+  } catch { return { id: "", name: "" }; }
 }
 
 // =============================================================================
@@ -450,12 +421,13 @@ function QtyControl({
 //  CART ITEM CARD
 // =============================================================================
 function CartItemCard({
-  item, isUpdating, isRemoving, onUpdateQty, onRemove, onMetaResolved,
+  item, isUpdating, isRemoving, onUpdateQty, onRemove, onMetaResolved, currentCountry,
 }: {
   item: CartItem; isUpdating: boolean; isRemoving: boolean;
   onUpdateQty: (id: string, qty: number) => void;
   onRemove:    (id: string) => void;
   onMetaResolved: (cartId: string, meta: ResolvedMeta) => void;
+  currentCountry: string;
 }) {
   const p      = item.productId;
   const cartId = item._id;
@@ -463,8 +435,8 @@ function CartItemCard({
   const [imgErr,      setImgErr]      = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [meta, setMeta] = useState<ResolvedMeta>({
-    colorName: "", categoryName: "", countryName: "india",
-    currencySymbol: "₹", currencyCode: "INR",
+    colorName: "", categoryName: "", countryName: "", countryId: "",
+    currencySymbol: "$", currencyCode: "USD",
   });
 
   const colorKey    = typeof p?.color    === "string" ? p.color    : (p?.color    as { _id?: string })?._id ?? "";
@@ -479,10 +451,19 @@ function CartItemCard({
       resolveColor(p?.color),
       resolveCategory(p?.category),
       resolveCountry(p?.country),
-    ]).then(([colorName, categoryName, countryName]) => {
+    ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
-      const { symbol: currencySymbol, code: currencyCode } = currencyFor(countryName || "india");
-      const resolved: ResolvedMeta = { colorName, categoryName, countryName, currencySymbol, currencyCode };
+      const countryName = countryResult.name;
+      const countryId = countryResult.id;
+      const { symbol: currencySymbol, code: currencyCode } = currencyFor(currentCountry);
+      const resolved: ResolvedMeta = { 
+        colorName, 
+        categoryName, 
+        countryName, 
+        countryId,
+        currencySymbol, 
+        currencyCode 
+      };
       setMeta(resolved);
       setMetaLoading(false);
       onMetaResolved(cartId, resolved);
@@ -490,7 +471,7 @@ function CartItemCard({
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorKey, categoryKey, countryKey]);
+  }, [colorKey, categoryKey, countryKey, currentCountry]);
 
   const src       = getImgSrc(p?.images);
   const price     = getPrice(p);
@@ -579,7 +560,7 @@ function CartItemCard({
                 </span>
               )}
 
-              {/* Country */}
+              {/* Country - Show the actual product's country */}
               {meta.countryName && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-400">
                   <IcoGlobe cls="h-3 w-3 shrink-0" />
@@ -587,13 +568,11 @@ function CartItemCard({
                 </span>
               )}
 
-              {/* Currency */}
-              {meta.countryName && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400">
-                  <IcoCurrency cls="h-3 w-3 shrink-0" />
-                  <span>{meta.currencyCode} {meta.currencySymbol}</span>
-                </span>
-              )}
+              {/* Currency - Show current cart's currency */}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400">
+                <IcoCurrency cls="h-3 w-3 shrink-0" />
+                <span>{meta.currencyCode} {meta.currencySymbol}</span>
+              </span>
             </>
           )}
 
@@ -654,20 +633,21 @@ function CartItemCard({
 }
 
 // =============================================================================
-//  ORDER SUMMARY — India-only cart, always shows ₹
+//  ORDER SUMMARY
 // =============================================================================
 function OrderSummary({
   items,
   resolvedMetas,
   onCheckout,
+  countryName,
 }: {
   items: CartItem[];
   resolvedMetas: Record<string, ResolvedMeta>;
   onCheckout: () => void;
+  countryName: string;
 }) {
-  // Since we only ever show India items, symbol is always ₹
-  const displaySymbol = "₹";
-  const allResolved   = items.length > 0 && items.every((item) => !!resolvedMetas[item._id]);
+  const { symbol: displaySymbol } = currencyFor(countryName);
+  const allResolved = items.length > 0 && items.every((item) => !!resolvedMetas[item._id]);
 
   const subtotal = items.reduce(
     (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1), 0
@@ -679,10 +659,16 @@ function OrderSummary({
     return acc + (orig - disc) * (Number(item.quantity) || 1);
   }, 0);
 
+  const displayCountry = countryName
+    ? countryName.charAt(0).toUpperCase() + countryName.slice(1)
+    : "";
+
   return (
     <div className="sticky top-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="border-b border-neutral-100 px-6 py-5 dark:border-neutral-800">
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Order Summary</h2>
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          Order Summary{displayCountry ? ` (${displayCountry})` : ""}
+        </h2>
       </div>
       <div className="space-y-5 p-6">
         <div className="space-y-3">
@@ -790,15 +776,20 @@ function CartSkeleton() {
 // =============================================================================
 //  EMPTY / NOT-LOGGED-IN STATES
 // =============================================================================
-function EmptyCart() {
+function EmptyCart({ countryName }: { countryName: string }) {
+  const displayCountry = countryName
+    ? countryName.charAt(0).toUpperCase() + countryName.slice(1)
+    : "";
   return (
     <div className="flex flex-col items-center justify-center py-28 text-center">
       <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-neutral-100 ring-8 ring-neutral-50 dark:bg-neutral-800 dark:ring-neutral-900">
         <IcoBag cls="h-14 w-14 text-neutral-300 dark:text-neutral-600" />
       </div>
-      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">Your cart is empty</h2>
+      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
+        Your {displayCountry} cart is empty
+      </h2>
       <p className="mb-8 max-w-xs text-sm leading-relaxed text-neutral-400 dark:text-neutral-500">
-        Looks like you haven&apos;t added anything yet.
+        Looks like you haven&apos;t added any items for {displayCountry} yet.
       </p>
       <Link href="/"
         className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-7 py-3.5 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] dark:bg-white dark:text-neutral-900">
@@ -831,9 +822,31 @@ function NotLoggedIn() {
 // =============================================================================
 export default function CartPage() {
   const router = useRouter();
+  const params = useParams();
+
+  // ── Get country from URL params - works with both [country] and [name] ────────────
+  // Check both possible parameter names
+  const urlCountry = (() => {
+    if (!params) return "";
+    // Try to get country from 'country' param (for [country] route)
+    if (params.country) {
+      return (Array.isArray(params.country) ? params.country[0] : params.country).toLowerCase().trim();
+    }
+    // Try to get country from 'name' param (for [name] route)
+    if (params.name) {
+      return (Array.isArray(params.name) ? params.name[0] : params.name).toLowerCase().trim();
+    }
+    return "";
+  })();
+
+  const [currentCountry, setCurrentCountry] = useState<string>(urlCountry);
+  const [countryId,      setCountryId]      = useState<string>("");
+  const [isValidCountry, setIsValidCountry] = useState<boolean>(true);
+  const [isValidating,   setIsValidating]   = useState<boolean>(true);
 
   const [userEmail,     setUserEmail]     = useState<string>("");
   const [cartItems,     setCartItems]     = useState<CartItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<CartItem[]>([]);
   const [loading,       setLoading]       = useState<boolean>(true);
   const [updatingIds,   setUpdatingIds]   = useState<Set<string>>(new Set());
   const [removingIds,   setRemovingIds]   = useState<Set<string>>(new Set());
@@ -843,12 +856,69 @@ export default function CartPage() {
   const isMutating  = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Sync currentCountry whenever the URL param changes ─────────────────────
+  useEffect(() => {
+    const fresh = (() => {
+      if (!params) return "";
+      if (params.country) {
+        return (Array.isArray(params.country) ? params.country[0] : params.country).toLowerCase().trim();
+      }
+      if (params.name) {
+        return (Array.isArray(params.name) ? params.name[0] : params.name).toLowerCase().trim();
+      }
+      return "";
+    })();
+    setCurrentCountry(fresh);
+  }, [params]);
+
   // ── Bootstrap ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const email = getUserEmail();
     setUserEmail(email);
-    if (!email) setLoading(false);
   }, []);
+
+  // ── Validate country exists in database ──────────────────────────────────────
+  useEffect(() => {
+    if (!currentCountry) {
+      setIsValidating(false);
+      setIsValidCountry(false);
+      setLoading(false);
+      return;
+    }
+
+    const validateCountry = async () => {
+      setIsValidating(true);
+      try {
+        const res = await fetch(ALL_COUNTRIES_URL);
+        if (!res.ok) {
+          setIsValidCountry(false);
+          setIsValidating(false);
+          return;
+        }
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const found = json.data.find(
+            (c: { name?: string; _id?: string }) =>
+              c.name?.toLowerCase() === currentCountry.toLowerCase()
+          );
+          if (found?._id) {
+            setCountryId(found._id);
+            setIsValidCountry(true);
+          } else {
+            setIsValidCountry(false);
+          }
+        } else {
+          setIsValidCountry(false);
+        }
+      } catch {
+        setIsValidCountry(false);
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    validateCountry();
+  }, [currentCountry]);
 
   const showToast = useCallback((message: string, type: ToastState["type"] = "success") => {
     setToast({ message, type });
@@ -859,51 +929,85 @@ export default function CartPage() {
     setResolvedMetas((prev) => ({ ...prev, [cartId]: meta }));
   }, []);
 
+  // ── Filter items: only show products belonging to the URL country ───────────
+  const filterItemsByCountry = useCallback((items: CartItem[]) => {
+    if (!currentCountry || !countryId) return [];
+
+    return items.filter((item) => {
+      const productCountry = item.productId?.country;
+      if (!productCountry) return false;
+
+      let productCountryId   = "";
+      let productCountryName = "";
+
+      if (typeof productCountry === "string") {
+        productCountryId = productCountry;
+      } else {
+        if (productCountry._id)  productCountryId   = productCountry._id;
+        if (productCountry.name) productCountryName = productCountry.name.toLowerCase();
+      }
+
+      // Match by resolved MongoDB _id
+      if (countryId && productCountryId === countryId) return true;
+
+      // Fallback: match by name
+      if (productCountryName && productCountryName === currentCountry.toLowerCase()) return true;
+
+      return false;
+    });
+  }, [currentCountry, countryId]);
+
   // ── Full cart fetch ──────────────────────────────────────────────────────────
   const fetchCart = useCallback(async (email: string) => {
-    if (!email) return;
+    if (!email || !isValidCountry) return;
     setLoading(true);
     try {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
       const all = json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : [];
-      // ✅ Show ONLY India items — filter by INDIA_COUNTRY_ID
-      const indiaOnly = all.filter(isIndiaItem);
-      setCartItems(indiaOnly);
-      setResolvedMetas({});
+      setCartItems(all);
     } catch (err) {
       showToast(`Failed to load cart: ${(err as Error).message}`, "error");
       setCartItems([]);
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, isValidCountry]);
 
   // ── Silent background refresh ───────────────────────────────────────────────
   const silentFetch = useCallback(async (email: string) => {
-    if (!email || isMutating.current) return;
+    if (!email || isMutating.current || !isValidCountry) return;
     try {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
       if (json.success && Array.isArray(json.data)) {
-        // ✅ Filter here too so background refresh doesn't bring back non-India items
-        const indiaOnly = (json.data as CartItem[]).filter(isIndiaItem);
-        setCartItems(indiaOnly);
+        setCartItems(json.data as CartItem[]);
       }
     } catch { /* silent */ }
-  }, []);
+  }, [isValidCountry]);
 
   // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (userEmail) fetchCart(userEmail);
-  }, [userEmail, fetchCart]);
+    if (userEmail && !isValidating && isValidCountry) {
+      fetchCart(userEmail);
+    }
+  }, [userEmail, fetchCart, isValidating, isValidCountry]);
 
   // ── Auto-refresh ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!userEmail) return;
+    if (!userEmail || !isValidCountry) return;
     intervalRef.current = setInterval(() => silentFetch(userEmail), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [userEmail, silentFetch]);
+  }, [userEmail, silentFetch, isValidCountry]);
+
+  // ── Re-filter whenever items or country resolution changes ──────────────────
+  useEffect(() => {
+    if (cartItems.length > 0 && isValidCountry) {
+      setFilteredItems(filterItemsByCountry(cartItems));
+    } else {
+      setFilteredItems([]);
+    }
+  }, [cartItems, filterItemsByCountry, isValidCountry]);
 
   // ── Update quantity ─────────────────────────────────────────────────────────
   const handleUpdateQty = useCallback(async (cartId: string, newQty: number) => {
@@ -965,16 +1069,58 @@ export default function CartPage() {
   // ── Checkout ────────────────────────────────────────────────────────────────
   const handleCheckout = useCallback(() => {
     const data: CheckoutData = {
-      items: cartItems, userEmail,
-      subtotal: cartItems.reduce(
+      items: filteredItems,
+      userEmail,
+      subtotal: filteredItems.reduce(
         (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1), 0
       ),
+      countryName: currentCountry,
     };
     sessionStorage.setItem("checkout_data", JSON.stringify(data));
-    router.push("/checkout");
-  }, [cartItems, userEmail, router]);
+    router.push(`/checkout?country=${currentCountry}`);
+  }, [filteredItems, userEmail, router, currentCountry]);
 
-  const totalItems = cartItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+  const totalItems = filteredItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+
+  const displayCountry = currentCountry
+    ? currentCountry.charAt(0).toUpperCase() + currentCountry.slice(1)
+    : "";
+
+  // ── Show validation state while checking country ───────────────────────────
+  if (isValidating) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+        <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <CartSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  // ── If country is invalid, show error ───────────────────────────────────────
+  if (!isValidCountry) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+        <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <div className="flex flex-col items-center justify-center py-28 text-center">
+            <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-neutral-100 ring-8 ring-neutral-50 dark:bg-neutral-800 dark:ring-neutral-900">
+              <IcoGlobe cls="h-14 w-14 text-neutral-300 dark:text-neutral-600" />
+            </div>
+            <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
+              Invalid Country
+            </h2>
+            <p className="mb-8 max-w-xs text-sm leading-relaxed text-neutral-400 dark:text-neutral-500">
+              {currentCountry ? `"${displayCountry}" is not a valid country.` : "No country was specified in the URL."} Please navigate via a valid country link.
+            </p>
+            <Link href="/"
+              className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-7 py-3.5 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] dark:bg-white dark:text-neutral-900">
+              <IcoArrowL cls="h-4 w-4" /> Go Home
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // ============================================================================
   return (
@@ -988,23 +1134,29 @@ export default function CartPage() {
               Home
             </Link>
             <IcoChevR cls="h-3 w-3 text-neutral-300 dark:text-neutral-700" />
-            <span className="font-medium text-neutral-700 dark:text-neutral-300">Shopping Cart</span>
+            <Link href="/cart" className="text-neutral-400 transition-colors hover:text-neutral-700 dark:text-neutral-600 dark:hover:text-neutral-300">
+              Cart
+            </Link>
+            <IcoChevR cls="h-3 w-3 text-neutral-300 dark:text-neutral-700" />
+            <span className="font-medium text-neutral-700 dark:text-neutral-300">
+              {displayCountry}
+            </span>
           </nav>
 
           <div className="flex items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl">
-                Shopping Cart
+                Shopping Cart — {displayCountry}
               </h1>
               {!loading && userEmail && (
                 <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
-                  {cartItems.length === 0
-                    ? "Your cart is empty"
-                    : `${totalItems} ${totalItems === 1 ? "item" : "items"} · ${cartItems.length} ${cartItems.length === 1 ? "product" : "products"}`}
+                  {filteredItems.length === 0
+                    ? `Your ${displayCountry} cart is empty`
+                    : `${totalItems} ${totalItems === 1 ? "item" : "items"} · ${filteredItems.length} ${filteredItems.length === 1 ? "product" : "products"} · ${displayCountry}`}
                 </p>
               )}
             </div>
-            {!loading && cartItems.length > 0 && (
+            {!loading && filteredItems.length > 0 && (
               <Link href="/"
                 className="hidden shrink-0 items-center gap-1.5 text-sm font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 sm:flex">
                 <IcoArrowL cls="h-3.5 w-3.5" /> Continue Shopping
@@ -1018,13 +1170,13 @@ export default function CartPage() {
           <CartSkeleton />
         ) : !userEmail ? (
           <NotLoggedIn />
-        ) : cartItems.length === 0 ? (
-          <EmptyCart />
+        ) : filteredItems.length === 0 ? (
+          <EmptyCart countryName={currentCountry} />
         ) : (
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
             <div className="min-w-0 flex-1">
               <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {cartItems.map((item, idx) => (
+                {filteredItems.map((item, idx) => (
                   <CartItemCard
                     key={item._id ?? idx}
                     item={item}
@@ -1033,6 +1185,7 @@ export default function CartPage() {
                     onUpdateQty={handleUpdateQty}
                     onRemove={handleRemove}
                     onMetaResolved={handleMetaResolved}
+                    currentCountry={currentCountry}
                   />
                 ))}
               </div>
@@ -1045,9 +1198,10 @@ export default function CartPage() {
             </div>
             <div className="w-full shrink-0 lg:w-[360px] xl:w-[390px]">
               <OrderSummary
-                items={cartItems}
+                items={filteredItems}
                 resolvedMetas={resolvedMetas}
                 onCheckout={handleCheckout}
+                countryName={currentCountry}
               />
             </div>
           </div>

@@ -1,7 +1,9 @@
+// components/CountryCategory.tsx  (or wherever your component lives)
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { ChevronDownIcon } from '@heroicons/react/24/solid'
 import clsx from 'clsx'
 
@@ -30,15 +32,31 @@ const API_URL =
     ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categoryview`
     : 'http://localhost:7000/api/categoryview'
 
-/** Re-fetch interval in ms (30 s). Set to 0 to disable polling. */
 const POLL_INTERVAL = 30_000
+
+// ─── Helper: build correct href ───────────────────────────────────────────────
+// If countryName is known  → /country/india/category/[id]
+// Otherwise fallback       → /category/[id]
+
+function buildCategoryHref(id: string, countryName?: string | null) {
+  if (countryName) return `/country/${countryName}/category/${id}`
+  return `/category/${id}`
+}
 
 // ─── Sub-item link ─────────────────────────────────────────────────────────────
 
-const SubCategoryLink = ({ sub, onClick }: { sub: SubCategory; onClick?: () => void }) => (
+const SubCategoryLink = ({
+  sub,
+  countryName,
+  onClick,
+}: {
+  sub: SubCategory
+  countryName?: string | null
+  onClick?: () => void
+}) => (
   <li>
     <Link
-      href={`/category/${sub._id}`}
+      href={buildCategoryHref(sub._id, countryName)}
       onClick={onClick}
       className="block rounded-md px-4 py-2 text-sm font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white transition-colors"
     >
@@ -49,18 +67,21 @@ const SubCategoryLink = ({ sub, onClick }: { sub: SubCategory; onClick?: () => v
 
 // ─── Dropdown Menu Item ────────────────────────────────────────────────────────
 
-const CategoryDropdown = ({ category }: { category: Category }) => {
+const CategoryDropdown = ({
+  category,
+  countryName,
+}: {
+  category: Category
+  countryName?: string | null
+}) => {
   const hasChildren = Array.isArray(category.subCategories) && category.subCategories.length > 0
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLLIElement>(null)
 
-  // Close on outside click (mobile / keyboard users)
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     document.addEventListener('touchstart', handler)
@@ -70,7 +91,6 @@ const CategoryDropdown = ({ category }: { category: Category }) => {
     }
   }, [open])
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -81,16 +101,15 @@ const CategoryDropdown = ({ category }: { category: Category }) => {
 
   return (
     <li ref={ref} className="relative group menu-item">
-      {/* Trigger */}
+      {/* Parent category link — also scoped to country if available */}
       <Link
-        href={`/category/${category._id}`}
+        href={buildCategoryHref(category._id, countryName)}
         aria-haspopup={hasChildren ? 'listbox' : undefined}
         aria-expanded={hasChildren ? open : undefined}
         onMouseEnter={() => hasChildren && setOpen(true)}
         onMouseLeave={() => hasChildren && setOpen(false)}
         onFocus={() => hasChildren && setOpen(true)}
         onBlur={(e) => {
-          // keep open if focus moves inside the dropdown
           if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false)
         }}
         className="flex items-center self-center rounded-full px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 lg:text-[15px] xl:px-5 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors"
@@ -123,7 +142,12 @@ const CategoryDropdown = ({ category }: { category: Category }) => {
         >
           <ul className="rounded-lg bg-white py-2 text-sm shadow-lg ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10">
             {category.subCategories.map((sub) => (
-              <SubCategoryLink key={sub._id} sub={sub} onClick={() => setOpen(false)} />
+              <SubCategoryLink
+                key={sub._id}
+                sub={sub}
+                countryName={countryName}
+                onClick={() => setOpen(false)}
+              />
             ))}
           </ul>
         </div>
@@ -175,36 +199,18 @@ function useCategoryData(apiUrl: string) {
       try {
         if (!isBackground) setLoading(true)
         setError(null)
-
         const res = await fetch(apiUrl, {
           signal,
-          // Prevent stale cache in production
-          next: { revalidate: 30 },
           cache: 'no-store',
         } as RequestInit)
-
-        if (!res.ok) {
-          throw new Error(`API error ${res.status}: ${res.statusText}`)
-        }
-
+        if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`)
         const data: CategoryViewResponse = await res.json()
-
-        if (isMounted.current) {
-          setCategories(data.categories ?? [])
-        }
+        if (isMounted.current) setCategories(data.categories ?? [])
       } catch (err) {
         if ((err as Error).name === 'AbortError') return
-        if (isMounted.current) {
-          setError((err as Error).message ?? 'Unknown error')
-        }
+        if (isMounted.current) setError((err as Error).message ?? 'Unknown error')
       } finally {
-        if (isMounted.current && !isBackground) {
-          setLoading(false)
-        }
-        // For background refreshes, always clear loading
-        if (isMounted.current && isBackground) {
-          setLoading(false)
-        }
+        if (isMounted.current) setLoading(false)
       }
     },
     [apiUrl],
@@ -213,19 +219,15 @@ function useCategoryData(apiUrl: string) {
   useEffect(() => {
     isMounted.current = true
     const controller = new AbortController()
-
-    // Initial fetch
     fetchCategories(controller.signal, false)
 
-    // Polling — silent background refresh
     let timer: ReturnType<typeof setInterval> | null = null
     if (POLL_INTERVAL > 0) {
       timer = setInterval(() => {
-        const bgController = new AbortController()
-        fetchCategories(bgController.signal, true)
+        const bg = new AbortController()
+        fetchCategories(bg.signal, true)
       }, POLL_INTERVAL)
     }
-
     return () => {
       isMounted.current = false
       controller.abort()
@@ -240,12 +242,18 @@ function useCategoryData(apiUrl: string) {
 
 export interface CategoryNavProps {
   className?: string
-  /** Override API URL (defaults to NEXT_PUBLIC_API_URL env var) */
   apiUrl?: string
+  /** Pass explicitly, OR leave undefined to auto-read from URL params */
+  countryName?: string
 }
 
-const CountryCategory = ({ className, apiUrl = API_URL }: CategoryNavProps) => {
+const CountryCategory = ({ className, apiUrl = API_URL, countryName: propCountry }: CategoryNavProps) => {
   const { categories, loading, error } = useCategoryData(apiUrl)
+
+  // ✅ Auto-detect country from URL params if not passed as prop
+  // Works inside /country/[name]/... routes automatically
+  const params = useParams()
+  const countryName = propCountry ?? (params?.name as string | undefined) ?? null
 
   if (loading) return <NavSkeleton />
 
@@ -263,9 +271,21 @@ const CountryCategory = ({ className, apiUrl = API_URL }: CategoryNavProps) => {
     <nav aria-label="Category navigation">
       <ul className={clsx('flex flex-wrap items-center gap-1', className)}>
         <StaticNavLink href="/" label="Home" />
-        <StaticNavLink href="/allproduct" label="All Products" />
+        {/* If inside a country page, link "All Products" scoped to country */}
+        <StaticNavLink
+          href={countryName ? `/country/${countryName}` : '/allproduct'}
+          label={countryName ? `All in ${countryName}` : 'All Products'}
+        />
+   <StaticNavLink
+  href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
+  label="All Products"
+/>
         {categories.map((category) => (
-          <CategoryDropdown key={category._id} category={category} />
+          <CategoryDropdown
+            key={category._id}
+            category={category}
+            countryName={countryName}
+          />
         ))}
       </ul>
     </nav>

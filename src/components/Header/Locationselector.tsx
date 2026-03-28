@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Country {
   _id: string
@@ -35,12 +37,13 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  const dropdownMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isOpen) return
     setFetchError('')
     setLoading(true)
-    fetch('http://localhost:7000/api/allCountries')
+    fetch(`${BASE_URL}/api/allCountries`)
       .then((res) => {
         if (!res.ok) throw new Error('Network response was not ok')
         return res.json()
@@ -57,6 +60,7 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -66,6 +70,25 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Handle scroll locking when dropdown is open
+  useEffect(() => {
+    if (dropdownOpen && dropdownMenuRef.current) {
+      const dropdownMenu = dropdownMenuRef.current
+      const handleWheel = (e: WheelEvent) => {
+        const { scrollTop, scrollHeight, clientHeight } = dropdownMenu
+        const isAtTop = scrollTop === 0
+        const isAtBottom = scrollTop + clientHeight >= scrollHeight
+
+        if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+          e.preventDefault()
+        }
+      }
+
+      dropdownMenu.addEventListener('wheel', handleWheel, { passive: false })
+      return () => dropdownMenu.removeEventListener('wheel', handleWheel)
+    }
+  }, [dropdownOpen])
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
@@ -82,7 +105,7 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[999] flex items-start justify-center bg-black/40 backdrop-blur-sm pt-14 px-4"
+      className="fixed inset-0 z-[999] flex items-start justify-center bg-black/40 backdrop-blur-sm pt-14 px-4 h-auto"
       onClick={handleBackdropClick}
     >
       <div
@@ -94,7 +117,7 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#6b6b2a]/10 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-[#6b6b2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-[#B4538F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -122,9 +145,12 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
         </div>
 
         {/* Body */}
-        <div className="px-5 pb-5 space-y-3">
+        <div className="px-5 pb-5 space-y-4">
           {/* Country Dropdown */}
-          <div ref={dropdownRef} className="relative">
+          <div className="relative" ref={dropdownRef}>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Select Country
+            </label>
             <button
               type="button"
               onClick={() => !loading && setDropdownOpen((v) => !v)}
@@ -132,7 +158,7 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
               className={clsx(
                 'w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm font-medium bg-white transition-colors',
                 dropdownOpen
-                  ? 'border-[#6b6b2a] ring-2 ring-[#6b6b2a]/20'
+                  ? 'border-[#B4538F] ring-2 ring-[#B4538F]/20'
                   : 'border-gray-200 hover:border-gray-300',
                 loading && 'opacity-60 cursor-not-allowed',
               )}
@@ -159,43 +185,59 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
               )}
             </button>
 
+            {/* Dropdown Menu */}
             {dropdownOpen && countries.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-xl max-h-56 overflow-y-auto">
-                {countries.map((country) => (
-                  <button
-                    key={country._id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCountry(country)
-                      setDropdownOpen(false)
-                    }}
-                    className={clsx(
-                      'w-full flex items-center justify-between px-4 py-2.5 text-sm text-left transition-colors',
-                      selectedCountry?._id === country._id
-                        ? 'bg-[#6b6b2a]/10 text-[#6b6b2a] font-semibold'
-                        : 'text-gray-700 hover:bg-gray-50',
-                    )}
-                  >
-                    <span>{capitalize(country.name)}</span>
-                    {selectedCountry?._id === country._id && (
-                      <svg className="w-4 h-4 text-[#6b6b2a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
+              <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl">
+                <div 
+                  ref={dropdownMenuRef}
+                  className="max-h-64 overflow-y-auto overscroll-contain"
+                  style={{ 
+                    scrollBehavior: 'smooth',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  {countries.map((country) => (
+                    <button
+                      key={country._id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCountry(country)
+                        setDropdownOpen(false)
+                      }}
+                      className={clsx(
+                        'w-full flex items-center justify-between px-4 py-3 text-sm text-left transition-colors hover:bg-gray-50',
+                        selectedCountry?._id === country._id
+                          ? 'bg-[#B4538F]/10 text-[#B4538F] font-semibold'
+                          : 'text-gray-700',
+                      )}
+                    >
+                      <span>{capitalize(country.name)}</span>
+                      {selectedCountry?._id === country._id && (
+                        <svg className="w-4 h-4 text-[#B4538F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
-          {/* City Input */}
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Enter your city (optional)"
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#6b6b2a] focus:ring-2 focus:ring-[#6b6b2a]/20 transition-colors"
-          />
+          {/* City Input - commented out as per original */}
+          {/* <div>
+            <label htmlFor="city" className="block text-xs font-medium text-gray-700 mb-1.5">
+              City (Optional)
+            </label>
+            <input
+              id="city"
+              type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Enter your city"
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#B4538F] focus:ring-2 focus:ring-[#B4538F]/20 transition-colors"
+            />
+          </div> */}
 
           {fetchError && (
             <p className="text-xs text-red-500 flex items-center gap-1">
@@ -213,10 +255,10 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
             onClick={handleContinue}
             disabled={!selectedCountry || loading}
             className={clsx(
-              'w-full py-3.5 rounded-lg font-semibold text-sm text-white transition-colors duration-150',
-              'bg-[#6b6b2a] hover:bg-[#5a5a22] active:bg-[#4a4a1c]',
+              'w-full py-3.5 rounded-lg font-semibold text-sm text-white transition-all duration-150',
+              'bg-[#B4538F] hover:bg-[#9f3e7a] active:bg-[#8a3568]',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              'focus:outline-none focus:ring-2 focus:ring-[#6b6b2a]/40',
+              'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/40',
             )}
           >
             Continue Shopping
@@ -228,6 +270,29 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
         @keyframes modalIn {
           from { opacity: 0; transform: translateY(-10px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        
+        /* Custom scrollbar styling for better appearance */
+        .overscroll-contain {
+          overscroll-behavior: contain;
+        }
+        
+        .max-h-64::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .max-h-64::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        
+        .max-h-64::-webkit-scrollbar-thumb {
+          background: #c1c1c1;
+          border-radius: 10px;
+        }
+        
+        .max-h-64::-webkit-scrollbar-thumb:hover {
+          background: #a8a8a8;
         }
       `}</style>
     </div>
@@ -255,10 +320,10 @@ export default function LocationSelector() {
         className={clsx(
           'hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg',
           'hover:bg-gray-100 transition-colors duration-150',
-          'focus:outline-none focus:ring-2 focus:ring-[#6b6b2a]/20',
+          'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/20',
         )}
       >
-        <svg className="w-4 h-4 text-[#6b6b2a] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-[#B4538F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
             d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

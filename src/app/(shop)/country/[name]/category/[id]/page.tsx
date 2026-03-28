@@ -11,18 +11,42 @@ interface Category {
   subCategories: SubCategory[]
 }
 interface Color { _id: string; name: string }
+interface CountryInfo { _id: string; name: string }
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: Category; subCategory: string; color: Color
+  country: CountryInfo
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const imgSrc = (p: string) => `${BASE}${p}`
 const pct = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0
 const PER_PAGE = 12
+
+// ─── Currency map by country name ─────────────────────────────────────────────
+const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
+  india:            { symbol: '₹',   code: 'INR' },
+  'united states':  { symbol: '$',   code: 'USD' },
+  usa:              { symbol: '$',   code: 'USD' },
+  uk:               { symbol: '£',   code: 'GBP' },
+  'united kingdom': { symbol: '£',   code: 'GBP' },
+  europe:           { symbol: '€',   code: 'EUR' },
+  germany:          { symbol: '€',   code: 'EUR' },
+  france:           { symbol: '€',   code: 'EUR' },
+  japan:            { symbol: '¥',   code: 'JPY' },
+  china:            { symbol: '¥',   code: 'CNY' },
+  australia:        { symbol: 'A$',  code: 'AUD' },
+  canada:           { symbol: 'C$',  code: 'CAD' },
+  uae:              { symbol: 'AED', code: 'AED' },
+  singapore:        { symbol: 'S$',  code: 'SGD' },
+}
+
+function getCurrency(countryName: string) {
+  return CURRENCY_MAP[countryName?.toLowerCase()] ?? { symbol: '₹', code: 'INR' }
+}
 
 const COLOR_MAP: Record<string, string> = {
   pink: '#f9a8d4', red: '#f87171', white: '#f0ece6', blue: '#93c5fd',
@@ -62,9 +86,22 @@ const IconArrowLeft = () => (
     <path d="M19 12H5M12 5l-7 7 7 7" />
   </svg>
 )
+const IconGlobe = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+)
+
+// ─── Price display helper ─────────────────────────────────────────────────────
+function Price({ amount, symbol }: { amount: number; symbol: string }) {
+  return <>{symbol}{amount.toLocaleString()}</>
+}
 
 // ─── Quick View Modal ─────────────────────────────────────────────────────────
-function QuickViewModal({ product, onClose }: { product: Product; onClose: () => void }) {
+function QuickViewModal({
+  product, onClose, currencySymbol,
+}: { product: Product; onClose: () => void; currencySymbol: string }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
@@ -76,10 +113,7 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
     document.body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
-    return () => {
-      document.body.style.overflow = ''
-      window.removeEventListener('keydown', onKey)
-    }
+    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey) }
   }, [onClose])
 
   return (
@@ -90,8 +124,7 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
       style={{ animation: 'fadein 0.2s ease' }}
     >
       <div
-        role="dialog"
-        aria-modal="true"
+        role="dialog" aria-modal="true"
         style={{ animation: 'slideup 0.28s cubic-bezier(0.34,1.3,0.64,1)' }}
         className="bg-white rounded-[18px] w-full max-w-[900px] max-h-[92vh] overflow-y-auto relative shadow-[0_36px_90px_rgba(20,14,10,0.26)]"
       >
@@ -127,15 +160,11 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
                   <button
                     className="absolute top-1/2 left-2.5 -translate-y-1/2 w-[34px] h-[34px] rounded-full bg-white/90 flex items-center justify-center cursor-pointer text-[#1e1610] shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:bg-[#1e1610] hover:text-[#f7f3ee] transition-all duration-200 border-none"
                     onClick={() => setActiveImg(i => (i - 1 + product.images.length) % product.images.length)}
-                  >
-                    <IconChevLeft />
-                  </button>
+                  ><IconChevLeft /></button>
                   <button
                     className="absolute top-1/2 right-2.5 -translate-y-1/2 w-[34px] h-[34px] rounded-full bg-white/90 flex items-center justify-center cursor-pointer text-[#1e1610] shadow-[0_2px_10px_rgba(0,0,0,0.1)] hover:bg-[#1e1610] hover:text-[#f7f3ee] transition-all duration-200 border-none"
                     onClick={() => setActiveImg(i => (i + 1) % product.images.length)}
-                  >
-                    <IconChevRight />
-                  </button>
+                  ><IconChevRight /></button>
                 </>
               )}
             </div>
@@ -143,8 +172,7 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
               <div className="flex gap-2 flex-wrap">
                 {product.images.map((src, i) => (
                   <button
-                    key={i}
-                    onClick={() => setActiveImg(i)}
+                    key={i} onClick={() => setActiveImg(i)}
                     className={`w-16 h-16 rounded-[9px] border-2 overflow-hidden cursor-pointer transition-all duration-200 p-0 bg-[#f0ebe3] flex-shrink-0 ${i === activeImg ? 'border-[#b5623b]' : 'border-transparent hover:border-[#1e1610]'}`}
                   >
                     <img src={imgSrc(src)} alt="" className="w-full h-full object-cover" />
@@ -166,6 +194,11 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
                   {product.color.name}
                 </span>
               )}
+              {product.country?.name && (
+                <span className="text-[0.7rem] px-2.5 py-[3px] rounded-full bg-[#f0ebe3] text-[#7a6b5e] font-medium flex items-center gap-1.5 border border-[#e6ddd3] capitalize">
+                  <IconGlobe /> {product.country.name}
+                </span>
+              )}
             </div>
             <h2 className="font-serif text-[clamp(1.35rem,2.4vw,1.8rem)] font-bold leading-tight mb-1.5">
               {product.name}
@@ -175,12 +208,12 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
             )}
             <div className="flex items-baseline gap-2.5 flex-wrap mb-3.5">
               <span className="text-[1.65rem] font-bold text-[#1e1610] leading-none">
-                ₹{product.discountPrice.toLocaleString()}
+                <Price amount={product.discountPrice} symbol={currencySymbol} />
               </span>
               {discount > 0 && (
                 <>
                   <span className="text-[0.95rem] text-[#b0a090] line-through">
-                    ₹{product.exactPrice.toLocaleString()}
+                    <Price amount={product.exactPrice} symbol={currencySymbol} />
                   </span>
                   <span className="text-[0.72rem] bg-[#dcfce7] text-[#3d8b5e] px-2.5 py-[3px] rounded-full font-bold">
                     Save {discount}%
@@ -196,27 +229,15 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
             <div className="flex items-center gap-2 mb-4">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${product.stock === 0 ? 'bg-red-500' : product.stock <= 5 ? 'bg-amber-500' : 'bg-green-500'}`} />
               <span className="text-[0.8rem] text-[#7a6b5e] font-medium">
-                {product.stock === 0
-                  ? 'Out of stock'
-                  : product.stock <= 5
-                  ? `Only ${product.stock} left — order soon`
-                  : `In stock · ${product.stock} available`}
+                {product.stock === 0 ? 'Out of stock' : product.stock <= 5 ? `Only ${product.stock} left — order soon` : `In stock · ${product.stock} available`}
               </span>
             </div>
             {product.stock > 0 && (
               <div className="flex gap-2.5 items-center mb-2.5 flex-wrap">
                 <div className="flex items-center border border-[#e6ddd3] rounded-[9px] overflow-hidden flex-shrink-0">
-                  <button
-                    onClick={() => setQty(q => Math.max(1, q - 1))}
-                    className="w-[38px] h-11 border-none bg-[#f0ebe3] text-lg cursor-pointer text-[#1e1610] flex items-center justify-center hover:bg-[#e6ddd3] transition-all duration-200 font-light"
-                  >−</button>
-                  <span className="w-[42px] text-center text-[0.92rem] font-bold border-x border-[#e6ddd3] h-11 flex items-center justify-center">
-                    {qty}
-                  </span>
-                  <button
-                    onClick={() => setQty(q => Math.min(product.stock, q + 1))}
-                    className="w-[38px] h-11 border-none bg-[#f0ebe3] text-lg cursor-pointer text-[#1e1610] flex items-center justify-center hover:bg-[#e6ddd3] transition-all duration-200 font-light"
-                  >+</button>
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="w-[38px] h-11 border-none bg-[#f0ebe3] text-lg cursor-pointer text-[#1e1610] flex items-center justify-center hover:bg-[#e6ddd3] transition-all duration-200 font-light">−</button>
+                  <span className="w-[42px] text-center text-[0.92rem] font-bold border-x border-[#e6ddd3] h-11 flex items-center justify-center">{qty}</span>
+                  <button onClick={() => setQty(q => Math.min(product.stock, q + 1))} className="w-[38px] h-11 border-none bg-[#f0ebe3] text-lg cursor-pointer text-[#1e1610] flex items-center justify-center hover:bg-[#e6ddd3] transition-all duration-200 font-light">+</button>
                 </div>
                 <button
                   onClick={() => { setAdded(true); setTimeout(() => setAdded(false), 2200) }}
@@ -239,7 +260,19 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
-function ProductCard({ product, onQuickView }: { product: Product; onQuickView: () => void }) {
+// ✅ countryName passed as prop from parent — no useParams() here
+//    navigates to: /country/india/product/[id]
+function ProductCard({
+  product,
+  onQuickView,
+  currencySymbol,
+  countryName,
+}: {
+  product: Product
+  onQuickView: () => void
+  currencySymbol: string
+  countryName: string   // ✅ FIXED — was undefined "countrySlug", now prop from parent
+}) {
   const router = useRouter()
   const [imgIdx, setImgIdx] = useState(0)
   const discount = pct(product.exactPrice, product.discountPrice)
@@ -249,7 +282,7 @@ function ProductCard({ product, onQuickView }: { product: Product; onQuickView: 
       className="bg-white rounded-[13px] overflow-hidden shadow-[0_2px_18px_rgba(30,22,16,0.07)] transition-all duration-200 cursor-pointer border border-[#e6ddd3] hover:shadow-[0_16px_50px_rgba(30,22,16,0.16)] hover:-translate-y-1.5 group"
       onMouseEnter={() => product.images.length > 1 && setImgIdx(1)}
       onMouseLeave={() => setImgIdx(0)}
-      onClick={() => router.push(`/product/${product._id}`)}
+      onClick={() => router.push(`/country/${countryName}/product/${product._id}`)}
     >
       <div className="relative aspect-square overflow-hidden bg-[#f0ebe3]">
         {product.images[imgIdx] ? (
@@ -284,9 +317,13 @@ function ProductCard({ product, onQuickView }: { product: Product; onQuickView: 
         <h3 className="font-serif text-[1.02rem] font-semibold leading-snug mb-[3px]">{product.name}</h3>
         <p className="text-[0.77rem] text-[#7a6b5e] mb-2.5 overflow-hidden text-ellipsis whitespace-nowrap">{product.title}</p>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[0.98rem] font-semibold text-[#1e1610]">₹{product.discountPrice.toLocaleString()}</span>
+          <span className="text-[0.98rem] font-semibold text-[#1e1610]">
+            <Price amount={product.discountPrice} symbol={currencySymbol} />
+          </span>
           {discount > 0 && (
-            <span className="text-[0.76rem] text-[#b0a090] line-through">₹{product.exactPrice.toLocaleString()}</span>
+            <span className="text-[0.76rem] text-[#b0a090] line-through">
+              <Price amount={product.exactPrice} symbol={currencySymbol} />
+            </span>
           )}
         </div>
       </div>
@@ -313,110 +350,110 @@ function Pagination({ page, total, perPage, onChange }: {
   const btn = 'min-w-[38px] h-[38px] px-2 rounded-[9px] border border-[#e6ddd3] bg-white text-[0.86rem] cursor-pointer flex items-center justify-center text-[#1e1610] transition-all duration-200 hover:border-[#1e1610] disabled:opacity-30 disabled:cursor-not-allowed'
   return (
     <nav className="flex gap-1.5 justify-center mt-14 flex-wrap" aria-label="Pagination">
-      <button className={btn} disabled={page === 1} onClick={() => onChange(page - 1)}>
-        <IconChevLeft />
-      </button>
+      <button className={btn} disabled={page === 1} onClick={() => onChange(page - 1)}><IconChevLeft /></button>
       {nums.map((n, i) =>
         n === '…'
           ? <span key={`e${i}`} className="flex items-center px-1 text-[#b0a090]">…</span>
           : <button key={n} className={`${btn} ${n === page ? '!bg-[#1e1610] !text-[#f7f3ee] !border-[#1e1610]' : ''}`} onClick={() => onChange(n as number)}>{n}</button>
       )}
-      <button className={btn} disabled={page === pages} onClick={() => onChange(page + 1)}>
-        <IconChevRight />
-      </button>
+      <button className={btn} disabled={page === pages} onClick={() => onChange(page + 1)}><IconChevRight /></button>
     </nav>
   )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function CategoryPage() {
+// Route: /country/[name]/category/[id]
+// params.name = "india"  → API + currency + product links
+// params.id   = category _id OR subcategory _id → filtering
+export default function CountryCategoryPage() {
   const params = useParams()
   const router = useRouter()
-  // The URL id can be a CATEGORY _id OR a SUBCATEGORY _id (both come from CategoryNav)
-  const urlId = params?.id as string
 
-  const [category, setCategory]       = useState<Category | null>(null)
-  const [activeSub, setActiveSub]     = useState<string>('all')
-  const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState('')
-  const [sort, setSort]               = useState('newest')
-  const [page, setPage]               = useState(1)
-  const [quickView, setQuickView]     = useState<Product | null>(null)
+  // ✅ Read ONCE at top level — passed down as props to children
+  const countryName = (params?.name as string) ?? ''
+  const urlId       = (params?.id   as string) ?? ''
+
+  const currency = getCurrency(countryName)
+
+  const [allProducts, setAllProducts]         = useState<Product[]>([])
+  const [matchedCategory, setMatchedCategory] = useState<Category | null>(null)
+  const [activeSub, setActiveSub]             = useState<string>('all')
+  const [loading, setLoading]                 = useState(true)
+  const [error, setError]                     = useState('')
+  const [sort, setSort]                       = useState('newest')
+  const [page, setPage]                       = useState(1)
+  const [quickView, setQuickView]             = useState<Product | null>(null)
 
   useEffect(() => {
-    if (!urlId) return
+    if (!countryName || !urlId) return
     setLoading(true)
     setError('')
 
-    Promise.all([
-      // Fetch ALL categories (no 404 risk — no ID in URL)
-      fetch(`${BASE}/api/categoryview`)
-        .then(r => {
-          if (!r.ok) throw new Error(`Failed to load categories (${r.status})`)
-          return r.json()
-        }),
-      // Fetch ALL products
-      fetch(`${BASE}/api/productview`)
-        .then(r => {
-          if (!r.ok) throw new Error(`Failed to load products (${r.status})`)
-          return r.json()
-        }),
-    ])
-      .then(([catData, prodData]) => {
-        const categories: Category[] = catData.categories ?? []
-        const products: Product[] = Array.isArray(prodData)
-          ? prodData
-          : prodData.products ?? prodData.data ?? []
+    fetch(`${BASE}/api/countrywise?country=${encodeURIComponent(countryName)}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`Failed to load products for "${countryName}" (${r.status})`)
+        return r.json()
+      })
+      .then((json) => {
+        const products: Product[] = Array.isArray(json)
+          ? json
+          : json.data ?? json.products ?? []
 
-        let matchedCategory: Category | null = null
-        let matchedSubId = 'all'
+        if (!products.length) {
+          throw new Error(`No products found for country "${countryName}".`)
+        }
 
-        // 1. Try matching urlId as a top-level category _id
+        // Build unique category list from products
+        const categoryMap = new Map<string, Category>()
+        for (const p of products) {
+          if (p.category?._id && !categoryMap.has(p.category._id)) {
+            categoryMap.set(p.category._id, p.category)
+          }
+        }
+        const categories = Array.from(categoryMap.values())
+
+        let found: Category | null = null
+        let foundSubId = 'all'
+
+        // 1. Try urlId as a top-level category _id
         const directCat = categories.find(c => c._id === urlId)
         if (directCat) {
-          matchedCategory = directCat
-          matchedSubId = 'all'
+          found = directCat
+          foundSubId = 'all'
         } else {
-          // 2. Try matching urlId as a subcategory _id inside any category
+          // 2. Try urlId as a subcategory _id
           for (const cat of categories) {
             const sub = cat.subCategories?.find(s => s._id === urlId)
             if (sub) {
-              matchedCategory = cat
-              matchedSubId = sub._id
+              found = cat
+              foundSubId = sub._id
               break
             }
           }
         }
 
-        if (!matchedCategory) {
-          throw new Error('Category not found. Please check the URL.')
+        if (!found) {
+          throw new Error('Category not found for this country. Check the URL.')
         }
 
-        // Only keep products that belong to this category
-        const categoryProducts = products.filter(
-          p => p.category?._id === matchedCategory!._id
-        )
-
-        setCategory(matchedCategory)
-        setActiveSub(matchedSubId)
-        setAllProducts(categoryProducts)
+        const filtered = products.filter(p => p.category?._id === found!._id)
+        setMatchedCategory(found)
+        setActiveSub(foundSubId)
+        setAllProducts(filtered)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [urlId])
+  }, [countryName, urlId])
 
   const handleSubChange = useCallback((subId: string) => {
     setActiveSub(subId)
     setPage(1)
   }, [])
 
-  // Filter products by active subcategory tab
   const filtered = activeSub === 'all'
     ? allProducts
     : allProducts.filter(p => p.subCategory === activeSub)
 
-  // Sort
   const sorted = [...filtered].sort((a, b) => {
     if (sort === 'price-asc')  return a.discountPrice - b.discountPrice
     if (sort === 'price-desc') return b.discountPrice - a.discountPrice
@@ -426,7 +463,7 @@ export default function CategoryPage() {
 
   const paginated = sorted.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const activeSubName = activeSub !== 'all'
-    ? category?.subCategories.find(s => s._id === activeSub)?.name
+    ? matchedCategory?.subCategories.find(s => s._id === activeSub)?.name
     : undefined
 
   return (
@@ -435,10 +472,10 @@ export default function CategoryPage() {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap');
         body { font-family: 'Jost', sans-serif; }
         .font-serif { font-family: 'Playfair Display', serif; }
-        @keyframes rot    { to { transform: rotate(360deg) } }
-        @keyframes fadein { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes rot     { to { transform: rotate(360deg) } }
+        @keyframes fadein  { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideup { from { opacity:0; transform: translateY(26px) scale(0.98) } to { opacity:1; transform:none } }
-        @keyframes pageIn { from { opacity:0; transform:translateY(-10px) } to { opacity:1; transform:none } }
+        @keyframes pageIn  { from { opacity:0; transform:translateY(-10px) } to { opacity:1; transform:none } }
         .spin-anim  { animation: rot 0.75s linear infinite; }
         .page-enter { animation: pageIn 0.3s ease; }
       `}</style>
@@ -449,7 +486,10 @@ export default function CategoryPage() {
         {loading && (
           <div className="flex flex-col items-center justify-center min-h-screen gap-4">
             <div className="spin-anim w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full" />
-            <p className="text-[#7a6b5e] text-[0.9rem]">Loading products…</p>
+            <p className="text-[#7a6b5e] text-[0.9rem]">
+              Loading products for{' '}
+              <span className="capitalize font-semibold text-[#b5623b]">{countryName}</span>…
+            </p>
           </div>
         )}
 
@@ -469,20 +509,32 @@ export default function CategoryPage() {
         )}
 
         {/* Main Content */}
-        {!loading && !error && category && (
+        {!loading && !error && matchedCategory && (
           <div className="max-w-[1440px] mx-auto px-6 py-10 page-enter">
+
+            {/* Country + Currency banner */}
+            <div className="flex items-center gap-2.5 mb-6 px-4 py-2.5 rounded-full bg-white border border-[#e6ddd3] w-fit shadow-[0_2px_10px_rgba(30,22,16,0.06)]">
+              <IconGlobe />
+              <span className="text-[0.78rem] font-medium text-[#7a6b5e]">Showing prices in</span>
+              <span className="text-[0.78rem] font-bold text-[#1e1610] capitalize">{countryName}</span>
+              <span className="text-[0.72rem] px-2 py-0.5 rounded-full bg-[#f0ebe3] text-[#b5623b] font-bold border border-[#e6ddd3]">
+                {currency.symbol} {currency.code}
+              </span>
+            </div>
 
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-[0.78rem] text-[#b0a090] mb-8 flex-wrap">
               <Link href="/" className="hover:text-[#b5623b] transition-colors">Home</Link>
               <span>/</span>
-              <Link href="/allproduct" className="hover:text-[#b5623b] transition-colors">All Products</Link>
+              <Link href={`/country/${countryName}`} className="hover:text-[#b5623b] transition-colors capitalize">
+                {countryName}
+              </Link>
               <span>/</span>
               <button
                 onClick={() => handleSubChange('all')}
                 className="hover:text-[#b5623b] transition-colors bg-transparent border-none cursor-pointer text-[#b0a090] p-0 text-[0.78rem]"
               >
-                {category.name}
+                {matchedCategory.name}
               </button>
               {activeSubName && (
                 <>
@@ -497,14 +549,14 @@ export default function CategoryPage() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[0.7rem] uppercase tracking-[0.18em] text-[#b5623b] font-semibold mb-1.5">
-                    Collection
+                    Collection · <span className="capitalize">{countryName}</span>
                   </p>
                   <h1 className="font-serif text-[clamp(2rem,5vw,3.2rem)] font-bold leading-none text-[#1e1610]">
-                    {activeSubName ?? category.name}
+                    {activeSubName ?? matchedCategory.name}
                   </h1>
                   {activeSubName && (
                     <p className="text-[0.84rem] text-[#7a6b5e] mt-1.5">
-                      in <span className="text-[#b5623b] font-medium">{category.name}</span>
+                      in <span className="text-[#b5623b] font-medium">{matchedCategory.name}</span>
                     </p>
                   )}
                 </div>
@@ -523,7 +575,7 @@ export default function CategoryPage() {
             </div>
 
             {/* Subcategory Tabs */}
-            {category.subCategories && category.subCategories.length > 0 && (
+            {matchedCategory.subCategories && matchedCategory.subCategories.length > 0 && (
               <div className="mb-8 overflow-x-auto -mx-1">
                 <div className="flex gap-2 px-1 pb-1 min-w-max">
                   <button
@@ -534,12 +586,12 @@ export default function CategoryPage() {
                         : 'border-[#e6ddd3] bg-white text-[#7a6b5e] hover:border-[#b5623b] hover:text-[#b5623b]'
                     }`}
                   >
-                    All {category.name}
+                    All {matchedCategory.name}
                     <span className={`ml-2 text-[0.72rem] px-1.5 py-0.5 rounded-full ${activeSub === 'all' ? 'bg-white/20' : 'bg-[#f0ebe3]'}`}>
                       {allProducts.length}
                     </span>
                   </button>
-                  {category.subCategories.map(sub => {
+                  {matchedCategory.subCategories.map(sub => {
                     const count = allProducts.filter(p => p.subCategory === sub._id).length
                     const isActive = activeSub === sub._id
                     return (
@@ -587,23 +639,27 @@ export default function CategoryPage() {
                 <div className="text-[3rem]">🌸</div>
                 <p className="font-serif text-[1.15rem] font-semibold">No products found</p>
                 <p className="text-[0.84rem] text-[#7a6b5e]">
-                  {activeSub !== 'all'
-                    ? 'No products in this subcategory yet.'
-                    : 'This category has no products yet.'}
+                  {activeSub !== 'all' ? 'No products in this subcategory yet.' : 'This category has no products yet.'}
                 </p>
                 {activeSub !== 'all' && (
                   <button
                     onClick={() => handleSubChange('all')}
                     className="mt-2 px-5 py-2.5 rounded-full bg-[#1e1610] text-[#f7f3ee] text-sm border-none cursor-pointer hover:bg-[#7a3e22] transition-all duration-200"
                   >
-                    View All {category.name}
+                    View All {matchedCategory.name}
                   </button>
                 )}
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                 {paginated.map(p => (
-                  <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} />
+                  <ProductCard
+                    key={p._id}
+                    product={p}
+                    currencySymbol={currency.symbol}
+                    countryName={countryName}
+                    onQuickView={() => setQuickView(p)}
+                  />
                 ))}
               </div>
             )}
@@ -612,8 +668,14 @@ export default function CategoryPage() {
           </div>
         )}
 
-        {/* Quick View */}
-        {quickView && <QuickViewModal product={quickView} onClose={() => setQuickView(null)} />}
+        {/* Quick View Modal */}
+        {quickView && (
+          <QuickViewModal
+            product={quickView}
+            currencySymbol={currency.symbol}
+            onClose={() => setQuickView(null)}
+          />
+        )}
       </div>
     </>
   )

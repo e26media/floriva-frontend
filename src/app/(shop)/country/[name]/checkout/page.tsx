@@ -3,65 +3,30 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
 // =============================================================================
-//  CURRENCY CONFIG
+//  COUNTRY CONFIG — only "qatar" is permitted
 // =============================================================================
-const COUNTRY_CURRENCY_MAP: Record<string, { currency: string; symbol: string; locale: string }> = {
-  australia:            { currency: "AUD", symbol: "A$",  locale: "en-AU" },
-  au:                   { currency: "AUD", symbol: "A$",  locale: "en-AU" },
-  "united states":      { currency: "USD", symbol: "$",   locale: "en-US" },
-  us:                   { currency: "USD", symbol: "$",   locale: "en-US" },
-  usa:                  { currency: "USD", symbol: "$",   locale: "en-US" },
-  "united kingdom":     { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  uk:                   { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  gb:                   { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  canada:               { currency: "CAD", symbol: "C$",  locale: "en-CA" },
-  ca:                   { currency: "CAD", symbol: "C$",  locale: "en-CA" },
-  india:                { currency: "INR", symbol: "₹",   locale: "en-IN" },
-  in:                   { currency: "INR", symbol: "₹",   locale: "en-IN" },
-  europe:               { currency: "EUR", symbol: "€",   locale: "en-DE" },
-  germany:              { currency: "EUR", symbol: "€",   locale: "de-DE" },
-  de:                   { currency: "EUR", symbol: "€",   locale: "de-DE" },
-  france:               { currency: "EUR", symbol: "€",   locale: "fr-FR" },
-  fr:                   { currency: "EUR", symbol: "€",   locale: "fr-FR" },
-  japan:                { currency: "JPY", symbol: "¥",   locale: "ja-JP" },
-  jp:                   { currency: "JPY", symbol: "¥",   locale: "ja-JP" },
-  china:                { currency: "CNY", symbol: "¥",   locale: "zh-CN" },
-  cn:                   { currency: "CNY", symbol: "¥",   locale: "zh-CN" },
-  singapore:            { currency: "SGD", symbol: "S$",  locale: "en-SG" },
-  sg:                   { currency: "SGD", symbol: "S$",  locale: "en-SG" },
-  "new zealand":        { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
-  nz:                   { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
-  "united arab emirates": { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  uae:                  { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  ae:                   { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  switzerland:          { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  ch:                   { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  "south korea":        { currency: "KRW", symbol: "₩",  locale: "ko-KR" },
-  kr:                   { currency: "KRW", symbol: "₩",  locale: "ko-KR" },
-  brazil:               { currency: "BRL", symbol: "R$",  locale: "pt-BR" },
-  br:                   { currency: "BRL", symbol: "R$",  locale: "pt-BR" },
-  mexico:               { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  mx:                   { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  "south africa":       { currency: "ZAR", symbol: "R",   locale: "en-ZA" },
-  za:                   { currency: "ZAR", symbol: "R",   locale: "en-ZA" },
-  sweden:               { currency: "SEK", symbol: "kr",  locale: "sv-SE" },
-  se:                   { currency: "SEK", symbol: "kr",  locale: "sv-SE" },
-  norway:               { currency: "NOK", symbol: "kr",  locale: "nb-NO" },
-  no:                   { currency: "NOK", symbol: "kr",  locale: "nb-NO" },
-  denmark:              { currency: "DKK", symbol: "kr",  locale: "da-DK" },
-  dk:                   { currency: "DKK", symbol: "kr",  locale: "da-DK" },
-};
+const ALLOWED_COUNTRY = "qatar";
 
-const DEFAULT_CURRENCY = { currency: "USD", symbol: "$", locale: "en-US" };
-
-function getCurrencyInfo(countryParam: string | null) {
-  if (!countryParam) return DEFAULT_CURRENCY;
-  const key = countryParam.toLowerCase().trim();
-  return COUNTRY_CURRENCY_MAP[key] ?? DEFAULT_CURRENCY;
+interface CountryConfig {
+  label: string;
+  currencyCode: string;
+  currencySymbol: string;
+  locale: string;
+  flag: string;
 }
+
+const COUNTRY_MAP: Record<string, CountryConfig> = {
+  qatar: {
+    label:          "Qatar",
+    currencyCode:   "QAR",
+    currencySymbol: "ر.ق",
+    locale:         "ar-QA",
+    flag:           "🇶🇦",
+  },
+};
 
 // =============================================================================
 //  TYPES
@@ -116,14 +81,29 @@ const IMAGE_BASE       = "http://localhost:7000";
 // =============================================================================
 //  HELPERS
 // =============================================================================
-function getUserData(): Partial<{ email: string; firstName: string; lastName: string; name: string; phone: string }> {
+function getUserData(): Partial<{
+  email: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  phone: string;
+}> {
   if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem("floriva_user") || "{}"); }
-  catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem("floriva_user") || "{}");
+  } catch {
+    return {};
+  }
 }
 
-function fmt(n: number, locale: string, currency: string): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(n ?? 0);
+/** Format a number as currency using the given country config */
+function fmt(n: number, cfg: CountryConfig): string {
+  // Format number with 2 decimal places and thousands separator
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n ?? 0);
+  return `${cfg.currencySymbol} ${formatted}`;
 }
 
 function getImgSrc(images?: (string | ProductImage)[]): string | null {
@@ -147,15 +127,22 @@ function getPrice(p?: Product): number {
 // =============================================================================
 //  SAFE FETCH
 // =============================================================================
-async function safeFetch(url: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
+async function safeFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Record<string, unknown>> {
   const res = await fetch(url, options);
   const ct  = res.headers.get("content-type") ?? "";
   if (ct.includes("text/html")) {
-    throw new Error(`Server returned HTML for ${url} (status ${res.status}). Check backend is running.`);
+    throw new Error(
+      `Server returned HTML for ${url} (status ${res.status}). Check backend is running.`
+    );
   }
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok || !json.success) {
-    throw new Error((json.message as string) || `Request failed with status ${res.status}`);
+    throw new Error(
+      (json.message as string) || `Request failed with status ${res.status}`
+    );
   }
   return json;
 }
@@ -242,7 +229,7 @@ const IcoGlobe = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="10" />
     <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+    <path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" />
   </svg>
 );
 
@@ -265,22 +252,56 @@ function Toast({ t }: { t: ToastState | null }) {
 }
 
 // =============================================================================
-//  CURRENCY BADGE
+//  COUNTRY NOT ALLOWED SCREEN
 // =============================================================================
-function CurrencyBadge({ symbol, currency, country }: { symbol: string; currency: string; country: string }) {
+function CountryNotAllowed({ countrySlug }: { countrySlug: string }) {
+  const router = useRouter();
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-      <IcoGlobe c="h-3.5 w-3.5" />
-      <span>{symbol}</span>
-      <span className="text-neutral-400">·</span>
-      <span>{currency}</span>
-      {country && (
-        <>
-          <span className="text-neutral-400">·</span>
-          <span className="capitalize">{country}</span>
-        </>
-      )}
-    </span>
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center px-4">
+      <div className="max-w-md w-full text-center">
+        {/* Icon */}
+        <div className="mb-6 flex justify-center">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-red-100 ring-8 ring-red-50 dark:bg-red-900/20 dark:ring-red-950">
+            <IcoGlobe c="h-12 w-12 text-red-500 dark:text-red-400" />
+          </div>
+        </div>
+
+        {/* Text */}
+        <h1 className="mb-3 text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+          Region Not Available
+        </h1>
+        <p className="mb-2 text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">
+          The checkout is not available for{" "}
+          <strong className="text-neutral-700 dark:text-neutral-300 capitalize">
+            {countrySlug || "this region"}
+          </strong>
+          .
+        </p>
+        <p className="mb-8 text-sm text-neutral-400 dark:text-neutral-500 leading-relaxed">
+          This store currently only ships to{" "}
+          <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+            🇶🇦 Qatar
+          </span>
+          . Please visit the Qatar store to place your order.
+        </p>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button
+            onClick={() => router.push("/country/qatar/cart")}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-6 py-3 text-sm font-semibold uppercase tracking-widest text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 transition-all"
+          >
+            🇶🇦 Go to Qatar Store
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 px-6 py-3 text-sm font-semibold uppercase tracking-widest text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-all"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -298,7 +319,10 @@ interface FieldProps {
 function Field({ label, id, required, error, children }: FieldProps) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+      >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
@@ -318,9 +342,19 @@ interface InputProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
-function Input({ id, type = "text", placeholder, value, onChange, error, disabled }: InputProps) {
+function Input({
+  id,
+  type = "text",
+  placeholder,
+  value,
+  onChange,
+  error,
+  disabled,
+  readOnly,
+}: InputProps) {
   return (
     <input
       id={id}
@@ -330,9 +364,11 @@ function Input({ id, type = "text", placeholder, value, onChange, error, disable
       value={value}
       onChange={onChange}
       disabled={disabled}
+      readOnly={readOnly}
       className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all
         placeholder:text-neutral-400 dark:text-neutral-100 dark:placeholder:text-neutral-600
         disabled:cursor-not-allowed disabled:opacity-50
+        read-only:bg-neutral-50 read-only:cursor-default dark:read-only:bg-neutral-800/50
         ${error
           ? "border-red-400 bg-red-50 focus:border-red-500 focus:ring-2 focus:ring-red-100"
           : "border-neutral-200 bg-white focus:border-neutral-500 focus:ring-2 focus:ring-neutral-100 dark:border-neutral-700 dark:bg-neutral-800"
@@ -348,9 +384,10 @@ interface SectionHeaderProps {
   icon: React.ReactNode;
   title: string;
   step?: string;
+  badge?: React.ReactNode;
 }
 
-function SectionHeader({ icon, title, step }: SectionHeaderProps) {
+function SectionHeader({ icon, title, step, badge }: SectionHeaderProps) {
   return (
     <div className="flex items-center gap-3 border-b border-neutral-100 px-6 py-5 dark:border-neutral-800">
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
@@ -361,7 +398,10 @@ function SectionHeader({ icon, title, step }: SectionHeaderProps) {
           {step}
         </span>
       )}
-      <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</h2>
+      <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+        {title}
+      </h2>
+      {badge && <div className="ml-auto">{badge}</div>}
     </div>
   );
 }
@@ -371,12 +411,10 @@ function SectionHeader({ icon, title, step }: SectionHeaderProps) {
 // =============================================================================
 function OrderItemRow({
   item,
-  locale,
-  currency,
+  cfg,
 }: {
   item: CartItem;
-  locale: string;
-  currency: string;
+  cfg: CountryConfig;
 }) {
   const p = item.productId;
   const [imgErr, setImgErr] = useState(false);
@@ -411,7 +449,7 @@ function OrderItemRow({
           {p?.name ?? p?.title ?? "Product"}
         </p>
         <p className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
-          {fmt(price * qty, locale, currency)}
+          {fmt(price * qty, cfg)}
         </p>
       </div>
     </div>
@@ -425,13 +463,17 @@ interface SuccessScreenProps {
   orderId: string;
   email: string;
   paymentMethod: string;
-  currencySymbol: string;
-  currency: string;
-  locale: string;
+  cfg: CountryConfig;
   subtotal: number;
 }
 
-function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency, locale, subtotal }: SuccessScreenProps) {
+function SuccessScreen({
+  orderId,
+  email,
+  paymentMethod,
+  cfg,
+  subtotal,
+}: SuccessScreenProps) {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -439,38 +481,41 @@ function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency
         <IcoCheck c="h-12 w-12 text-emerald-600 dark:text-emerald-400" />
       </div>
 
+      {/* Country badge */}
+      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+        {cfg.flag} {cfg.label} &nbsp;·&nbsp; {cfg.currencyCode}
+      </div>
+
       <h2 className="mb-2 text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
         Order Placed!
       </h2>
       <p className="mb-3 text-sm text-neutral-500 dark:text-neutral-400">
         Confirmation sent to{" "}
-        <strong className="text-neutral-700 dark:text-neutral-300">{email}</strong>
+        <strong className="text-neutral-700 dark:text-neutral-300">
+          {email}
+        </strong>
       </p>
-
-      {/* Currency info badge on success */}
-      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
-        <IcoGlobe c="h-4 w-4" />
-        {fmt(subtotal, locale, currency)} {currency}
-      </div>
 
       {paymentMethod === "cash_on_delivery" && (
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
-          <IcoCash c="h-4 w-4" /> Pay on Delivery · {currencySymbol}
+          <IcoCash c="h-4 w-4" /> Pay on Delivery · {fmt(subtotal, cfg)}
         </div>
       )}
       {paymentMethod === "online" && (
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
-          <IcoCheck c="h-4 w-4" /> Payment Successful
+          <IcoCheck c="h-4 w-4" /> Payment Successful · {fmt(subtotal, cfg)}
         </div>
       )}
 
       {orderId && (
-        <p className="mb-8 font-mono text-xs text-neutral-400">Order ID: {orderId}</p>
+        <p className="mb-8 font-mono text-xs text-neutral-400">
+          Order ID: {orderId}
+        </p>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
-          onClick={() => router.push("/")}
+          onClick={() => router.push(`/country/${ALLOWED_COUNTRY}`)}
           className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-7 py-3.5 text-sm font-semibold uppercase tracking-widest text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900"
         >
           Continue Shopping
@@ -490,14 +535,18 @@ function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency
 //  MAIN CHECKOUT PAGE
 // =============================================================================
 export default function CheckoutPage() {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  // ── Read ?country= param ──────────────────────────────────────────────────
-  const countryParam   = searchParams.get("country");
-  const currencyInfo   = getCurrencyInfo(countryParam);
-  const { currency, symbol: currencySymbol, locale } = currencyInfo;
+  // ── Read [country] param from URL (e.g. /country/qatar/cart) ──────────────
+  // Works with Next.js App Router. If you are on Pages Router, use useRouter().query.country
+  const params      = useParams();
+  const countrySlug = (
+    Array.isArray(params?.country) ? params.country[0] : params?.country ?? ""
+  ).toLowerCase();
 
+  const cfg = COUNTRY_MAP[countrySlug]; // undefined if not allowed
+
+  // ── State ─────────────────────────────────────────────────────────────────
   const [cartItems,     setCartItems]     = useState<CartItem[]>([]);
   const [submitting,    setSubmitting]    = useState(false);
   const [toast,         setToast]         = useState<ToastState | null>(null);
@@ -510,13 +559,11 @@ export default function CheckoutPage() {
     firstName: "", lastName: "", email: "", phone: "",
     streetAddress1: "", streetAddress2: "",
     city: "", stateProvinceRegionId: "", postalCode: "",
-    // Pre-fill country from URL param
-    country: countryParam
-      ? countryParam.charAt(0).toUpperCase() + countryParam.slice(1).toLowerCase()
-      : "",
+    // Pre-fill country field with the country from the URL
+    country: cfg?.label ?? "",
   });
 
-  // ── Load cart from sessionStorage + prefill user email / name ─────────────
+  // ── Load cart + prefill user ───────────────────────────────────────────────
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("checkout_data");
@@ -533,29 +580,31 @@ export default function CheckoutPage() {
       firstName: user.firstName ?? (user.name?.split(" ")[0])                ?? "",
       lastName:  user.lastName  ?? (user.name?.split(" ").slice(1).join(" ")) ?? "",
       phone:     user.phone     ?? "",
+      // Always keep country locked to the URL country
+      country: cfg?.label ?? f.country,
     }));
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countrySlug]);
 
-  // ── Keep country field in sync if URL param changes ───────────────────────
-  useEffect(() => {
-    if (countryParam) {
-      setForm((f) => ({
-        ...f,
-        country: countryParam.charAt(0).toUpperCase() + countryParam.slice(1).toLowerCase(),
-      }));
-    }
-  }, [countryParam]);
-
-  const showToast = useCallback((message: string, type: ToastState["type"] = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  }, []);
+  const showToast = useCallback(
+    (message: string, type: ToastState["type"] = "success") => {
+      setToast({ message, type });
+      setTimeout(() => setToast(null), 5000);
+    },
+    []
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    // Prevent editing the locked "country" field
+    if (name === "country") return;
     setForm((f) => ({ ...f, [name]: value }));
     if (errors[name as keyof FormState]) {
-      setErrors((p) => { const n = { ...p }; delete n[name as keyof FormState]; return n; });
+      setErrors((p) => {
+        const n = { ...p };
+        delete n[name as keyof FormState];
+        return n;
+      });
     }
   };
 
@@ -565,12 +614,12 @@ export default function CheckoutPage() {
     if (!form.firstName.trim())             e.firstName             = "Required";
     if (!form.lastName.trim())              e.lastName              = "Required";
     if (!form.email.trim())                 e.email                 = "Required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      e.email = "Invalid email";
     if (!form.streetAddress1.trim())        e.streetAddress1        = "Required";
     if (!form.city.trim())                  e.city                  = "Required";
     if (!form.stateProvinceRegionId.trim()) e.stateProvinceRegionId = "Required";
     if (!form.postalCode.trim())            e.postalCode            = "Required";
-    if (!form.country.trim())               e.country               = "Required";
     return e;
   };
 
@@ -599,7 +648,8 @@ export default function CheckoutPage() {
     const payload = {
       userEmail:    form.email,
       paymentMethod,
-      currency,
+      country:      countrySlug,
+      currency:     cfg?.currencyCode ?? "QAR",
       products: cartItems.map((item) => ({
         product:  item.productId._id,
         quantity: item.quantity || 1,
@@ -611,19 +661,18 @@ export default function CheckoutPage() {
         city:                  form.city.trim(),
         stateProvinceRegionId: form.stateProvinceRegionId.trim(),
         postalCode:            form.postalCode.trim(),
-        country:               form.country.trim(),
+        country:               cfg?.label ?? "Qatar",
       },
     };
 
     try {
-      // Step 1 — Create the order
       const json = await safeFetch(CREATE_ORDER_URL, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
       });
 
-      // Step 2 — Mark cart items as "success" so cart becomes empty
+      // Clear cart
       try {
         await fetch(CONFIRM_CART_URL, {
           method:  "POST",
@@ -631,23 +680,30 @@ export default function CheckoutPage() {
           body:    JSON.stringify({ userEmail: form.email }),
         });
       } catch (cartErr) {
-        console.warn("[Checkout] Could not clear cart:", (cartErr as Error).message);
+        console.warn(
+          "[Checkout] Could not clear cart:",
+          (cartErr as Error).message
+        );
       }
 
-      // Step 3 — Clean sessionStorage
       sessionStorage.removeItem("checkout_data");
 
-      // Step 4 — Show success
       const order = json.order as { _id?: string } | undefined;
       setDoneOrderId(order?._id ?? (json.orderId as string) ?? "");
       setSuccess(true);
-
     } catch (err) {
       showToast((err as Error).message, "error");
     } finally {
       setSubmitting(false);
     }
   };
+
+  // ==========================================================================
+  //  RENDER — Country not allowed (block all except qatar)
+  // ==========================================================================
+  if (!cfg) {
+    return <CountryNotAllowed countrySlug={countrySlug} />;
+  }
 
   // ==========================================================================
   //  RENDER — Success
@@ -660,9 +716,7 @@ export default function CheckoutPage() {
             orderId={doneOrderId}
             email={form.email}
             paymentMethod={paymentMethod}
-            currencySymbol={currencySymbol}
-            currency={currency}
-            locale={locale}
+            cfg={cfg}
             subtotal={subtotal}
           />
         </main>
@@ -672,7 +726,7 @@ export default function CheckoutPage() {
   }
 
   // ==========================================================================
-  //  RENDER — Main Form
+  //  RENDER — Main Checkout Form
   // ==========================================================================
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
@@ -681,22 +735,41 @@ export default function CheckoutPage() {
         {/* ── Header ── */}
         <div className="mb-10 border-b border-neutral-200 pb-8 dark:border-neutral-800">
           <nav className="mb-4 flex items-center gap-1.5 text-xs">
-            <Link href="/" className="text-neutral-400 transition-colors hover:text-neutral-700">Home</Link>
+            <Link
+              href={`/country/${countrySlug}`}
+              className="text-neutral-400 transition-colors hover:text-neutral-700"
+            >
+              Home
+            </Link>
             <IcoChevR c="h-3 w-3 text-neutral-300" />
-            <Link href="/cart" className="text-neutral-400 transition-colors hover:text-neutral-700">Cart</Link>
+            <Link
+              href={`/country/${countrySlug}/cart`}
+              className="text-neutral-400 transition-colors hover:text-neutral-700"
+            >
+              Cart
+            </Link>
             <IcoChevR c="h-3 w-3 text-neutral-300" />
-            <span className="font-medium text-neutral-700 dark:text-neutral-300">Checkout</span>
+            <span className="font-medium text-neutral-700 dark:text-neutral-300">
+              Checkout
+            </span>
           </nav>
-          <div className="flex flex-wrap items-center gap-4">
+
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl">
               Checkout
             </h1>
-            {/* Currency badge — shows whenever ?country= is in the URL */}
-            <CurrencyBadge
-              symbol={currencySymbol}
-              currency={currency}
-              country={countryParam ?? ""}
-            />
+            {/* Country + currency badge */}
+            <div className="flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white px-4 py-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+              <span className="text-xl">{cfg.flag}</span>
+              <div className="text-xs">
+                <p className="font-semibold text-neutral-800 dark:text-neutral-200">
+                  {cfg.label}
+                </p>
+                <p className="text-neutral-400">
+                  {cfg.currencyCode} ({cfg.currencySymbol})
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -714,17 +787,61 @@ export default function CheckoutPage() {
                   title="Contact Information"
                 />
                 <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
-                  <Field label="First Name" id="firstName" required error={errors.firstName}>
-                    <Input id="firstName" placeholder="John"  value={form.firstName} onChange={handleChange} error={errors.firstName} disabled={submitting} />
+                  <Field
+                    label="First Name"
+                    id="firstName"
+                    required
+                    error={errors.firstName}
+                  >
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={form.firstName}
+                      onChange={handleChange}
+                      error={errors.firstName}
+                      disabled={submitting}
+                    />
                   </Field>
-                  <Field label="Last Name" id="lastName" required error={errors.lastName}>
-                    <Input id="lastName"  placeholder="Doe"   value={form.lastName}  onChange={handleChange} error={errors.lastName}  disabled={submitting} />
+                  <Field
+                    label="Last Name"
+                    id="lastName"
+                    required
+                    error={errors.lastName}
+                  >
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={form.lastName}
+                      onChange={handleChange}
+                      error={errors.lastName}
+                      disabled={submitting}
+                    />
                   </Field>
-                  <Field label="Email Address" id="email" required error={errors.email}>
-                    <Input id="email" type="email" placeholder="john@example.com" value={form.email} onChange={handleChange} error={errors.email} disabled={submitting} />
+                  <Field
+                    label="Email Address"
+                    id="email"
+                    required
+                    error={errors.email}
+                  >
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={form.email}
+                      onChange={handleChange}
+                      error={errors.email}
+                      disabled={submitting}
+                    />
                   </Field>
                   <Field label="Phone" id="phone">
-                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={handleChange} disabled={submitting} />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+974 5000 0000"
+                      value={form.phone}
+                      onChange={handleChange}
+                      disabled={submitting}
+                    />
                   </Field>
                 </div>
               </section>
@@ -738,33 +855,94 @@ export default function CheckoutPage() {
                 />
                 <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Field label="Street Address" id="streetAddress1" required error={errors.streetAddress1}>
-                      <Input id="streetAddress1" placeholder="123 Main Street" value={form.streetAddress1} onChange={handleChange} error={errors.streetAddress1} disabled={submitting} />
+                    <Field
+                      label="Street Address"
+                      id="streetAddress1"
+                      required
+                      error={errors.streetAddress1}
+                    >
+                      <Input
+                        id="streetAddress1"
+                        placeholder="Building 12, Street 45"
+                        value={form.streetAddress1}
+                        onChange={handleChange}
+                        error={errors.streetAddress1}
+                        disabled={submitting}
+                      />
                     </Field>
                   </div>
                   <div className="sm:col-span-2">
-                    <Field label="Apartment / Suite (optional)" id="streetAddress2">
-                      <Input id="streetAddress2" placeholder="Apt 4B" value={form.streetAddress2} onChange={handleChange} disabled={submitting} />
+                    <Field
+                      label="Apartment / Floor (optional)"
+                      id="streetAddress2"
+                    >
+                      <Input
+                        id="streetAddress2"
+                        placeholder="Floor 3, Unit 301"
+                        value={form.streetAddress2}
+                        onChange={handleChange}
+                        disabled={submitting}
+                      />
                     </Field>
                   </div>
                   <Field label="City" id="city" required error={errors.city}>
-                    <Input id="city" placeholder="New York" value={form.city} onChange={handleChange} error={errors.city} disabled={submitting} />
-                  </Field>
-                  <Field label="State / Province" id="stateProvinceRegionId" required error={errors.stateProvinceRegionId}>
-                    <Input id="stateProvinceRegionId" placeholder="NY" value={form.stateProvinceRegionId} onChange={handleChange} error={errors.stateProvinceRegionId} disabled={submitting} />
-                  </Field>
-                  <Field label="Postal Code" id="postalCode" required error={errors.postalCode}>
-                    <Input id="postalCode" placeholder="10001" value={form.postalCode} onChange={handleChange} error={errors.postalCode} disabled={submitting} />
-                  </Field>
-                  <Field label="Country" id="country" required error={errors.country}>
                     <Input
-                      id="country"
-                      placeholder="United States"
-                      value={form.country}
+                      id="city"
+                      placeholder="Doha"
+                      value={form.city}
                       onChange={handleChange}
-                      error={errors.country}
+                      error={errors.city}
                       disabled={submitting}
                     />
+                  </Field>
+                  <Field
+                    label="Zone / District"
+                    id="stateProvinceRegionId"
+                    required
+                    error={errors.stateProvinceRegionId}
+                  >
+                    <Input
+                      id="stateProvinceRegionId"
+                      placeholder="Al Rayyan"
+                      value={form.stateProvinceRegionId}
+                      onChange={handleChange}
+                      error={errors.stateProvinceRegionId}
+                      disabled={submitting}
+                    />
+                  </Field>
+                  <Field
+                    label="Postal Code"
+                    id="postalCode"
+                    required
+                    error={errors.postalCode}
+                  >
+                    <Input
+                      id="postalCode"
+                      placeholder="12345"
+                      value={form.postalCode}
+                      onChange={handleChange}
+                      error={errors.postalCode}
+                      disabled={submitting}
+                    />
+                  </Field>
+
+                  {/* Country — locked / read-only */}
+                  <Field label="Country" id="country" required>
+                    <div className="relative">
+                      <Input
+                        id="country"
+                        value={`${cfg.flag}  ${cfg.label}`}
+                        onChange={handleChange}
+                        readOnly
+                        disabled={submitting}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+                        Locked
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-neutral-400">
+                      Delivery is available in {cfg.label} only.
+                    </p>
                   </Field>
                 </div>
               </section>
@@ -779,9 +957,24 @@ export default function CheckoutPage() {
                 <div className="space-y-3 p-6">
                   {(
                     [
-                      { id: "standard",  label: "Standard Shipping",  desc: "5–7 business days", price: "Free"   },
-                      { id: "express",   label: "Express Shipping",   desc: "2–3 business days", price: `${currencySymbol}12.99` },
-                      { id: "overnight", label: "Overnight Delivery", desc: "Next business day",  price: `${currencySymbol}24.99` },
+                      {
+                        id:    "standard",
+                        label: "Standard Shipping",
+                        desc:  "3–5 business days",
+                        price: "Free",
+                      },
+                      {
+                        id:    "express",
+                        label: "Express Shipping",
+                        desc:  "1–2 business days",
+                        price: `${cfg.currencySymbol} 19.99`,
+                      },
+                      {
+                        id:    "overnight",
+                        label: "Same-Day Delivery",
+                        desc:  "Today (order before 12 PM)",
+                        price: `${cfg.currencySymbol} 39.99`,
+                      },
                     ] as const
                   ).map((opt) => (
                     <label
@@ -796,10 +989,18 @@ export default function CheckoutPage() {
                         className="h-4 w-4 accent-neutral-900"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">{opt.label}</p>
+                        <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                          {opt.label}
+                        </p>
                         <p className="text-xs text-neutral-400">{opt.desc}</p>
                       </div>
-                      <span className={`text-sm font-semibold ${opt.price === "Free" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-700 dark:text-neutral-300"}`}>
+                      <span
+                        className={`text-sm font-semibold ${
+                          opt.price === "Free"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-neutral-700 dark:text-neutral-300"
+                        }`}
+                      >
                         {opt.price}
                       </span>
                     </label>
@@ -834,8 +1035,12 @@ export default function CheckoutPage() {
                     />
                     <IcoCash c="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Cash on Delivery</p>
-                      <p className="text-xs text-neutral-400">Pay with cash when your order arrives</p>
+                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                        Cash on Delivery
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        Pay with cash when your order arrives
+                      </p>
                     </div>
                     <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:bg-amber-950 dark:text-amber-400">
                       COD
@@ -860,12 +1065,19 @@ export default function CheckoutPage() {
                     />
                     <IcoCard c="mt-0.5 h-5 w-5 shrink-0 text-neutral-600 dark:text-neutral-400" />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Pay Online</p>
-                      <p className="text-xs text-neutral-400">Secure — Visa, Mastercard, AmEx</p>
+                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+                        Pay Online
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        Secure — Visa, Mastercard, AmEx
+                      </p>
                     </div>
                     <div className="flex shrink-0 gap-1">
                       {(["Visa", "MC", "AmEx"] as const).map((b) => (
-                        <span key={b} className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">
+                        <span
+                          key={b}
+                          className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800"
+                        >
                           {b}
                         </span>
                       ))}
@@ -878,8 +1090,8 @@ export default function CheckoutPage() {
                       <IcoInfo c="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                       <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
                         You will pay{" "}
-                        <strong>{fmt(subtotal, locale, currency)}</strong>{" "}
-                        <span className="opacity-70">({currency})</span> cash upon delivery.
+                        <strong>{fmt(subtotal, cfg)}</strong> cash upon
+                        delivery.
                       </p>
                     </div>
                   )}
@@ -904,41 +1116,42 @@ export default function CheckoutPage() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
                     <IcoBag c="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                   </div>
-                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Order Summary</h2>
+                  <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    Order Summary
+                  </h2>
                   {cartItems.length > 0 && (
                     <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                      {cartItems.length} {cartItems.length === 1 ? "item" : "items"}
+                      {cartItems.length}{" "}
+                      {cartItems.length === 1 ? "item" : "items"}
                     </span>
                   )}
                 </div>
 
-                {/* Currency indicator inside summary */}
-                <div className="flex items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-6 py-2.5 dark:border-neutral-800 dark:bg-neutral-800/50">
-                  <IcoGlobe c="h-3.5 w-3.5 text-neutral-400" />
-                  <span className="text-xs text-neutral-400">
+                {/* Currency banner */}
+                <div className="flex items-center gap-2.5 border-b border-neutral-100 bg-neutral-50 px-6 py-3 dark:border-neutral-800 dark:bg-neutral-800/60">
+                  <span className="text-base">{cfg.flag}</span>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     Prices shown in{" "}
-                    <strong className="text-neutral-600 dark:text-neutral-300">
-                      {currency} ({currencySymbol})
+                    <strong className="text-neutral-700 dark:text-neutral-300">
+                      {cfg.currencyCode} ({cfg.currencySymbol})
                     </strong>
-                  </span>
+                  </p>
                 </div>
 
                 {/* Items */}
                 {cartItems.length > 0 ? (
                   <div className="divide-y divide-neutral-100 px-6 dark:divide-neutral-800">
                     {cartItems.map((item) => (
-                      <OrderItemRow
-                        key={item._id}
-                        item={item}
-                        locale={locale}
-                        currency={currency}
-                      />
+                      <OrderItemRow key={item._id} item={item} cfg={cfg} />
                     ))}
                   </div>
                 ) : (
                   <div className="px-6 py-6 text-center text-sm text-neutral-400">
                     No items.{" "}
-                    <Link href="/cart" className="font-medium text-neutral-700 underline dark:text-neutral-300">
+                    <Link
+                      href={`/country/${countrySlug}/cart`}
+                      className="font-medium text-neutral-700 underline dark:text-neutral-300"
+                    >
                       Go to cart
                     </Link>
                   </div>
@@ -947,22 +1160,32 @@ export default function CheckoutPage() {
                 {/* Totals */}
                 <div className="space-y-3 border-t border-neutral-100 p-6 dark:border-neutral-800">
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500 dark:text-neutral-400">Subtotal</span>
+                    <span className="text-neutral-500 dark:text-neutral-400">
+                      Subtotal
+                    </span>
                     <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
-                      {fmt(subtotal, locale, currency)}
+                      {fmt(subtotal, cfg)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-neutral-500 dark:text-neutral-400">Shipping</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Free</span>
+                    <span className="text-neutral-500 dark:text-neutral-400">
+                      Shipping
+                    </span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      Free
+                    </span>
                   </div>
                   <div className="flex items-center justify-between border-t border-dashed border-neutral-200 pt-3 dark:border-neutral-700">
-                    <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">Total</span>
+                    <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+                      Total
+                    </span>
                     <div className="text-right">
                       <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-                        {fmt(subtotal, locale, currency)}
+                        {fmt(subtotal, cfg)}
                       </span>
-                      <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">{currency}</p>
+                      <p className="text-[10px] text-neutral-400">
+                        {cfg.currencyCode}
+                      </p>
                     </div>
                   </div>
 
@@ -975,11 +1198,14 @@ export default function CheckoutPage() {
                       }`}
                   >
                     {paymentMethod === "cash_on_delivery" ? (
-                      <><IcoCash c="h-4 w-4 shrink-0" /> Cash on Delivery</>
+                      <>
+                        <IcoCash c="h-4 w-4 shrink-0" /> Cash on Delivery
+                      </>
                     ) : (
-                      <><IcoCard c="h-4 w-4 shrink-0" /> Online Payment</>
+                      <>
+                        <IcoCard c="h-4 w-4 shrink-0" /> Online Payment
+                      </>
                     )}
-                    <span className="ml-auto font-bold">{currencySymbol}</span>
                   </div>
                 </div>
 
@@ -991,11 +1217,17 @@ export default function CheckoutPage() {
                     className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-neutral-900 py-4 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
                   >
                     {submitting ? (
-                      <><IcoSpin c="h-4 w-4" /> Processing…</>
+                      <>
+                        <IcoSpin c="h-4 w-4" /> Processing…
+                      </>
                     ) : paymentMethod === "cash_on_delivery" ? (
-                      <><IcoCash c="h-4 w-4" /> Place Order (COD · {currencySymbol})</>
+                      <>
+                        <IcoCash c="h-4 w-4" /> Place Order (COD)
+                      </>
                     ) : (
-                      <><IcoCard c="h-4 w-4" /> Place Order · {fmt(subtotal, locale, currency)}</>
+                      <>
+                        <IcoCard c="h-4 w-4" /> Place Order (Pay Online)
+                      </>
                     )}
                   </button>
 
@@ -1003,9 +1235,20 @@ export default function CheckoutPage() {
                     <IcoInfo c="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
                     <p className="text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500">
                       By placing your order you agree to our{" "}
-                      <a href="#" className="font-medium text-neutral-600 underline hover:text-neutral-900 dark:text-neutral-400">Terms</a>
-                      {" "}and{" "}
-                      <a href="#" className="font-medium text-neutral-600 underline hover:text-neutral-900 dark:text-neutral-400">Privacy Policy</a>.
+                      <a
+                        href="#"
+                        className="font-medium text-neutral-600 underline hover:text-neutral-900 dark:text-neutral-400"
+                      >
+                        Terms
+                      </a>{" "}
+                      and{" "}
+                      <a
+                        href="#"
+                        className="font-medium text-neutral-600 underline hover:text-neutral-900 dark:text-neutral-400"
+                      >
+                        Privacy Policy
+                      </a>
+                      .
                     </p>
                   </div>
                 </div>

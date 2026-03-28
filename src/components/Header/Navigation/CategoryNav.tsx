@@ -25,10 +25,8 @@ interface CategoryViewResponse {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL
-    ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categoryview`
-    : 'http://localhost:7000/api/categoryview'
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
+const API_URL = `${BASE_URL}/api/categoryview`;
 
 /** Re-fetch interval in ms (30 s). Set to 0 to disable polling. */
 const POLL_INTERVAL = 30_000

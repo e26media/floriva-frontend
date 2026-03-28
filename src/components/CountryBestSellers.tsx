@@ -4,8 +4,8 @@ import Heading from '@/components/Heading/Heading'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
 import useEmblaCarousel from 'embla-carousel-react'
+import { usePathname } from 'next/navigation'
 import { FC, useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -20,20 +20,17 @@ export interface TCategory {
 export interface TColor { _id: string; name: string; createdAt: string; updatedAt: string }
 export interface TCountry { _id: string; name: string; createdAt: string; updatedAt: string }
 export interface TFeaturedProduct {
-  _id: string
-  name: string
-  createdAt: string
-  updatedAt: string
+  _id: string; name: string; createdAt: string; updatedAt: string
 }
 
 export interface TApiProduct {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: TCategory | null; subCategory: string | null; color: TColor | null
-  country: TCountry | null
+  country?: TCountry | null
   stock: number; deliveryInfo: string; images: string[]
-  FeaturedProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   featuredProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
+  FeaturedProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   featured_product?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   createdAt: string; updatedAt: string
 }
@@ -44,85 +41,122 @@ export interface TApiProduct {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
+const BEST_SELLER_LABEL = 'Best Seller'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Country → Currency symbol map
+// Country → Currency mapping
 // ─────────────────────────────────────────────────────────────────────────────
 
-const COUNTRY_CURRENCY: Record<string, { symbol: string; code: string }> = {
-  australia:      { symbol: 'A$',  code: 'AUD' },
-  austria:        { symbol: '€',   code: 'EUR' },
-  bangladesh:     { symbol: '৳',   code: 'BDT' },
-  belgium:        { symbol: '€',   code: 'EUR' },
-  brazil:         { symbol: 'R$',  code: 'BRL' },
-  canada:         { symbol: 'C$',  code: 'CAD' },
-  china:          { symbol: '¥',   code: 'CNY' },
-  denmark:        { symbol: 'kr',  code: 'DKK' },
-  egypt:          { symbol: 'E£',  code: 'EGP' },
-  finland:        { symbol: '€',   code: 'EUR' },
-  france:         { symbol: '€',   code: 'EUR' },
-  germany:        { symbol: '€',   code: 'EUR' },
-  greece:         { symbol: '€',   code: 'EUR' },
-  india:          { symbol: '₹',   code: 'INR' },
-  indonesia:      { symbol: 'Rp',  code: 'IDR' },
-  iran:           { symbol: '﷼',   code: 'IRR' },
-  ireland:        { symbol: '€',   code: 'EUR' },
-  israel:         { symbol: '₪',   code: 'ILS' },
-  italy:          { symbol: '€',   code: 'EUR' },
-  japan:          { symbol: '¥',   code: 'JPY' },
-  jordan:         { symbol: 'JD',  code: 'JOD' },
-  kenya:          { symbol: 'KSh', code: 'KES' },
-  kuwait:         { symbol: 'KD',  code: 'KWD' },
-  malaysia:       { symbol: 'RM',  code: 'MYR' },
-  mexico:         { symbol: 'MX$', code: 'MXN' },
-  morocco:        { symbol: 'MAD', code: 'MAD' },
-  netherlands:    { symbol: '€',   code: 'EUR' },
-  'new zealand':  { symbol: 'NZ$', code: 'NZD' },
-  nigeria:        { symbol: '₦',   code: 'NGN' },
-  norway:         { symbol: 'kr',  code: 'NOK' },
-  oman:           { symbol: 'OMR', code: 'OMR' },
-  pakistan:       { symbol: '₨',   code: 'PKR' },
-  philippines:    { symbol: '₱',   code: 'PHP' },
-  poland:         { symbol: 'zł',  code: 'PLN' },
-  portugal:       { symbol: '€',   code: 'EUR' },
-  qatar:          { symbol: 'QR',  code: 'QAR' },
-  russia:         { symbol: '₽',   code: 'RUB' },
-  'saudi arabia': { symbol: 'SR',  code: 'SAR' },
-  singapore:      { symbol: 'S$',  code: 'SGD' },
-  'south africa': { symbol: 'R',   code: 'ZAR' },
-  'south korea':  { symbol: '₩',   code: 'KRW' },
-  spain:          { symbol: '€',   code: 'EUR' },
-  'sri lanka':    { symbol: 'Rs',  code: 'LKR' },
-  sweden:         { symbol: 'kr',  code: 'SEK' },
-  switzerland:    { symbol: 'Fr',  code: 'CHF' },
-  thailand:       { symbol: '฿',   code: 'THB' },
-  turkey:         { symbol: '₺',   code: 'TRY' },
-  ukraine:        { symbol: '₴',   code: 'UAH' },
-  'united arab emirates': { symbol: 'AED', code: 'AED' },
-  uae:            { symbol: 'AED', code: 'AED' },
-  'united kingdom': { symbol: '£', code: 'GBP' },
-  uk:             { symbol: '£',   code: 'GBP' },
-  'united states': { symbol: '$',  code: 'USD' },
-  usa:            { symbol: '$',   code: 'USD' },
-  us:             { symbol: '$',   code: 'USD' },
-  vietnam:        { symbol: '₫',   code: 'VND' },
+interface CurrencyInfo {
+  symbol: string       // e.g. "₹"
+  code: string         // e.g. "INR"
+  locale: string       // e.g. "en-IN"
+  position: 'before' | 'after'
 }
 
-function getCurrencyForCountry(country: string): { symbol: string; code: string } {
-  const key = country.trim().toLowerCase()
-  return COUNTRY_CURRENCY[key] ?? { symbol: '₹', code: 'INR' }
+const COUNTRY_CURRENCY_MAP: Record<string, CurrencyInfo> = {
+  india:          { symbol: '₹',  code: 'INR', locale: 'en-IN', position: 'before' },
+  in:             { symbol: '₹',  code: 'INR', locale: 'en-IN', position: 'before' },
+  usa:            { symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
+  us:             { symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
+  'united-states':{ symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
+  uk:             { symbol: '£',  code: 'GBP', locale: 'en-GB', position: 'before' },
+  'united-kingdom':{ symbol: '£', code: 'GBP', locale: 'en-GB', position: 'before' },
+  gb:             { symbol: '£',  code: 'GBP', locale: 'en-GB', position: 'before' },
+  europe:         { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
+  eu:             { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
+  germany:        { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
+  france:         { symbol: '€',  code: 'EUR', locale: 'fr-FR', position: 'before' },
+  japan:          { symbol: '¥',  code: 'JPY', locale: 'ja-JP', position: 'before' },
+  jp:             { symbol: '¥',  code: 'JPY', locale: 'ja-JP', position: 'before' },
+  canada:         { symbol: 'CA$',code: 'CAD', locale: 'en-CA', position: 'before' },
+  ca:             { symbol: 'CA$',code: 'CAD', locale: 'en-CA', position: 'before' },
+  australia:      { symbol: 'A$', code: 'AUD', locale: 'en-AU', position: 'before' },
+  au:             { symbol: 'A$', code: 'AUD', locale: 'en-AU', position: 'before' },
+  uae:            { symbol: 'AED',code: 'AED', locale: 'ar-AE', position: 'before' },
+  singapore:      { symbol: 'S$', code: 'SGD', locale: 'en-SG', position: 'before' },
+  sg:             { symbol: 'S$', code: 'SGD', locale: 'en-SG', position: 'before' },
+}
+
+const DEFAULT_CURRENCY: CurrencyInfo = { symbol: '₹', code: 'INR', locale: 'en-IN', position: 'before' }
+
+function getCurrencyForCountry(countrySlug: string | null): CurrencyInfo {
+  if (!countrySlug) return DEFAULT_CURRENCY
+  const key = countrySlug.toLowerCase().trim()
+  return COUNTRY_CURRENCY_MAP[key] ?? DEFAULT_CURRENCY
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Format price with country-specific currency
+// URL helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formatPrice(n: number, symbol: string) {
-  return symbol + n.toLocaleString('en-IN')
+/**
+ * Extracts country slug from pathname.
+ *   "/country/india"               → "india"
+ *   "/country/india/category/abc"  → "india"
+ *   "/category/abc"                → null
+ */
+function getCountryFromPathname(pathname: string): string | null {
+  const match = pathname.match(/^\/country\/([^/]+)/i)
+  return match ? match[1] : null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Get user email from localStorage
+// Format price using country currency
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatPrice(amount: number, currency: CurrencyInfo): string {
+  try {
+    // Use Intl for proper locale number formatting
+    const formatted = new Intl.NumberFormat(currency.locale, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+    return `${currency.symbol}${formatted}`
+  } catch {
+    return `${currency.symbol}${amount.toLocaleString()}`
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Best Seller filter helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getFeaturedProductRaw(product: TApiProduct): unknown {
+  return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (product as any).FeaturedProduct ??
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (product as any).featuredProduct ??
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (product as any).featured_product ??
+    null
+  )
+}
+
+/**
+ * Returns true if the product's FeaturedProduct array contains an entry
+ * whose name matches "Best Seller" (case-insensitive).
+ */
+function isBestSeller(product: TApiProduct): boolean {
+  const raw = getFeaturedProductRaw(product)
+  if (!raw) return false
+  const arr: unknown[] = Array.isArray(raw) ? raw : [raw]
+  return arr.some((item) => {
+    if (!item) return false
+    if (typeof item === 'string') return false // bare ID string — no name to compare
+    if (typeof item === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const obj = item as Record<string, any>
+      return obj.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()
+    }
+    return false
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User email (for cart)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getUserEmail(): string | null {
@@ -149,7 +183,10 @@ function getUserEmail(): string | null {
 // Cart API
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function apiAddToCart(productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
+async function apiAddToCart(
+  productId: string,
+  quantity: number
+): Promise<{ ok: boolean; message: string }> {
   const userEmail = getUserEmail()
   if (!userEmail) return { ok: false, message: 'Please log in to add items to cart.' }
   try {
@@ -161,26 +198,44 @@ async function apiAddToCart(productId: string, quantity: number): Promise<{ ok: 
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, message: data?.message ?? `Failed (${res.status})` }
     return { ok: true, message: data?.message ?? 'Added to cart!' }
-  } catch { return { ok: false, message: 'Network error. Please try again.' } }
+  } catch {
+    return { ok: false, message: 'Network error. Please try again.' }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Toast system
+// Toast system (currency-aware)
 // ─────────────────────────────────────────────────────────────────────────────
 
 type TToastType = 'success' | 'error'
-type TCartToast = { id: number; product: TApiProduct; qty: number; type: TToastType; message?: string; currencySymbol: string }
+interface TCartToast {
+  id: number
+  product: TApiProduct
+  qty: number
+  type: TToastType
+  message?: string
+  currency: CurrencyInfo   // ← carry currency into toast
+}
 
 let _toastItems: TCartToast[] = []
 let _toastCounter = 0
 const _toastListeners = new Set<() => void>()
 const _notifyToast = () => _toastListeners.forEach((fn) => fn())
 
-function pushToast(product: TApiProduct, qty: number, type: TToastType, currencySymbol: string, message?: string) {
+function pushToast(
+  product: TApiProduct,
+  qty: number,
+  type: TToastType,
+  currency: CurrencyInfo,
+  message?: string
+) {
   const id = ++_toastCounter
-  _toastItems = [..._toastItems, { id, product, qty, type, message, currencySymbol }]
+  _toastItems = [..._toastItems, { id, product, qty, type, currency, message }]
   _notifyToast()
-  setTimeout(() => { _toastItems = _toastItems.filter((t) => t.id !== id); _notifyToast() }, 3500)
+  setTimeout(() => {
+    _toastItems = _toastItems.filter((t) => t.id !== id)
+    _notifyToast()
+  }, 3500)
 }
 
 function CartToastContainer() {
@@ -192,8 +247,10 @@ function CartToastContainer() {
   }, [])
   if (_toastItems.length === 0) return null
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
-      style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+    <div
+      className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
+      style={{ maxWidth: 'calc(100vw - 2rem)' }}
+    >
       <style>{`
         @keyframes toastSlide {
           from { opacity:0; transform:translateX(80px) scale(0.9); }
@@ -209,7 +266,8 @@ function CartToastContainer() {
             className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5"
             style={{
               animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
-              minWidth: 220, maxWidth: 320,
+              minWidth: 220,
+              maxWidth: 320,
             }}
           >
             <div className={`h-10 w-10 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
@@ -221,12 +279,17 @@ function CartToastContainer() {
               <p className={`text-xs font-bold mb-0.5 ${isError ? 'text-red-600' : 'text-emerald-600'}`}>
                 {isError ? 'Error' : '✓ Added to Bag!'}
               </p>
-              {isError
-                ? <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
-                : <>
-                    <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
-                    <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice, toast.currencySymbol)}</p>
-                  </>}
+              {isError ? (
+                <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
+              ) : (
+                <>
+                  <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
+                  {/* ✅ Uses the country-correct currency symbol */}
+                  <p className="text-xs text-gray-400">
+                    Qty {toast.qty} · {formatPrice(toast.product.discountPrice, toast.currency)}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )
@@ -236,7 +299,7 @@ function CartToastContainer() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Misc helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function imgSrc(path: string) {
@@ -252,15 +315,15 @@ function calcDiscount(exact: number, discounted: number) {
 
 function colorHex(name: string): string {
   const map: Record<string, string> = {
-    red:'#dc2626', crimson:'#b91c1c', blue:'#2563eb', navy:'#1e3a5f',
-    green:'#16a34a', olive:'#65a30d', black:'#171717', white:'#d4d4d4',
-    yellow:'#ca8a04', gold:'#b45309', orange:'#ea580c', purple:'#9333ea',
-    pink:'#ec4899', rose:'#e11d48', gray:'#6b7280', grey:'#6b7280',
-    silver:'#9ca3af', brown:'#78350f', tan:'#92400e', beige:'#d6cfc4',
-    cream:'#e8e0d0', camel:'#b08040', indigo:'#4338ca', teal:'#0d9488',
-    cyan:'#0891b2', lime:'#65a30d', maroon:'#881337', coral:'#ef4444',
-    salmon:'#fb923c', khaki:'#a3a35e', ivory:'#e8e0cc', lavender:'#a78bfa',
-    peach:'#fb923c', mint:'#34d399', sky:'#38bdf8',
+    red: '#dc2626', crimson: '#b91c1c', blue: '#2563eb', navy: '#1e3a5f',
+    green: '#16a34a', olive: '#65a30d', black: '#171717', white: '#d4d4d4',
+    yellow: '#ca8a04', gold: '#b45309', orange: '#ea580c', purple: '#9333ea',
+    pink: '#ec4899', rose: '#e11d48', gray: '#6b7280', grey: '#6b7280',
+    silver: '#9ca3af', brown: '#78350f', tan: '#92400e', beige: '#d6cfc4',
+    cream: '#e8e0d0', camel: '#b08040', indigo: '#4338ca', teal: '#0d9488',
+    cyan: '#0891b2', lime: '#65a30d', maroon: '#881337', coral: '#ef4444',
+    salmon: '#fb923c', khaki: '#a3a35e', ivory: '#e8e0cc', lavender: '#a78bfa',
+    peach: '#fb923c', mint: '#34d399', sky: '#38bdf8',
   }
   return map[name.toLowerCase()] ?? '#9ca3af'
 }
@@ -273,7 +336,10 @@ function getSwatches(product: TApiProduct): Array<{ hex: string; name: string }>
 function fakeRating(id: string): { rating: number; reviews: number } {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
-  return { rating: Math.round((3.8 + (hash % 13) * 0.1) * 10) / 10, reviews: 20 + (hash % 160) }
+  return {
+    rating: Math.round((3.8 + (hash % 13) * 0.1) * 10) / 10,
+    reviews: 20 + (hash % 160),
+  }
 }
 
 function isNewIn(createdAt: string): boolean {
@@ -281,26 +347,30 @@ function isNewIn(createdAt: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useAddToCart hook
+// useAddToCart — now currency-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useAddToCart(product: TApiProduct, currencySymbol: string) {
+function useAddToCart(product: TApiProduct, currency: CurrencyInfo) {
   const [loading, setLoading] = useState(false)
   const [added, setAdded] = useState(false)
 
-  const addToCart = useCallback(async (qty: number = 1) => {
-    if (loading || product.stock === 0) return
-    setLoading(true)
-    const result = await apiAddToCart(product._id, qty)
-    setLoading(false)
-    if (result.ok) {
-      setAdded(true)
-      pushToast(product, qty, 'success', currencySymbol)
-      setTimeout(() => setAdded(false), 2000)
-    } else {
-      pushToast(product, qty, 'error', currencySymbol, result.message)
-    }
-  }, [loading, product, currencySymbol])
+  const addToCart = useCallback(
+    async (qty: number = 1) => {
+      if (loading || product.stock === 0) return
+      setLoading(true)
+      const result = await apiAddToCart(product._id, qty)
+      setLoading(false)
+      if (result.ok) {
+        setAdded(true)
+        // ✅ Pass currency so toast shows correct symbol
+        pushToast(product, qty, 'success', currency)
+        setTimeout(() => setAdded(false), 2000)
+      } else {
+        pushToast(product, qty, 'error', currency, result.message)
+      }
+    },
+    [loading, product, currency]
+  )
 
   return { addToCart, loading, added }
 }
@@ -313,20 +383,29 @@ function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
   return (
     <div className="flex items-center gap-1.5">
       <svg className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
       <span className="text-xs font-medium text-gray-500">
-        {rating.toFixed(1)} <span className="text-gray-400 font-normal">({reviews} reviews)</span>
+        {rating.toFixed(1)}{' '}
+        <span className="text-gray-400 font-normal">({reviews} reviews)</span>
       </span>
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Qty Stepper
+// QtyStepper
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
+function QtyStepper({
+  value,
+  onChange,
+  max,
+}: {
+  value: number
+  onChange: (n: number) => void
+  max: number
+}) {
   return (
     <div className="flex h-11 items-center overflow-hidden rounded-full border border-gray-200 bg-white">
       <button
@@ -334,16 +413,18 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: num
         className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
         </svg>
       </button>
-      <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
+      <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">
+        {value}
+      </span>
       <button
         onClick={() => onChange(Math.min(max, value + 1))}
         className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       </button>
     </div>
@@ -351,10 +432,16 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: num
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Accordion
+// AccordionRow
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AccordionRow({ title, children }: { title: string; children: React.ReactNode }) {
+function AccordionRow({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-gray-100">
@@ -365,33 +452,39 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
         {title}
         <svg
           className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="pb-4 text-sm leading-relaxed text-gray-500">{children}</div>}
+      {open && (
+        <div className="pb-4 text-sm leading-relaxed text-gray-500">{children}</div>
+      )}
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal
+// QuickViewModal — currency-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({
   product,
+  currency,
+  countrySlug,
   onClose,
-  currencySymbol,
 }: {
   product: TApiProduct
+  currency: CurrencyInfo
+  countrySlug: string | null
   onClose: () => void
-  currencySymbol: string
 }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const thumbsRef = useRef<HTMLDivElement>(null)
-  const { addToCart, loading: adding, added } = useAddToCart(product, currencySymbol)
+  const { addToCart, loading: adding, added } = useAddToCart(product, currency)
 
   const { rating, reviews } = fakeRating(product._id)
   const discount = calcDiscount(product.exactPrice, product.discountPrice)
@@ -458,15 +551,18 @@ function QuickViewModal({
           aria-label="Close"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
         <div className="flex flex-col overflow-y-auto sm:flex-row sm:overflow-hidden flex-1 min-h-0">
 
-          {/* LEFT: Image panel */}
+          {/* LEFT — Image panel */}
           <div className="w-full flex-shrink-0 sm:w-[44%] sm:overflow-y-auto sm:flex sm:flex-col">
-            <div className="relative bg-gray-50 w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+            <div
+              className="relative bg-gray-50 w-full overflow-hidden"
+              style={{ aspectRatio: '1 / 1' }}
+            >
               {hasImages ? (
                 <img
                   key={activeImg}
@@ -479,7 +575,7 @@ function QuickViewModal({
                 <div className="flex h-full w-full items-center justify-center text-gray-300">
                   <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
               )}
@@ -488,7 +584,7 @@ function QuickViewModal({
                 {isNewIn(product.createdAt) && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
                     <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     New in
                   </span>
@@ -507,7 +603,7 @@ function QuickViewModal({
                     className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
                   >
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
                   <button
@@ -515,7 +611,7 @@ function QuickViewModal({
                     className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
                   >
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
                 </>
@@ -523,41 +619,58 @@ function QuickViewModal({
             </div>
 
             {product.images.length > 1 && (
-              <div ref={thumbsRef} className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white" style={{ scrollbarWidth: 'none' }}>
+              <div
+                ref={thumbsRef}
+                className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white"
+                style={{ scrollbarWidth: 'none' }}
+              >
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImg(idx)}
                     className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
-                      activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'
+                      activeImg === idx
+                        ? 'border-gray-900'
+                        : 'border-transparent opacity-50 hover:opacity-75'
                     }`}
                   >
-                    <img src={imgSrc(img)} alt="" className="h-full w-full object-cover"/>
+                    <img src={imgSrc(img)} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* RIGHT: Details panel */}
+          {/* RIGHT — Details panel */}
           <div className="details-panel w-full flex flex-col border-t border-gray-100 sm:border-t-0 sm:border-l sm:w-[56%] sm:overflow-y-auto p-4 sm:p-6">
             {categoryName && (
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                {categoryName}
+              </p>
             )}
-            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight mb-1">{product.name}</h2>
+            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight mb-1">
+              {product.name}
+            </h2>
             {product.title && product.title !== product.name && (
               <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
-            <div className="mb-3"><StarRating rating={rating} reviews={reviews}/></div>
+            <div className="mb-3">
+              <StarRating rating={rating} reviews={reviews} />
+            </div>
 
+            {/* ✅ Prices use country currency */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
-                {formatPrice(product.discountPrice, currencySymbol)}
+                {formatPrice(product.discountPrice, currency)}
               </span>
               {product.exactPrice > product.discountPrice && (
                 <>
-                  <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice, currencySymbol)}</span>
-                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">-{discount}%</span>
+                  <span className="text-sm text-gray-400 line-through">
+                    {formatPrice(product.exactPrice, currency)}
+                  </span>
+                  <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">
+                    -{discount}%
+                  </span>
                 </>
               )}
             </div>
@@ -565,11 +678,14 @@ function QuickViewModal({
             {swatches.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 text-xs font-semibold text-gray-500">
-                  Colour: <span className="capitalize text-gray-800">{colorName}</span>
+                  Colour:{' '}
+                  <span className="capitalize text-gray-800">{colorName}</span>
                 </p>
                 <div className="flex items-center gap-2">
                   {swatches.map((swatch, i) => (
-                    <span key={i} title={swatch.name}
+                    <span
+                      key={i}
+                      title={swatch.name}
                       className="h-6 w-6 rounded-full border-2 border-gray-900 ring-2 ring-gray-900 ring-offset-1 cursor-default"
                       style={{ backgroundColor: swatch.hex }}
                     />
@@ -580,49 +696,84 @@ function QuickViewModal({
 
             <div className="mb-4">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                product.stock > 5 ? 'bg-emerald-50 text-emerald-700'
-                  : product.stock > 0 ? 'bg-amber-50 text-amber-600'
+                product.stock > 5
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : product.stock > 0
+                  ? 'bg-amber-50 text-amber-600'
                   : 'bg-red-50 text-red-600'
               }`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current"/>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
                 {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
               </span>
             </div>
 
             <div className="mb-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                Quantity
+              </p>
               <div className="flex gap-2">
-                <QtyStepper value={qty} onChange={setQty} max={product.stock || 1}/>
+                <QtyStepper value={qty} onChange={setQty} max={product.stock || 1} />
                 <button
                   onClick={() => addToCart(qty)}
                   disabled={outOfStock || adding}
                   className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
-                    outOfStock ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-                      : adding ? 'cursor-wait bg-gray-800 text-white'
-                      : added ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
+                    outOfStock
+                      ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                      : adding
+                      ? 'cursor-wait bg-gray-800 text-white'
+                      : added
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
                       : 'bg-gray-900 text-white hover:bg-gray-700 hover:shadow-lg'
                   }`}
                 >
-                  {adding
-                    ? (<><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
-                    : added
-                    ? (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
-                    : (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>{outOfStock ? 'Out of Stock' : 'Add to Bag'}</>)
-                  }
+                  {adding ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Adding…
+                    </>
+                  ) : added ? (
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Added!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                      </svg>
+                      {outOfStock ? 'Out of Stock' : 'Add to Bag'}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
-            <hr className="border-gray-100 mb-3"/>
-            {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
-            {product.deliveryInfo && <AccordionRow title="Delivery Info">{product.deliveryInfo}</AccordionRow>}
+            <hr className="border-gray-100 mb-3" />
+            {product.description && (
+              <AccordionRow title="Description">{product.description}</AccordionRow>
+            )}
 
             <div className="flex items-center justify-end pt-4 mt-auto border-t border-gray-100">
-              <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
+              <a
+                href={
+                  countrySlug
+                    ? `/country/${countrySlug}/product/${product._id}`
+                    : `/product/${product._id}`
+                }
+                className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline"
+              >
                 View full page →
               </a>
             </div>
-            <div className="h-safe-bottom sm:h-0 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}/>
+            <div
+              className="h-safe-bottom sm:h-0 flex-shrink-0"
+              style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            />
           </div>
         </div>
       </div>
@@ -631,34 +782,36 @@ function QuickViewModal({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card
+// ProductCard — currency-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({
   data,
+  currency,
   onQuickView,
-  currencySymbol,
 }: {
   data: TApiProduct
+  currency: CurrencyInfo
   onQuickView: (p: TApiProduct) => void
-  currencySymbol: string
 }) {
   const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
   const colorName = data.color?.name ?? null
   const discount = calcDiscount(data.exactPrice, data.discountPrice)
   const { rating, reviews } = fakeRating(data._id)
-  const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
   const swatches = getSwatches(data)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const touchedRef = useRef(false)
-  const { addToCart, loading, added } = useAddToCart(data, currencySymbol)
+  const { addToCart, loading, added } = useAddToCart(data, currency)
 
   const handleTouchStart = useCallback(() => {
     if (!touchedRef.current) {
       touchedRef.current = true
       setOverlayVisible(true)
-      const timer = setTimeout(() => { touchedRef.current = false; setOverlayVisible(false) }, 3000)
+      const timer = setTimeout(() => {
+        touchedRef.current = false
+        setOverlayVisible(false)
+      }, 3000)
       return () => clearTimeout(timer)
     }
   }, [])
@@ -673,64 +826,93 @@ function ProductCard({
       >
         <div className="relative aspect-square w-full">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+            <img
+              src={imageUrl}
+              alt={data.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-gray-300">
               <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
           )}
           {outOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-2xl sm:rounded-3xl">
-              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">Out of Stock</span>
+              <span className="rounded-full bg-gray-800/80 px-3 py-1.5 text-xs font-semibold text-white">
+                Out of Stock
+              </span>
             </div>
           )}
         </div>
 
-        {/* New In badge */}
-        {newIn && !outOfStock && (
+        {/* Best Seller badge */}
+        {!outOfStock && (
           <div className="absolute left-2.5 top-2.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm backdrop-blur-sm">
-              <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-1 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+              <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              New in
-            </span>
-          </div>
-        )}
-
-        {/* Discount badge */}
-        {discount >= 10 && (
-          <div className={`absolute top-2.5 ${newIn && !outOfStock ? 'left-[72px]' : 'left-2.5'}`}>
-            <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
-              {discount}% Off
+              Best Seller
             </span>
           </div>
         )}
 
         <div className={`absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5 transition-transform duration-300 ease-out ${overlayVisible ? 'translate-y-0' : 'translate-y-full'}`}>
           <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onQuickView(data)
+            }}
             className="w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
-          >Quick View</button>
+          >
+            Quick View
+          </button>
           <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              addToCart(1)
+            }}
             disabled={outOfStock || loading}
             className={`w-full rounded-xl py-2 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
-              outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
-                : added ? 'bg-emerald-500 text-white shadow-md'
+              outOfStock
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : loading
+                ? 'bg-gray-800 text-white cursor-wait opacity-80'
+                : added
+                ? 'bg-emerald-500 text-white shadow-md'
                 : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'
             }`}
           >
-            {loading
-              ? (<><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
-              : added
-              ? (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
-              : outOfStock ? 'Out of Stock'
-              : (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>)
-            }
+            {loading ? (
+              <>
+                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                Adding…
+              </>
+            ) : added ? (
+              <>
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                ✓ Added to Bag!
+              </>
+            ) : outOfStock ? (
+              'Out of Stock'
+            ) : (
+              <>
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                Add to Bag
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -739,24 +921,36 @@ function ProductCard({
         {swatches.length > 0 && (
           <div className="flex items-center gap-1.5 mb-1.5">
             {swatches.map((swatch, i) => (
-              <span key={i} title={swatch.name} className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default" style={{ backgroundColor: swatch.hex }}/>
+              <span
+                key={i}
+                title={swatch.name}
+                className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
+                style={{ backgroundColor: swatch.hex }}
+              />
             ))}
           </div>
         )}
-        <h3 className="text-[13px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">{data.name}</h3>
+        <h3 className="text-[13px] sm:text-[15px] font-bold text-gray-900 leading-snug line-clamp-1 mb-0.5">
+          {data.name}
+        </h3>
         <p className="text-[11px] sm:text-[13px] text-gray-400 mb-1.5">
-          {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
+          {colorName
+            ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}`
+            : data.category?.name ?? ''}
         </p>
+        {/* ✅ Prices use country currency */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
-            {formatPrice(data.discountPrice, currencySymbol)}
+            {formatPrice(data.discountPrice, currency)}
           </span>
           {data.exactPrice > data.discountPrice && (
-            <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice, currencySymbol)}</span>
+            <span className="text-xs text-gray-400 line-through">
+              {formatPrice(data.exactPrice, currency)}
+            </span>
           )}
         </div>
         <div className="mt-1">
-          <StarRating rating={rating} reviews={reviews}/>
+          <StarRating rating={rating} reviews={reviews} />
         </div>
       </div>
     </div>
@@ -770,14 +964,18 @@ function ProductCard({
 function ProductCardSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200"/>
+      <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200" />
       <div className="mt-3 space-y-2 px-0.5">
-        <div className="flex gap-1.5">{[0,1,2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200"/>)}</div>
-        <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
-        <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200" />
+          ))}
+        </div>
+        <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200" />
+        <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200" />
         <div className="flex items-center gap-2">
-          <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200"/>
-          <div className="h-3 w-14 animate-pulse rounded-full bg-gray-200"/>
+          <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-3 w-14 animate-pulse rounded-full bg-gray-200" />
         </div>
       </div>
     </div>
@@ -785,10 +983,10 @@ function ProductCardSkeleton() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main Component
+// Main Component Props
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface CountryBestSellersProps {
+export interface BestSellersProps {
   className?: string
   heading?: string
   headingFontClassName?: string
@@ -796,75 +994,113 @@ export interface CountryBestSellersProps {
   subHeading?: string
   emblaOptions?: EmblaOptionsType
   pollInterval?: number
-  /**
-   * Override the country slug. If omitted, reads from Next.js route params
-   * (expects /country/[country] route, e.g. /country/australia).
-   */
-  country?: string
 }
 
-const CountryBestSellers: FC<CountryBestSellersProps> = ({
+// ─────────────────────────────────────────────────────────────────────────────
+// BestSellers — Main Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CountryBestSellers: FC<BestSellersProps> = ({
   className = '',
   headingFontClassName,
   headingClassName,
   heading,
-  subHeading,
+  subHeading = 'Handpicked favourites',
   emblaOptions = { slidesToScroll: 'auto' },
   pollInterval = POLL_INTERVAL,
-  country: countryProp,
 }) => {
-  // ── Resolve country name from route param or prop ─────────────────────────
-  const params = useParams()
-  const countrySlug: string = (
-    countryProp ??
-    (Array.isArray(params?.country) ? params.country[0] : params?.country) ??
-    ''
-  ).toLowerCase()
 
-  const { symbol: currencySymbol } = getCurrencyForCountry(countrySlug)
+  // ── 1. Detect country from URL ─────────────────────────────────────────────
+  //
+  //   /country/india               → countrySlug = "india"
+  //   /country/india/category/abc  → countrySlug = "india"
+  //   /                            → countrySlug = null  (use default ₹)
+  //
+  const pathname    = usePathname()
+  const countrySlug = getCountryFromPathname(pathname)   // e.g. "india" | null
 
-  const [products, setProducts] = useState<TApiProduct[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ── 2. Derive currency from country ───────────────────────────────────────
+  //
+  //   india  → ₹  (INR)
+  //   us     → $  (USD)
+  //   uk     → £  (GBP)
+  //   etc.
+  //
+  const currency = getCurrencyForCountry(countrySlug)
+
+  // ── 3. Build country-aware API URL ────────────────────────────────────────
+  //
+  //   /country/india → GET /api/countrywise?country=india
+  //   no country     → GET /api/countrywise  (or fallback; adjust as needed)
+  //
+  const apiUrl = countrySlug
+    ? `${BASE_URL}/api/countrywise?country=${encodeURIComponent(countrySlug)}`
+    : `${BASE_URL}/api/productview`   // fallback when no country in URL
+
+  // ── State ─────────────────────────────────────────────────────────────────
+
+  const [products, setProducts]           = useState<TApiProduct[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
   const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
   const isMounted = useRef(true)
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ ...emblaOptions, align: 'start', dragFree: false })
-  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } = useCarouselArrowButtons(emblaApi)
+  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
+    useCarouselArrowButtons(emblaApi)
 
-  // ── Fetch products from /api/countrywise?country=<slug> ───────────────────
-  const fetchProducts = useCallback(async (isBackground = false) => {
-    if (!countrySlug) {
-      setLoading(false)
-      return
-    }
-    try {
-      if (!isBackground) setLoading(true)
-      setError(null)
+  // ── 4. Fetch products ─────────────────────────────────────────────────────
 
-      const url = `${BASE_URL}/api/countrywise?country=${encodeURIComponent(countrySlug)}`
-      console.log('[CountryBestSellers] fetching →', url)
+  const fetchProducts = useCallback(
+    async (isBackground = false) => {
+      try {
+        if (!isBackground) setLoading(true)
+        setError(null)
 
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      const json = await res.json()
+        const res = await fetch(apiUrl, { cache: 'no-store' })
+        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        const json = await res.json()
 
-      // API returns { success, count, data: [...] }  OR  a plain array
-      const all: TApiProduct[] = Array.isArray(json)
-        ? json
-        : Array.isArray(json?.data)
-        ? json.data
-        : []
+        // API returns { data: [...] } or bare array
+        const all: TApiProduct[] = Array.isArray(json)
+          ? json
+          : Array.isArray(json.data)
+          ? json.data
+          : []
 
-      console.log(`[CountryBestSellers] country=${countrySlug} → ${all.length} products`)
+        // ── 5. Filter: keep only products tagged "Best Seller" ─────────────
+        //
+        //   FeaturedProduct: [{ name: "Best Seller" }, { name: "New Arrivals" }]
+        //   → kept (has Best Seller)
+        //
+        //   FeaturedProduct: [{ name: "New Arrivals" }]
+        //   → filtered out (no Best Seller)
+        //
+        const bestSellers = all.filter(isBestSeller)
 
-      if (isMounted.current) setProducts(all)
-    } catch (err: any) {
-      if (isMounted.current) setError(err.message ?? 'Failed to load products')
-    } finally {
-      if (isMounted.current && !isBackground) setLoading(false)
-    }
-  }, [countrySlug])
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[BestSellers] pathname     →', pathname)
+          console.log('[BestSellers] countrySlug  →', countrySlug)
+          console.log('[BestSellers] apiUrl       →', apiUrl)
+          console.log('[BestSellers] currency     →', currency)
+          console.log('[BestSellers] total fetched:', all.length)
+          console.log('[BestSellers] best sellers :', bestSellers.length)
+          if (all.length > 0) {
+            console.log('[BestSellers] sample FeaturedProduct:', getFeaturedProductRaw(all[0]))
+          }
+        }
+
+        if (isMounted.current) setProducts(bestSellers)
+      } catch (err: unknown) {
+        if (isMounted.current)
+          setError(err instanceof Error ? err.message : 'Failed to load products')
+      } finally {
+        if (isMounted.current && !isBackground) setLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [apiUrl]
+  )
 
   useEffect(() => {
     isMounted.current = true
@@ -874,42 +1110,46 @@ const CountryBestSellers: FC<CountryBestSellersProps> = ({
 
   // Background poll
   useEffect(() => {
-    if (!pollInterval || !countrySlug) return
+    if (!pollInterval) return
     const id = setInterval(() => fetchProducts(true), pollInterval)
     return () => clearInterval(id)
-  }, [fetchProducts, pollInterval, countrySlug])
+  }, [fetchProducts, pollInterval])
 
-  const handleQuickView = useCallback((product: TApiProduct) => setQuickViewProduct(product), [])
+  const handleQuickView = useCallback(
+    (product: TApiProduct) => setQuickViewProduct(product),
+    []
+  )
 
-  // Capitalise country name for heading fallback
-  const countryLabel = countrySlug
-    ? countrySlug.charAt(0).toUpperCase() + countrySlug.slice(1)
-    : ''
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <CartToastContainer/>
+      <CartToastContainer />
 
-      <div className={`nc-CountryBestSellers ${className}`}>
+      <div className={`nc-BestSellers ${className}`}>
         <div className="relative">
           <Heading
             className={headingClassName}
             fontClass={headingFontClassName}
-            headingDim={subHeading ?? (countryLabel ? `Products in ${countryLabel}` : '')}
+            headingDim={subHeading}
             hasNextPrev
             prevBtnDisabled={prevBtnDisabled}
             nextBtnDisabled={nextBtnDisabled}
             onClickPrev={onPrevButtonClick}
             onClickNext={onNextButtonClick}
           >
-            {heading ?? (countryLabel ? `${countryLabel} Collection` : 'Products')}
+            {heading || 'Best Sellers'}
           </Heading>
         </div>
 
         {/* Loading skeletons */}
         {loading && (
           <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
-            {[0,1,2,3].map((i) => <ProductCardSkeleton key={i}/>)}
+            {[0, 1, 2, 3].map((i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
           </div>
         )}
 
@@ -936,10 +1176,11 @@ const CountryBestSellers: FC<CountryBestSellersProps> = ({
                   key={product._id}
                   className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0"
                 >
+                  {/* ✅ Pass currency to every card */}
                   <ProductCard
                     data={product}
+                    currency={currency}
                     onQuickView={handleQuickView}
-                    currencySymbol={currencySymbol}
                   />
                 </div>
               ))}
@@ -950,20 +1191,18 @@ const CountryBestSellers: FC<CountryBestSellersProps> = ({
         {/* Empty */}
         {!loading && !error && products.length === 0 && (
           <div className="flex items-center justify-center rounded-2xl sm:rounded-3xl bg-gray-50 py-12">
-            <p className="text-sm text-gray-400">
-              {countrySlug
-                ? `No products available for ${countryLabel}.`
-                : 'No country specified.'}
-            </p>
+            <p className="text-sm text-gray-400">No best sellers available.</p>
           </div>
         )}
       </div>
 
+      {/* Quick view modal — ✅ passes currency + countrySlug */}
       {quickViewProduct && (
         <QuickViewModal
           product={quickViewProduct}
+          currency={currency}
+          countrySlug={countrySlug}
           onClose={() => setQuickViewProduct(null)}
-          currencySymbol={currencySymbol}
         />
       )}
     </>

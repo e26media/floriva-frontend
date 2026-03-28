@@ -1,9 +1,7 @@
 "use client";
 
-import Header from "@/components/Header/Header";
-import Header2 from "@/components/Header/Header2";
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string; }
@@ -15,14 +13,37 @@ interface Product {
   category: Category; subCategory: string | { _id: string };
   color: Color; stock: number; deliveryInfo: string;
   images: string[]; createdAt: string;
+  country?: string;
+  currency?: string;
 }
 interface Filters {
-  categories:    string[];   // selected category names  (multi)
-  subCategories: string[];   // selected subCategory _ids (multi)
+  categories:    string[];
+  subCategories: string[];
   color:  string;
   maxPrice: number;
   search: string;
 }
+
+// ─── Country → Currency map ────────────────────────────────────────────────────
+const COUNTRY_CURRENCY: Record<string, { symbol: string; code: string; name: string; flag: string }> = {
+  australia:       { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
+  india:           { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
+  usa:             { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  "united states": { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  uk:              { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  "united kingdom":{ symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  canada:          { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
+  newzealand:      { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  "new zealand":   { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  singapore:       { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
+  uae:             { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
+  germany:         { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
+  france:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
+  japan:           { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
+};
+
+const getCurrency = (country: string) =>
+  COUNTRY_CURRENCY[country.toLowerCase()] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🌐" };
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const BASE     = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
@@ -42,6 +63,10 @@ const COLOR_MAP: Record<string, string> = {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const getSubId = (p: Product): string =>
   typeof p.subCategory === "object" ? (p.subCategory as any)?._id ?? "" : p.subCategory ?? "";
+
+const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+
+const fmtPrice = (amount: number, symbol: string) => `${symbol}${amount.toLocaleString()}`;
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 const IcoCart = ({ s = 16 }: { s?: number }) => (
@@ -83,56 +108,33 @@ const IcoCheck = () => (
 );
 
 // ─── CheckboxRow ───────────────────────────────────────────────────────────────
-function CheckboxRow({
-  checked, onChange, label, count, indent = false,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-  count?: number;
-  indent?: boolean;
+function CheckboxRow({ checked, onChange, label, count, indent = false }: {
+  checked: boolean; onChange: () => void; label: string; count?: number; indent?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onChange}
-      className={`
-        flex items-center gap-[9px] w-full text-left rounded-[5px]
-        py-[5px] transition-colors duration-100 cursor-pointer bg-transparent border-none
-        hover:bg-[#f3ede6] group
-        ${indent ? "pl-[10px]" : "pl-[2px]"}
-      `}
-    >
-      <span className={`
-        w-[17px] h-[17px] flex-shrink-0 rounded-[4px] border-[1.8px] flex items-center justify-center
-        transition-all duration-150
-        ${checked
-          ? "bg-[#1e1610] border-[#1e1610]"
-          : "bg-white border-[#c0b5aa] group-hover:border-[#1e1610]"}
-      `}>
+    <button type="button" onClick={onChange}
+      className={`flex items-center gap-[9px] w-full text-left rounded-[5px] py-[5px] transition-colors duration-100 cursor-pointer bg-transparent border-none hover:bg-[#f3ede6] group ${indent ? "pl-[10px]" : "pl-[2px]"}`}>
+      <span className={`w-[17px] h-[17px] flex-shrink-0 rounded-[4px] border-[1.8px] flex items-center justify-center transition-all duration-150 ${checked ? "bg-[#1e1610] border-[#1e1610]" : "bg-white border-[#c0b5aa] group-hover:border-[#1e1610]"}`}>
         {checked && <IcoCheck />}
       </span>
-      <span className={`
-        text-[0.83rem] leading-snug flex-1
-        ${checked ? "font-semibold text-[#1e1610]" : "text-[#2d2520] group-hover:text-[#1e1610]"}
-      `}>
+      <span className={`text-[0.83rem] leading-snug flex-1 ${checked ? "font-semibold text-[#1e1610]" : "text-[#2d2520] group-hover:text-[#1e1610]"}`}>
         {label}
-        {count !== undefined && (
-          <span className="font-normal text-[#9e8e80]"> ({count})</span>
-        )}
+        {count !== undefined && <span className="font-normal text-[#9e8e80]"> ({count})</span>}
       </span>
     </button>
   );
 }
 
 // ─── QuickViewModal ────────────────────────────────────────────────────────────
-function QuickViewModal({ product, onClose }: { product: Product; onClose: () => void }) {
+function QuickViewModal({ product, onClose, currencySymbol }: {
+  product: Product; onClose: () => void; currencySymbol: string;
+}) {
   const [imgIdx, setImgIdx] = useState(0);
-  const [qty, setQty] = useState(1);
-  const [added, setAdded] = useState(false);
-  const disc = discount(product.exactPrice, product.discountPrice);
+  const [qty,    setQty]    = useState(1);
+  const [added,  setAdded]  = useState(false);
+  const disc     = discount(product.exactPrice, product.discountPrice);
   const colorHex = COLOR_MAP[product.color?.name?.toLowerCase()] ?? "#e5e7eb";
-  const ref = useRef<HTMLDivElement>(null);
+  const ref      = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -150,13 +152,11 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
         @keyframes qvSlide { from{opacity:0;transform:translateY(24px) scale(.98)} to{opacity:1;transform:none} }
         .qv-box { animation: qvSlide .26s cubic-bezier(.34,1.3,.64,1); }
       `}</style>
-
       <div className="qv-box bg-white rounded-2xl w-full max-w-[900px] max-h-[92vh] overflow-y-auto relative shadow-[0_32px_80px_rgba(0,0,0,.22)]">
         <button onClick={onClose}
           className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full border border-[#e6ddd3] bg-white flex items-center justify-center cursor-pointer hover:bg-[#1e1610] hover:text-white transition-all">
           <IcoClose />
         </button>
-
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Gallery */}
           <div className="p-7 border-b md:border-b-0 md:border-r border-[#e6ddd3]">
@@ -164,18 +164,12 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
               {product.images[imgIdx]
                 ? <img src={imgUrl(product.images[imgIdx])} alt={product.name} className="w-full h-full object-cover"/>
                 : <div className="w-full h-full bg-[#f0ebe3]"/>}
-              {disc > 0 && (
-                <span className="absolute top-3 left-3 bg-[#b5623b] text-white px-2.5 py-1 rounded-full text-[.7rem] font-semibold">−{disc}%</span>
-              )}
+              {disc > 0 && <span className="absolute top-3 left-3 bg-[#b5623b] text-white px-2.5 py-1 rounded-full text-[.7rem] font-semibold">−{disc}%</span>}
               {product.images.length > 1 && (<>
                 <button onClick={() => setImgIdx(i => (i - 1 + product.images.length) % product.images.length)}
-                  className="absolute top-1/2 left-2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-[#1e1610] hover:text-white transition-all cursor-pointer">
-                  <IcoChevL/>
-                </button>
+                  className="absolute top-1/2 left-2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-[#1e1610] hover:text-white transition-all cursor-pointer"><IcoChevL/></button>
                 <button onClick={() => setImgIdx(i => (i + 1) % product.images.length)}
-                  className="absolute top-1/2 right-2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-[#1e1610] hover:text-white transition-all cursor-pointer">
-                  <IcoChevR/>
-                </button>
+                  className="absolute top-1/2 right-2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-[#1e1610] hover:text-white transition-all cursor-pointer"><IcoChevR/></button>
               </>)}
             </div>
             {product.images.length > 1 && (
@@ -189,7 +183,6 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
               </div>
             )}
           </div>
-
           {/* Info */}
           <div className="p-8 flex flex-col">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -204,9 +197,9 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
             <h2 className="font-serif text-[clamp(1.3rem,2.4vw,1.75rem)] font-bold leading-tight mb-1">{product.name}</h2>
             {product.title !== product.name && <p className="text-[.84rem] text-[#7a6b5e] mb-4 leading-relaxed">{product.title}</p>}
             <div className="flex items-baseline gap-2.5 flex-wrap mb-3">
-              <span className="text-[1.6rem] font-bold leading-none">₹{product.discountPrice.toLocaleString()}</span>
+              <span className="text-[1.6rem] font-bold leading-none">{fmtPrice(product.discountPrice, currencySymbol)}</span>
               {disc > 0 && (<>
-                <span className="text-[.94rem] text-[#b0a090] line-through">₹{product.exactPrice.toLocaleString()}</span>
+                <span className="text-[.94rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, currencySymbol)}</span>
                 <span className="text-[.7rem] bg-[#dcfce7] text-[#3d8b5e] px-2.5 py-[3px] rounded-full font-bold">Save {disc}%</span>
               </>)}
             </div>
@@ -242,7 +235,9 @@ function QuickViewModal({ product, onClose }: { product: Product; onClose: () =>
 }
 
 // ─── ProductCard ───────────────────────────────────────────────────────────────
-function ProductCard({ product, onQuickView }: { product: Product; onQuickView: () => void }) {
+function ProductCard({ product, onQuickView, currencySymbol }: {
+  product: Product; onQuickView: () => void; currencySymbol: string;
+}) {
   const router = useRouter();
   const [idx, setIdx] = useState(0);
   const disc = discount(product.exactPrice, product.discountPrice);
@@ -272,8 +267,8 @@ function ProductCard({ product, onQuickView }: { product: Product; onQuickView: 
         <h3 className="font-serif text-[1rem] font-semibold leading-snug mb-0.5">{product.name}</h3>
         <p className="text-[.76rem] text-[#7a6b5e] mb-2 truncate">{product.title}</p>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[.97rem] font-semibold">₹{product.discountPrice.toLocaleString()}</span>
-          {disc > 0 && <span className="text-[.75rem] text-[#b0a090] line-through">₹{product.exactPrice.toLocaleString()}</span>}
+          <span className="text-[.97rem] font-semibold">{fmtPrice(product.discountPrice, currencySymbol)}</span>
+          {disc > 0 && <span className="text-[.75rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, currencySymbol)}</span>}
         </div>
       </div>
     </article>
@@ -281,34 +276,24 @@ function ProductCard({ product, onQuickView }: { product: Product; onQuickView: 
 }
 
 // ─── FiltersSidebar ────────────────────────────────────────────────────────────
-function FiltersSidebar({
-  products, allCatData, filters, setFilters, mobileOpen, onClose,
-}: {
-  products:   Product[];
-  allCatData: Category[];
-  filters:    Filters;
-  setFilters: (f: Filters) => void;
-  mobileOpen: boolean;
-  onClose:    () => void;
+function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen, onClose, currencySymbol }: {
+  products: Product[]; allCatData: Category[]; filters: Filters;
+  setFilters: (f: Filters) => void; mobileOpen: boolean; onClose: () => void; currencySymbol: string;
 }) {
-  const router = useRouter();
-
-  const catNames = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
+  const catNames   = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
   const colorNames = Array.from(new Set(products.map(p => p.color?.name).filter(Boolean))) as string[];
-
-  const prices = products.map(p => p.discountPrice);
-  const gMin = prices.length ? Math.min(...prices) : 0;
-  const gMax = prices.length ? Math.max(...prices) : 10000;
+  const prices     = products.map(p => p.discountPrice);
+  const gMin       = prices.length ? Math.min(...prices) : 0;
+  const gMax       = prices.length ? Math.max(...prices) : 10000;
 
   const catCount = (name: string) => products.filter(p => p.category?.name === name).length;
 
-  const getMergedSubs = (catName: string): { name: string; ids: string[] }[] => {
+  const getMergedSubs = (catName: string) => {
     const apiCat = allCatData.find(c => c.name === catName);
     const merged: { name: string; ids: string[] }[] = [];
     (apiCat?.subCategories ?? []).forEach(sc => {
       const ex = merged.find(m => m.name === sc.name);
-      if (ex) ex.ids.push(sc._id);
-      else merged.push({ name: sc.name, ids: [sc._id] });
+      if (ex) ex.ids.push(sc._id); else merged.push({ name: sc.name, ids: [sc._id] });
     });
     return merged;
   };
@@ -348,98 +333,68 @@ function FiltersSidebar({
 
   const reset = () => {
     setFilters({ categories: [], subCategories: [], color: "", maxPrice: gMax, search: "" });
-    router.push(window.location.pathname, { scroll: false });
+    const params = new URLSearchParams(window.location.search);
+    params.delete("color");
+    window.history.replaceState({}, "", params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname);
   };
 
   const totalActive = filters.categories.length + filters.subCategories.length + (filters.color ? 1 : 0);
 
   return (
     <>
-   
       {mobileOpen && <div className="fixed inset-0 bg-black/50 z-[199] backdrop-blur-sm md:hidden" onClick={onClose}/>}
-
       <aside className={`
-        w-[252px] flex-shrink-0 bg-white rounded-[14px] border border-[#e6ddd3] sticky top-6  mt-10
+        w-[252px] flex-shrink-0 bg-white rounded-[14px] border border-[#e6ddd3] sticky top-6 mt-10
         max-md:fixed max-md:top-0 max-md:bottom-0 max-md:z-[200]
         max-md:w-[272px] max-md:rounded-none max-md:overflow-y-auto
         max-md:shadow-[4px_0_30px_rgba(0,0,0,.14)] max-md:transition-[left_.3s_ease]
         ${mobileOpen ? "max-md:left-0" : "max-md:-left-[280px]"}
       `}>
-
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e6ddd3]">
           <div className="flex items-center gap-2">
             <span className="font-serif text-[1.06rem] font-semibold text-[#1e1610]">Filters</span>
             {totalActive > 0 && (
-              <span className="bg-[#1e1610] text-white text-[.6rem] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center leading-none">
-                {totalActive}
-              </span>
+              <span className="bg-[#1e1610] text-white text-[.6rem] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center leading-none">{totalActive}</span>
             )}
           </div>
           <div className="flex items-center gap-3">
             {totalActive > 0 && (
-              <button type="button" onClick={reset}
-                className="text-[#b5623b] text-[.74rem] font-medium bg-transparent border-none cursor-pointer hover:underline">
-                Clear All
-              </button>
+              <button type="button" onClick={reset} className="text-[#b5623b] text-[.74rem] font-medium bg-transparent border-none cursor-pointer hover:underline">Clear All</button>
             )}
-            <button type="button" onClick={onClose} className="md:hidden bg-transparent border-none cursor-pointer text-[#1e1610]">
-              <IcoClose/>
-            </button>
+            <button type="button" onClick={onClose} className="md:hidden bg-transparent border-none cursor-pointer text-[#1e1610]"><IcoClose/></button>
           </div>
         </div>
 
         <div className="px-4 py-4 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-120px)]">
-
           {/* Search */}
           <div>
             <p className="sidebar-label">Search</p>
             <div className="flex items-center gap-2 border border-[#ddd5cb] rounded-[8px] px-3 py-[9px] bg-[#faf7f4] focus-within:border-[#b5623b] focus-within:bg-white transition-all">
               <IcoSearch/>
-              <input
-                className="border-none outline-none w-full text-[.83rem] bg-transparent text-[#1e1610] placeholder:text-[#b8aba0]"
-                placeholder="Search products…"
-                value={filters.search}
-                onChange={e => setFilters({ ...filters, search: e.target.value })}
-              />
+              <input className="border-none outline-none w-full text-[.83rem] bg-transparent text-[#1e1610] placeholder:text-[#b8aba0]"
+                placeholder="Search products…" value={filters.search}
+                onChange={e => setFilters({ ...filters, search: e.target.value })}/>
               {filters.search && (
                 <button type="button" onClick={() => setFilters({ ...filters, search: "" })}
-                  className="flex-shrink-0 text-[#a09080] hover:text-[#1e1610] bg-transparent border-none cursor-pointer flex items-center">
-                  <IcoX/>
-                </button>
+                  className="flex-shrink-0 text-[#a09080] hover:text-[#1e1610] bg-transparent border-none cursor-pointer flex items-center"><IcoX/></button>
               )}
             </div>
           </div>
 
-          {/* Category + SubCategory */}
+          {/* Category */}
           <div>
             <p className="sidebar-label">Category</p>
             <div className="flex flex-col gap-0.5">
               {catNames.map(catName => {
-                const isCatOn = filters.categories.includes(catName);
+                const isCatOn    = filters.categories.includes(catName);
                 const mergedSubs = getMergedSubs(catName);
-                const count = catCount(catName);
                 return (
                   <div key={catName}>
-                    <CheckboxRow
-                      checked={isCatOn}
-                      onChange={() => toggleCat(catName)}
-                      label={catName}
-                      count={count}
-                    />
+                    <CheckboxRow checked={isCatOn} onChange={() => toggleCat(catName)} label={catName} count={catCount(catName)}/>
                     {isCatOn && mergedSubs.length > 0 && (
-                      <div
-                        className="ml-[26px] border-l-2 border-[#ece5dd] pl-[10px] mb-1 flex flex-col gap-0.5"
-                        style={{ animation: "scIn .18s ease both" }}
-                      >
+                      <div className="ml-[26px] border-l-2 border-[#ece5dd] pl-[10px] mb-1 flex flex-col gap-0.5" style={{ animation: "scIn .18s ease both" }}>
                         {mergedSubs.map(sc => (
-                          <CheckboxRow
-                            key={sc.name}
-                            checked={isSubOn(sc.ids)}
-                            onChange={() => toggleSub(sc.ids)}
-                            label={sc.name}
-                            count={subCount(catName, sc.ids)}
-                            indent
-                          />
+                          <CheckboxRow key={sc.name} checked={isSubOn(sc.ids)} onChange={() => toggleSub(sc.ids)} label={sc.name} count={subCount(catName, sc.ids)} indent/>
                         ))}
                       </div>
                     )}
@@ -449,12 +404,11 @@ function FiltersSidebar({
             </div>
           </div>
 
-          {/* Colour swatches */}
+          {/* Colour */}
           <div>
             <p className="sidebar-label">Colour</p>
             <div className="flex flex-wrap gap-x-[10px] gap-y-3">
-              <button type="button"
-                onClick={() => filters.color && handleColor(filters.color)}
+              <button type="button" onClick={() => filters.color && handleColor(filters.color)}
                 className="flex flex-col items-center gap-[3px] cursor-pointer bg-transparent border-none p-0 group/sw">
                 <span className={`w-[28px] h-[28px] rounded-full border-2 flex items-center justify-center transition-all ${!filters.color ? "border-[#1e1610] scale-110" : "border-[#ddd5cb] group-hover/sw:border-[#b5623b]"}`}
                   style={{ background: !filters.color ? "#1e1610" : "conic-gradient(#f87171,#fde047,#86efac,#93c5fd,#c4b5fd,#f9a8d4,#f87171)" }}>
@@ -462,18 +416,15 @@ function FiltersSidebar({
                 </span>
                 <span className={`text-[.58rem] ${!filters.color ? "font-bold text-[#1e1610]" : "text-[#7a6b5e]"}`}>All</span>
               </button>
-
               {colorNames.map(c => {
                 const on = filters.color === c;
                 return (
                   <button key={c} type="button" title={c} onClick={() => handleColor(c)}
                     className="flex flex-col items-center gap-[3px] cursor-pointer bg-transparent border-none p-0 group/sw">
-                    <span
-                      className={`w-[28px] h-[28px] rounded-full border-2 flex items-center justify-center transition-all ${on ? "border-[#1e1610] scale-110 shadow-[0_0_0_3px_rgba(30,22,16,.15)]" : "border-transparent hover:border-[#b5623b] hover:scale-105"}`}
+                    <span className={`w-[28px] h-[28px] rounded-full border-2 flex items-center justify-center transition-all ${on ? "border-[#1e1610] scale-110 shadow-[0_0_0_3px_rgba(30,22,16,.15)]" : "border-transparent hover:border-[#b5623b] hover:scale-105"}`}
                       style={{ background: COLOR_MAP[c.toLowerCase()] ?? "#e5e7eb" }}>
                       {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                        stroke={["white","yellow","cream","ivory","peach"].includes(c.toLowerCase()) ? "#1e1610" : "white"} strokeWidth="3">
-                        <path d="M20 6L9 17l-5-5"/></svg>}
+                        stroke={["white","yellow","cream","ivory","peach"].includes(c.toLowerCase()) ? "#1e1610" : "white"} strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
                     </span>
                     <span className={`text-[.58rem] capitalize ${on ? "font-bold text-[#1e1610]" : "text-[#7a6b5e]"}`}>{c}</span>
                   </button>
@@ -487,33 +438,23 @@ function FiltersSidebar({
             <p className="sidebar-label flex justify-between">
               Max Price
               <span className="text-[.76rem] text-[#1e1610] font-semibold normal-case tracking-normal">
-                ₹{(filters.maxPrice ?? gMax).toLocaleString()}
+                {fmtPrice(filters.maxPrice ?? gMax, currencySymbol)}
               </span>
             </p>
             <input type="range" min={gMin} max={gMax} value={filters.maxPrice ?? gMax}
               onChange={e => setFilters({ ...filters, maxPrice: +e.target.value })}
               className="w-full cursor-pointer h-1 mb-2 block accent-[#b5623b]"/>
             <div className="flex justify-between text-[.68rem] text-[#b0a090]">
-              <span>₹{gMin.toLocaleString()}</span><span>₹{gMax.toLocaleString()}</span>
+              <span>{fmtPrice(gMin, currencySymbol)}</span>
+              <span>{fmtPrice(gMax, currencySymbol)}</span>
             </div>
           </div>
         </div>
       </aside>
 
       <style>{`
-        .sidebar-label {
-          font-size: .67rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: .12em;
-          color: #9e8e80;
-          margin-bottom: .45rem;
-          display: flex;
-        }
-        @keyframes scIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to   { opacity: 1; transform: none; }
-        }
+        .sidebar-label { font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#9e8e80;margin-bottom:.45rem;display:flex; }
+        @keyframes scIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
       `}</style>
     </>
   );
@@ -525,7 +466,6 @@ function Pagination({ page, total, perPage, onChange }: {
 }) {
   const pages = Math.ceil(total / perPage);
   if (pages <= 1) return null;
-
   const nums: (number | "…")[] = [];
   if (pages <= 7) { for (let i = 1; i <= pages; i++) nums.push(i); }
   else {
@@ -535,12 +475,10 @@ function Pagination({ page, total, perPage, onChange }: {
     if (page < pages - 2) nums.push("…");
     nums.push(pages);
   }
-
   const base = "min-w-[36px] h-[36px] px-2 rounded-[8px] border border-[#e6ddd3] bg-white text-[.84rem] cursor-pointer flex items-center justify-center text-[#1e1610] transition-all hover:border-[#1e1610] disabled:opacity-30 disabled:cursor-not-allowed";
   const act  = "!bg-[#1e1610] !text-white !border-[#1e1610]";
-
   return (
-    <nav className="flex gap-1.5 justify-center mt-14 flex-wrap" aria-label="Pagination">
+    <nav className="flex gap-1.5 justify-center mt-14 flex-wrap">
       <button className={base} disabled={page === 1} onClick={() => onChange(page - 1)}><IcoChevL/></button>
       {nums.map((n, i) =>
         n === "…"
@@ -552,72 +490,116 @@ function Pagination({ page, total, perPage, onChange }: {
   );
 }
 
-// ─── AllProductsPageInner (contains all the real logic) ───────────────────────
+// ─── Main Page Inner ───────────────────────────────────────────────────────────
 function AllProductsPageInner() {
+  // Extract country from URL: /country/[country]/allproduct
+  const params = useParams();
+  const country = ((params?.country as string) ?? "").toLowerCase().trim();
+
   const searchParams = useSearchParams();
   const urlColor = searchParams.get("color") ?? "";
 
-  const [products,     setProducts]     = useState<Product[]>([]);
-  const [allCatData,   setAllCatData]   = useState<Category[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState("");
-  const [page,         setPage]         = useState(1);
-  const [sort,         setSort]         = useState("newest");
-  const [quickView,    setQuickView]    = useState<Product | null>(null);
-  const [mobSb,        setMobSb]        = useState(false);
+  // Get currency based on country
+  const currency = getCurrency(country);
+
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [allCatData, setAllCatData] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("newest");
+  const [quickView, setQuickView] = useState<Product | null>(null);
+  const [mobSb, setMobSb] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
-    categories:    [],
-    subCategories: [],
-    color:         urlColor,
-    maxPrice:      999999,
-    search:        "",
+    categories: [], subCategories: [], color: urlColor, maxPrice: 999999, search: "",
   });
 
+  // Sync color from URL
   useEffect(() => {
     setFilters(f => ({ ...f, color: urlColor }));
     setPage(1);
   }, [urlColor]);
 
+  // ── Fetch products with country filtering ──────────────────────────────────────────
   useEffect(() => {
-    fetch(`${BASE}/api/productview`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(d => {
-        const list: Product[] = Array.isArray(d) ? d : d.products ?? d.data ?? [];
-        setProducts(list);
-        if (list.length)
-          setFilters(f => ({ ...f, maxPrice: Math.max(...list.map(p => p.discountPrice)) }));
+    setLoading(true);
+    setError("");
+    setAllProducts([]);
+
+    // Build API URL with country parameter if country exists
+    const apiUrl = country
+      ? `${BASE}/api/productview?country=${encodeURIComponent(country)}`
+      : `${BASE}/api/productview`;
+
+    fetch(apiUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`Server error ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        // Normalise response data
+        let productsList: Product[] = Array.isArray(data)
+          ? data
+          : data.products ?? data.data ?? data.result ?? [];
+
+        // Apply client-side country filter as fallback (for cases where API doesn't filter)
+        if (country && productsList.length > 0) {
+          const hasCountryField = productsList.some(
+            p => p.country !== undefined && p.country !== null && String(p.country).trim() !== ""
+          );
+          if (hasCountryField) {
+            productsList = productsList.filter(
+              p => String(p.country ?? "").toLowerCase().trim() === country
+            );
+          }
+        }
+
+        setAllProducts(productsList);
+
+        // Set max price filter based on products
+        if (productsList.length) {
+          setFilters(f => ({
+            ...f,
+            maxPrice: Math.max(...productsList.map(p => p.discountPrice)),
+          }));
+        }
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [country]);
 
+  // ── Fetch categories ────────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${BASE}/api/categoryview`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(d => {
-        const list: Category[] = Array.isArray(d) ? d : d.categories ?? d.data ?? [];
-        setAllCatData(list);
+        const categoriesList: Category[] = Array.isArray(d) ? d : d.categories ?? d.data ?? [];
+        setAllCatData(categoriesList);
       })
-      .catch(e => console.warn("Category fetch failed:", e.message));
+      .catch(e => console.warn("Category fetch failed:", e));
   }, []);
 
-  const handleFilters = useCallback((f: Filters) => { setFilters(f); setPage(1); }, []);
+  const handleFilters = useCallback((f: Filters) => {
+    setFilters(f);
+    setPage(1);
+  }, []);
 
-  const filtered = products
+  // ── Apply UI filters ────────────────────────────────────────────────────────
+  const filtered = allProducts
     .filter(p => filters.categories.length === 0 || filters.categories.includes(p.category?.name))
     .filter(p => filters.subCategories.length === 0 || filters.subCategories.includes(getSubId(p)))
     .filter(p => !filters.color || p.color?.name?.toLowerCase() === filters.color.toLowerCase())
     .filter(p => p.discountPrice <= (filters.maxPrice ?? 999999))
     .filter(p => !filters.search ||
       p.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-      p.title.toLowerCase().includes(filters.search.toLowerCase())
+      (p.title ?? "").toLowerCase().includes(filters.search.toLowerCase())
     );
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "price-asc")  return a.discountPrice - b.discountPrice;
+    if (sort === "price-asc") return a.discountPrice - b.discountPrice;
     if (sort === "price-desc") return b.discountPrice - a.discountPrice;
-    if (sort === "name")       return a.name.localeCompare(b.name);
+    if (sort === "name") return a.name.localeCompare(b.name);
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -625,24 +607,26 @@ function AllProductsPageInner() {
 
   const selectedSubNames = (() => {
     const seen = new Set<string>();
-    return filters.subCategories
-      .map(id => {
-        for (const cat of allCatData) {
-          const sc = cat.subCategories.find(s => s._id === id);
-          if (sc && !seen.has(sc.name)) { seen.add(sc.name); return sc.name; }
+    return filters.subCategories.map(id => {
+      for (const cat of allCatData) {
+        const sc = cat.subCategories.find(s => s._id === id);
+        if (sc && !seen.has(sc.name)) {
+          seen.add(sc.name);
+          return sc.name;
         }
-        return null;
-      })
-      .filter((n): n is string => n !== null);
+      }
+      return null;
+    }).filter((n): n is string => n !== null);
   })();
 
   const totalActive = filters.categories.length + selectedSubNames.length + (filters.color ? 1 : 0);
 
   const headingText =
     selectedSubNames.length === 1 ? selectedSubNames[0]
-    : filters.categories.length  === 1 ? filters.categories[0]
-    : filters.color ? `${filters.color.charAt(0).toUpperCase()}${filters.color.slice(1)} Flowers`
-    : "All Flowers";
+      : filters.categories.length === 1 ? filters.categories[0]
+      : filters.color ? `${capitalize(filters.color)} Flowers`
+      : country ? `${capitalize(country)} Collection`
+      : "All Flowers";
 
   return (
     <>
@@ -661,12 +645,13 @@ function AllProductsPageInner() {
 
           {!loading && !error && (
             <FiltersSidebar
-              products={products}
+              products={allProducts}
               allCatData={allCatData}
               filters={filters}
               setFilters={handleFilters}
               mobileOpen={mobSb}
               onClose={() => setMobSb(false)}
+              currencySymbol={currency.symbol}
             />
           )}
 
@@ -674,54 +659,82 @@ function AllProductsPageInner() {
             {loading ? (
               <div className="flex flex-col items-center justify-center min-h-[360px] gap-4">
                 <div className="spin w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full"/>
-                <p className="text-[#7a6b5e] text-[.9rem]">Loading products…</p>
+                <p className="text-[#7a6b5e] text-[.9rem]">
+                  Loading{country ? ` ${capitalize(country)}` : ""} products…
+                </p>
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center justify-center min-h-[360px]">
+              <div className="flex flex-col items-center justify-center min-h-[360px] gap-3">
                 <p className="text-red-600 text-[.9rem]">⚠ Failed to load: {error}</p>
+                <button onClick={() => window.location.reload()}
+                  className="px-5 py-2 rounded-full bg-[#1e1610] text-white text-sm font-semibold cursor-pointer border-none hover:bg-[#7a3e22] transition-colors">
+                  Retry
+                </button>
               </div>
             ) : (
               <>
                 <div className="fade-up mt-10 mb-6">
+                  {/* Breadcrumb */}
                   <nav className="flex items-center gap-2 text-[.77rem] text-[#b0a090] mb-3 flex-wrap">
                     <a href="/" className="hover:text-[#1e1610] transition-colors">Home</a>
                     <span>/</span>
+                    {country && (
+                      <>
+                        <a href={`/country/${country}`} className="hover:text-[#1e1610] transition-colors capitalize">{country}</a>
+                        <span>/</span>
+                      </>
+                    )}
                     <span className="text-[#7a6b5e]">Shop</span>
                     {filters.categories.length === 1 && (
-                      <><span>/</span>
-                        <button type="button"
-                          onClick={() => handleFilters({ ...filters, categories: [], subCategories: [] })}
+                      <>
+                        <span>/</span>
+                        <button type="button" onClick={() => handleFilters({ ...filters, categories: [], subCategories: [] })}
                           className="text-[#7a6b5e] hover:text-[#1e1610] bg-transparent border-none cursor-pointer transition-colors">
                           {filters.categories[0]}
                         </button>
                       </>
                     )}
                     {selectedSubNames.length === 1 && (
-                      <><span>/</span><span className="text-[#1e1610] font-medium">{selectedSubNames[0]}</span></>
+                      <>
+                        <span>/</span>
+                        <span className="text-[#1e1610] font-medium">{selectedSubNames[0]}</span>
+                      </>
                     )}
                   </nav>
 
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <h1 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight">
-                        {headingText}
-                        {filters.color && (
-                          <span className="ml-3 inline-block w-[15px] h-[15px] rounded-full align-middle border border-black/10"
-                            style={{ background: COLOR_MAP[filters.color.toLowerCase()] ?? "#e5e7eb", verticalAlign: "middle" }}/>
+                      {/* Title with country and currency badge */}
+                      <div className="flex items-center gap-3 flex-wrap mb-1">
+                        <h1 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight">
+                          {headingText}
+                          {filters.color && (
+                            <span className="ml-3 inline-block w-[15px] h-[15px] rounded-full align-middle border border-black/10"
+                              style={{ background: COLOR_MAP[filters.color.toLowerCase()] ?? "#e5e7eb", verticalAlign: "middle" }} />
+                          )}
+                        </h1>
+                        {country && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1610] text-white text-[.72rem] font-semibold tracking-wide">
+                            <span>{currency.flag}</span>
+                            <span className="capitalize">{country}</span>
+                            <span className="opacity-50">·</span>
+                            <span>{currency.code}</span>
+                          </span>
                         )}
-                      </h1>
-                      <p className="text-[.84rem] text-[#7a6b5e] mt-1">
+                      </div>
+                      <p className="text-[.84rem] text-[#7a6b5e]">
                         <strong className="text-[#1e1610] font-semibold">{filtered.length}</strong>
                         {" "}of{" "}
-                        <strong className="text-[#1e1610] font-semibold">{products.length}</strong> products
+                        <strong className="text-[#1e1610] font-semibold">{allProducts.length}</strong> products
+                        {" · prices in "}
+                        <span className="font-semibold text-[#b5623b]">{currency.symbol} {currency.code}</span>
                       </p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
                       <button type="button" onClick={() => setMobSb(true)}
                         className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
-                        <IcoFilter/>
-                        Filters
+                        <IcoFilter />Filters
                         {totalActive > 0 && (
                           <span className="ml-0.5 bg-[#1e1610] text-white text-[.58rem] w-[17px] h-[17px] rounded-full flex items-center justify-center font-bold">{totalActive}</span>
                         )}
@@ -737,7 +750,17 @@ function AllProductsPageInner() {
                   </div>
                 </div>
 
-                {paginated.length === 0 ? (
+                {allProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
+                    <div className="text-5xl">{currency.flag}</div>
+                    <p className="text-[1rem] font-serif font-semibold text-[#1e1610]">
+                      No products for {capitalize(country)}
+                    </p>
+                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[320px]">
+                      Make sure your products have a <code className="bg-[#f0ebe3] px-1 rounded text-[.8rem]">country</code> field set to <strong>"{country}"</strong> in your database.
+                    </p>
+                  </div>
+                ) : paginated.length === 0 ? (
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
                     <div className="text-5xl">🌸</div>
                     <p className="text-[#7a6b5e] text-[.9rem]">No products match your filters.</p>
@@ -750,24 +773,26 @@ function AllProductsPageInner() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                     {paginated.map(p => (
-                      <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)}/>
+                      <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} currencySymbol={currency.symbol} />
                     ))}
                   </div>
                 )}
 
-                <Pagination page={page} total={filtered.length} perPage={PER_PAGE} onChange={setPage}/>
+                <Pagination page={page} total={filtered.length} perPage={PER_PAGE} onChange={setPage} />
               </>
             )}
           </main>
         </div>
 
-        {quickView && <QuickViewModal product={quickView} onClose={() => setQuickView(null)}/>}
+        {quickView && (
+          <QuickViewModal product={quickView} onClose={() => setQuickView(null)} currencySymbol={currency.symbol} />
+        )}
       </div>
     </>
   );
 }
 
-// ─── AllProductsPage — default export with Suspense wrapper ───────────────────
+// ─── Default export ────────────────────────────────────────────────────────────
 export default function AllProductsPage() {
   return (
     <Suspense
@@ -775,7 +800,7 @@ export default function AllProductsPage() {
         <div className="bg-[#f7f3ee] min-h-screen flex flex-col items-center justify-center gap-4">
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
           <div style={{ animation: "spin .75s linear infinite" }}
-            className="w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full"/>
+            className="w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full" />
           <p className="text-[#7a6b5e] text-[.9rem]">Loading products…</p>
         </div>
       }
