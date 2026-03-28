@@ -1,5 +1,6 @@
-// "use client";
+"use client";
 
+import { Suspense } from "react";
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -111,7 +112,7 @@ interface FormState {
 const BASE_URL         = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 const CREATE_ORDER_URL = `${BASE_URL}/api/createorder`;
 const CONFIRM_CART_URL = `${BASE_URL}/api/confirm-order`;
-const IMAGE_BASE       = "http://localhost:7000";
+const IMAGE_BASE       = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || "http://localhost:7000";
 
 // =============================================================================
 //  HELPERS
@@ -247,6 +248,31 @@ const IcoGlobe = ({ c }: { c: string }) => (
 );
 
 // =============================================================================
+//  LOADING FALLBACK
+// =============================================================================
+function CheckoutLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="mb-10 border-b border-neutral-200 pb-8 dark:border-neutral-800">
+          <div className="h-8 w-48 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
+        </div>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
+          <div className="flex-1 space-y-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-96 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
+            ))}
+          </div>
+          <div className="w-full shrink-0 lg:w-[360px] xl:w-[400px]">
+            <div className="h-[600px] animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 //  TOAST
 // =============================================================================
 function Toast({ t }: { t: ToastState | null }) {
@@ -378,8 +404,8 @@ function OrderItemRow({
   locale: string;
   currency: string;
 }) {
-  const p = item.productId;
   const [imgErr, setImgErr] = useState(false);
+  const p = item.productId;
   const src   = getImgSrc(p?.images);
   const price = getPrice(p);
   const qty   = item.quantity || 1;
@@ -487,9 +513,9 @@ function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency
 }
 
 // =============================================================================
-//  MAIN CHECKOUT PAGE
+//  MAIN CHECKOUT PAGE CONTENT (with useSearchParams)
 // =============================================================================
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
@@ -1017,5 +1043,16 @@ export default function CheckoutPage() {
       </main>
       <Toast t={toast} />
     </div>
+  );
+}
+
+// =============================================================================
+//  EXPORT WRAPPED COMPONENT WITH SUSPENSE
+// =============================================================================
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<CheckoutLoadingFallback />}>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }
