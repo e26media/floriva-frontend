@@ -111,7 +111,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
           {/* ── Actions — right side ── */}
-          <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5">
+          <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5 ">
             {/* <SearchBtnPopover /> */}
             <CountryCart />
             <AvatarDropdown />
@@ -124,7 +124,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
         </div>
 
         {/* ── Category Nav row ── */}
-        <div className="mx-4  flex-2 lg:flex">
+        <div className="hidden  mx-4  flex-2 lg:flex  ">
           <CountryCategory
             // menu={navigationMenu}
             // featuredCollection={featuredCollection}
