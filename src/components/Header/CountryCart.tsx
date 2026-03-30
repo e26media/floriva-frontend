@@ -502,7 +502,7 @@ export default function CountryCart() {
       </button>
 
       <button onClick={() => setShowVendorPopup(true)} title="Join as Vendor"
-        className="hidden md:block relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
+        className=" md:block relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
         <HugeiconsIcon icon={Store02Icon} size={24} color="currentColor" strokeWidth={1.5} />
       </button>
 

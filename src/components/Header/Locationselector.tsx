@@ -105,7 +105,8 @@ function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[999] flex items-start justify-center bg-black/40 backdrop-blur-sm pt-14 px-4 h-auto"
+      className="fixed inset-0 z-[999] flex items-start justify-center  pt-14 px-4 h-auto"
+      // className="fixed inset-0 z-[999] flex items-start justify-center bg-black/40 backdrop-blur-sm pt-14 px-4 h-auto"
       onClick={handleBackdropClick}
     >
       <div
@@ -315,37 +316,52 @@ export default function LocationSelector() {
   return (
     <>
       <button
-        type="button"
-        onClick={() => setModalOpen(true)}
-        className={clsx(
-          'hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg',
-          'hover:bg-gray-100 transition-colors duration-150',
-          'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/20',
-        )}
-      >
-        <svg className="w-4 h-4 text-[#B4538F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
+  type="button"
+  onClick={() => setModalOpen(true)}
+  className={clsx(
+    'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg', // mobile: center
+    'lg:flex-row lg:items-center lg:gap-2', // desktop: row layout
+    'hover:bg-gray-100 transition-colors duration-150',
+    'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/20',
+  )}
+>
+  <svg
+    className="w-4 h-4 text-[#B4538F] shrink-0"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+    />
+  </svg>
 
-        <div className="text-left">
-          <p className="text-[11px] font-semibold text-gray-800 leading-tight whitespace-nowrap">
-            {selected
-              ? `${capitalize(selected.country.name)}${selected.city ? `, ${selected.city}` : ''}`
-              : 'Where to deliver?'}
-          </p>
-          {!selected && (
-            <p className="text-[11px] text-[#b5451b] font-medium flex items-center gap-0.5 leading-tight">
-              Location missing
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-            </p>
-          )}
-        </div>
-      </button>
+  <div className="text-center lg:text-left">
+    <p className="text-[11px] font-semibold text-gray-800 leading-tight whitespace-nowrap">
+      {selected
+        ? `${capitalize(selected.country.name)}${selected.city ? `, ${selected.city}` : ''}`
+        : 'Where to deliver?'}
+    </p>
+    {!selected && (
+      <p className="text-[11px] text-[#b5451b] font-medium flex items-center justify-center lg:justify-start gap-0.5 leading-tight">
+        Location missing
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+        </svg>
+      </p>
+    )}
+  </div>
+</button>
+
 
       <LocationModal
         isOpen={modalOpen}

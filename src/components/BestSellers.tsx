@@ -17,18 +17,16 @@ export interface TCategory {
   createdAt: string; updatedAt: string
 }
 export interface TColor { _id: string; name: string; createdAt: string; updatedAt: string }
-
+export interface TCountry { _id: string; name: string; createdAt: string; updatedAt: string }
 export interface TFeaturedProduct {
-  _id: string
-  name: string
-  createdAt: string
-  updatedAt: string
+  _id: string; name: string; createdAt: string; updatedAt: string
 }
 
 export interface TApiProduct {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: TCategory | null; subCategory: string | null; color: TColor | null
+  country?: TCountry | null
   stock: number; deliveryInfo: string; images: string[]
   featuredProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   FeaturedProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
@@ -37,68 +35,72 @@ export interface TApiProduct {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants
+// Constants — hardcoded to India / INR
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
-const POLL_INTERVAL = 30_000
+const BASE_URL           = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
+const POLL_INTERVAL      = 30_000
+const BEST_SELLERS_LABEL = 'Best Seller'   // ← adjust to match your DB value
 
-// ── Must match the name in your DB exactly (case-insensitive compare is used) ─
-const BEST_SELLER_LABEL = 'Best Seller'
+const INDIA_SLUG     = 'india'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fetch the "Best Seller" _id dynamically from /api/allFeaturedProducts/
+// Format price — always INR
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function fetchBestSellerId(): Promise<string | null> {
+function formatPrice(amount: number): string {
   try {
-    const res = await fetch(`${BASE_URL}/api/allFeaturedProducts/`, { cache: 'no-store' })
-    if (!res.ok) return null
-    const json = await res.json()
-    // Handle both shapes: array at root OR { data: [...] }
-    const list: TFeaturedProduct[] = Array.isArray(json) ? json : (json.data ?? [])
-    console.log('[BestSellers] allFeaturedProducts →', list)
-    const match = list.find(
-      (fp) => fp.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()
-    )
-    console.log('[BestSellers] matched featuredProduct →', match)
-    return match?._id ?? null
-  } catch (e) {
-    console.error('[BestSellers] fetchBestSellerId error:', e)
-    return null
+    const formatted = new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+    return `₹${formatted}`
+  } catch {
+    return `₹${amount.toLocaleString()}`
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Robust filter helpers
+// Best Sellers filter helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getFeaturedProductRaw(product: TApiProduct): unknown {
-  return (
-    (product as any).featuredProduct ??
-    (product as any).FeaturedProduct ??
-    (product as any).featured_product ??
-    null
-  )
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (product as any).FeaturedProduct ?? (product as any).featuredProduct ?? (product as any).featured_product ?? null
 }
 
-function matchesBestSeller(fp: unknown, bestSellerId: string): boolean {
-  if (!fp) return false
-  const arr: unknown[] = Array.isArray(fp) ? fp : [fp]
+function isBestSeller(product: TApiProduct): boolean {
+  const raw = getFeaturedProductRaw(product)
+  if (!raw) return false
+  const arr: unknown[] = Array.isArray(raw) ? raw : [raw]
   return arr.some((item) => {
-    if (!item) return false
-    if (typeof item === 'string') return item === bestSellerId
+    if (!item || typeof item === 'string') return false
     if (typeof item === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const obj = item as Record<string, any>
-      if (obj._id === bestSellerId) return true
-      if (obj.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()) return true
+      return obj.name?.trim().toLowerCase() === BEST_SELLERS_LABEL.toLowerCase()
     }
     return false
   })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Get user email from localStorage
+// Filter products belonging to India
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isIndiaProduct(product: TApiProduct): boolean {
+  const c = product.country
+  if (!c) return false
+  if (typeof c === 'string') return c.toLowerCase() === INDIA_SLUG
+  if (typeof c === 'object') {
+    return c.name?.toLowerCase() === INDIA_SLUG
+  }
+  return false
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User email (for cart)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getUserEmail(): string | null {
@@ -137,7 +139,9 @@ async function apiAddToCart(productId: string, quantity: number): Promise<{ ok: 
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { ok: false, message: data?.message ?? `Failed (${res.status})` }
     return { ok: true, message: data?.message ?? 'Added to cart!' }
-  } catch { return { ok: false, message: 'Network error. Please try again.' } }
+  } catch {
+    return { ok: false, message: 'Network error. Please try again.' }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +149,13 @@ async function apiAddToCart(productId: string, quantity: number): Promise<{ ok: 
 // ─────────────────────────────────────────────────────────────────────────────
 
 type TToastType = 'success' | 'error'
-type TCartToast = { id: number; product: TApiProduct; qty: number; type: TToastType; message?: string }
+interface TCartToast {
+  id: number
+  product: TApiProduct
+  qty: number
+  type: TToastType
+  message?: string
+}
 
 let _toastItems: TCartToast[] = []
 let _toastCounter = 0
@@ -156,7 +166,10 @@ function pushToast(product: TApiProduct, qty: number, type: TToastType, message?
   const id = ++_toastCounter
   _toastItems = [..._toastItems, { id, product, qty, type, message }]
   _notifyToast()
-  setTimeout(() => { _toastItems = _toastItems.filter((t) => t.id !== id); _notifyToast() }, 3500)
+  setTimeout(() => {
+    _toastItems = _toastItems.filter((t) => t.id !== id)
+    _notifyToast()
+  }, 3500)
 }
 
 function CartToastContainer() {
@@ -168,8 +181,7 @@ function CartToastContainer() {
   }, [])
   if (_toastItems.length === 0) return null
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"
-      style={{ maxWidth: 'calc(100vw - 2rem)' }}>
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 'calc(100vw - 2rem)' }}>
       <style>{`
         @keyframes toastSlide {
           from { opacity:0; transform:translateX(80px) scale(0.9); }
@@ -183,10 +195,7 @@ function CartToastContainer() {
           <div
             key={toast.id}
             className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-white shadow-2xl border border-gray-100 px-3 py-2.5"
-            style={{
-              animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards',
-              minWidth: 220, maxWidth: 320,
-            }}
+            style={{ animation: 'toastSlide 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards', minWidth: 220, maxWidth: 320 }}
           >
             <div className={`h-10 w-10 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden ${isError ? 'bg-red-50' : 'bg-gray-50'}`}>
               {!isError && imageUrl
@@ -197,12 +206,14 @@ function CartToastContainer() {
               <p className={`text-xs font-bold mb-0.5 ${isError ? 'text-red-600' : 'text-emerald-600'}`}>
                 {isError ? 'Error' : '✓ Added to Bag!'}
               </p>
-              {isError
-                ? <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
-                : <>
-                    <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
-                    <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
-                  </>}
+              {isError ? (
+                <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
+              ) : (
+                <>
+                  <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
+                  <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
+                </>
+              )}
             </div>
           </div>
         )
@@ -212,7 +223,7 @@ function CartToastContainer() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Misc helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function imgSrc(path: string) {
@@ -228,15 +239,15 @@ function calcDiscount(exact: number, discounted: number) {
 
 function colorHex(name: string): string {
   const map: Record<string, string> = {
-    red:'#dc2626', crimson:'#b91c1c', blue:'#2563eb', navy:'#1e3a5f',
-    green:'#16a34a', olive:'#65a30d', black:'#171717', white:'#d4d4d4',
-    yellow:'#ca8a04', gold:'#b45309', orange:'#ea580c', purple:'#9333ea',
-    pink:'#ec4899', rose:'#e11d48', gray:'#6b7280', grey:'#6b7280',
-    silver:'#9ca3af', brown:'#78350f', tan:'#92400e', beige:'#d6cfc4',
-    cream:'#e8e0d0', camel:'#b08040', indigo:'#4338ca', teal:'#0d9488',
-    cyan:'#0891b2', lime:'#65a30d', maroon:'#881337', coral:'#ef4444',
-    salmon:'#fb923c', khaki:'#a3a35e', ivory:'#e8e0cc', lavender:'#a78bfa',
-    peach:'#fb923c', mint:'#34d399', sky:'#38bdf8',
+    red: '#dc2626', crimson: '#b91c1c', blue: '#2563eb', navy: '#1e3a5f',
+    green: '#16a34a', olive: '#65a30d', black: '#171717', white: '#d4d4d4',
+    yellow: '#ca8a04', gold: '#b45309', orange: '#ea580c', purple: '#9333ea',
+    pink: '#ec4899', rose: '#e11d48', gray: '#6b7280', grey: '#6b7280',
+    silver: '#9ca3af', brown: '#78350f', tan: '#92400e', beige: '#d6cfc4',
+    cream: '#e8e0d0', camel: '#b08040', indigo: '#4338ca', teal: '#0d9488',
+    cyan: '#0891b2', lime: '#65a30d', maroon: '#881337', coral: '#ef4444',
+    salmon: '#fb923c', khaki: '#a3a35e', ivory: '#e8e0cc', lavender: '#a78bfa',
+    peach: '#fb923c', mint: '#34d399', sky: '#38bdf8',
   }
   return map[name.toLowerCase()] ?? '#9ca3af'
 }
@@ -249,22 +260,19 @@ function getSwatches(product: TApiProduct): Array<{ hex: string; name: string }>
 function fakeRating(id: string): { rating: number; reviews: number } {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
-  return { rating: Math.round((3.8 + (hash % 13) * 0.1) * 10) / 10, reviews: 20 + (hash % 160) }
+  return {
+    rating: Math.round((3.8 + (hash % 13) * 0.1) * 10) / 10,
+    reviews: 20 + (hash % 160),
+  }
 }
-
-function isNewIn(createdAt: string): boolean {
-  return Date.now() - new Date(createdAt).getTime() < 30 * 24 * 60 * 60 * 1000
-}
-
-function formatPrice(n: number) { return '₹' + n.toLocaleString('en-IN') }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// useAddToCart hook
+// useAddToCart
 // ─────────────────────────────────────────────────────────────────────────────
 
 function useAddToCart(product: TApiProduct) {
   const [loading, setLoading] = useState(false)
-  const [added, setAdded] = useState(false)
+  const [added, setAdded]     = useState(false)
 
   const addToCart = useCallback(async (qty: number = 1) => {
     if (loading || product.stock === 0) return
@@ -291,37 +299,34 @@ function StarRating({ rating, reviews }: { rating: number; reviews: number }) {
   return (
     <div className="flex items-center gap-1.5">
       <svg className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
       </svg>
       <span className="text-xs font-medium text-gray-500">
-        {rating.toFixed(1)} <span className="text-gray-400 font-normal">({reviews} reviews)</span>
+        {rating.toFixed(1)}{' '}
+        <span className="text-gray-400 font-normal">({reviews} reviews)</span>
       </span>
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Qty Stepper
+// QtyStepper
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max: number }) {
   return (
     <div className="flex h-11 items-center overflow-hidden rounded-full border border-gray-200 bg-white">
-      <button
-        onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
-      >
+      <button onClick={() => onChange(Math.max(1, value - 1))}
+        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
         </svg>
       </button>
       <span className="w-10 border-x border-gray-200 text-center text-sm font-bold text-gray-800">{value}</span>
-      <button
-        onClick={() => onChange(Math.min(max, value + 1))}
-        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100"
-      >
+      <button onClick={() => onChange(Math.min(max, value + 1))}
+        className="flex h-full w-11 items-center justify-center text-gray-500 transition hover:bg-gray-50 active:bg-gray-100">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       </button>
     </div>
@@ -329,23 +334,19 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: num
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Accordion
+// AccordionRow
 // ─────────────────────────────────────────────────────────────────────────────
 
 function AccordionRow({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-gray-100">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800"
-      >
+      <button onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between py-3.5 text-left text-sm font-semibold text-gray-800">
         {title}
-        <svg
-          className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+        <svg className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && <div className="pb-4 text-sm leading-relaxed text-gray-500">{children}</div>}
@@ -354,22 +355,22 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick View Modal
+// QuickViewModal
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
   const [activeImg, setActiveImg] = useState(0)
-  const [qty, setQty] = useState(1)
+  const [qty, setQty]             = useState(1)
   const thumbsRef = useRef<HTMLDivElement>(null)
   const { addToCart, loading: adding, added } = useAddToCart(product)
 
   const { rating, reviews } = fakeRating(product._id)
-  const discount = calcDiscount(product.exactPrice, product.discountPrice)
-  const outOfStock = product.stock === 0
+  const discount    = calcDiscount(product.exactPrice, product.discountPrice)
+  const outOfStock  = product.stock === 0
   const categoryName = product.category?.name ?? null
-  const colorName = product.color?.name ?? null
-  const swatches = getSwatches(product)
-  const hasImages = product.images.length > 0
+  const colorName    = product.color?.name ?? null
+  const swatches     = getSwatches(product)
+  const hasImages    = product.images.length > 0
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -395,23 +396,15 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <style>{`
-        @keyframes modalInMobile {
-          from { opacity:0; transform:translateY(60px); }
-          to   { opacity:1; transform:translateY(0); }
-        }
-        @keyframes modalInDesktop {
-          from { opacity:0; transform:scale(0.95) translateY(16px); }
-          to   { opacity:1; transform:scale(1) translateY(0); }
-        }
-        @keyframes imgFadeIn { from{opacity:0;}to{opacity:1;} }
-        .modal-mobile { animation: modalInMobile 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
-        @media (min-width: 640px) {
-          .modal-mobile { animation: modalInDesktop 0.28s cubic-bezier(0.34,1.1,0.64,1) forwards; }
-        }
-        .thumbs-no-scroll::-webkit-scrollbar { display: none; }
-        .details-panel::-webkit-scrollbar { width: 3px; }
-        .details-panel::-webkit-scrollbar-track { background: transparent; }
-        .details-panel::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+        @keyframes modalInMobile  { from{opacity:0;transform:translateY(60px);}   to{opacity:1;transform:translateY(0);} }
+        @keyframes modalInDesktop { from{opacity:0;transform:scale(0.95) translateY(16px);} to{opacity:1;transform:scale(1) translateY(0);} }
+        @keyframes imgFadeIn      { from{opacity:0;} to{opacity:1;} }
+        .modal-mobile { animation: modalInMobile 0.32s cubic-bezier(0.32,0.72,0,1) forwards; }
+        @media (min-width:640px) { .modal-mobile { animation: modalInDesktop 0.28s cubic-bezier(0.34,1.1,0.64,1) forwards; } }
+        .thumbs-no-scroll::-webkit-scrollbar { display:none; }
+        .details-panel::-webkit-scrollbar       { width:3px; }
+        .details-panel::-webkit-scrollbar-track { background:transparent; }
+        .details-panel::-webkit-scrollbar-thumb { background:#e5e7eb; border-radius:4px; }
       `}</style>
 
       <div
@@ -422,47 +415,39 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
           <div className="h-1 w-10 rounded-full bg-gray-200" />
         </div>
 
-        <button
-          onClick={onClose}
+        <button onClick={onClose}
           className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100/90 text-gray-500 transition hover:bg-gray-200 active:scale-95"
-          aria-label="Close"
-        >
+          aria-label="Close">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
         <div className="flex flex-col overflow-y-auto sm:flex-row sm:overflow-hidden flex-1 min-h-0">
 
-          {/* LEFT: Image panel */}
+          {/* LEFT — Image panel */}
           <div className="w-full flex-shrink-0 sm:w-[44%] sm:overflow-y-auto sm:flex sm:flex-col">
             <div className="relative bg-gray-50 w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
               {hasImages ? (
-                <img
-                  key={activeImg}
-                  src={imgSrc(product.images[activeImg])}
-                  alt={product.name}
-                  className="h-full w-full object-cover"
-                  style={{ animation: 'imgFadeIn 0.18s ease' }}
-                />
+                <img key={activeImg} src={imgSrc(product.images[activeImg])} alt={product.name}
+                  className="h-full w-full object-cover" style={{ animation: 'imgFadeIn 0.18s ease' }} />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-gray-300">
                   <svg className="h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
               )}
 
               <div className="absolute left-2.5 top-2.5 flex flex-col gap-1.5">
-                {isNewIn(product.createdAt) && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-gray-700 shadow-sm">
-                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                    New in
-                  </span>
-                )}
+                {/* Best Seller badge */}
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-1 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+                  <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  Best Seller
+                </span>
                 {discount >= 10 && (
                   <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
                     {discount}% Off
@@ -472,20 +457,16 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 
               {product.images.length > 1 && (
                 <>
-                  <button
-                    onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                    className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                  >
+                  <button onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                    className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95">
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  <button
-                    onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95"
-                  >
+                  <button onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md transition hover:shadow-lg active:scale-95">
                     <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
                 </>
@@ -495,21 +476,18 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             {product.images.length > 1 && (
               <div ref={thumbsRef} className="thumbs-no-scroll flex gap-2 overflow-x-auto p-2.5 bg-white" style={{ scrollbarWidth: 'none' }}>
                 {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImg(idx)}
+                  <button key={idx} onClick={() => setActiveImg(idx)}
                     className={`h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
                       activeImg === idx ? 'border-gray-900' : 'border-transparent opacity-50 hover:opacity-75'
-                    }`}
-                  >
-                    <img src={imgSrc(img)} alt="" className="h-full w-full object-cover"/>
+                    }`}>
+                    <img src={imgSrc(img)} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* RIGHT: Details panel */}
+          {/* RIGHT — Details panel */}
           <div className="details-panel w-full flex flex-col border-t border-gray-100 sm:border-t-0 sm:border-l sm:w-[56%] sm:overflow-y-auto p-4 sm:p-6">
             {categoryName && (
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400">{categoryName}</p>
@@ -518,8 +496,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             {product.title && product.title !== product.name && (
               <p className="text-sm text-gray-400 mb-2">{product.title}</p>
             )}
-            <div className="mb-3"><StarRating rating={rating} reviews={reviews}/></div>
+            <div className="mb-3">
+              <StarRating rating={rating} reviews={reviews} />
+            </div>
 
+            {/* Always INR prices */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
                 {formatPrice(product.discountPrice)}
@@ -541,8 +522,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                   {swatches.map((swatch, i) => (
                     <span key={i} title={swatch.name}
                       className="h-6 w-6 rounded-full border-2 border-gray-900 ring-2 ring-gray-900 ring-offset-1 cursor-default"
-                      style={{ backgroundColor: swatch.hex }}
-                    />
+                      style={{ backgroundColor: swatch.hex }} />
                   ))}
                 </div>
               </div>
@@ -554,7 +534,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
                   : product.stock > 0 ? 'bg-amber-50 text-amber-600'
                   : 'bg-red-50 text-red-600'
               }`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current"/>
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
                 {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
               </span>
             </div>
@@ -562,36 +542,42 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             <div className="mb-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">Quantity</p>
               <div className="flex gap-2">
-                <QtyStepper value={qty} onChange={setQty} max={product.stock || 1}/>
-                <button
-                  onClick={() => addToCart(qty)}
-                  disabled={outOfStock || adding}
+                <QtyStepper value={qty} onChange={setQty} max={product.stock || 1} />
+                <button onClick={() => addToCart(qty)} disabled={outOfStock || adding}
                   className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.97] ${
                     outOfStock ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                       : adding ? 'cursor-wait bg-gray-800 text-white'
-                      : added ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
+                      : added  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'
                       : 'bg-gray-900 text-white hover:bg-gray-700 hover:shadow-lg'
-                  }`}
-                >
-                  {adding
-                    ? (<><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
-                    : added
-                    ? (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
-                    : (<><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>{outOfStock ? 'Out of Stock' : 'Add to Bag'}</>)
-                  }
+                  }`}>
+                  {adding ? (
+                    <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>Adding…</>
+                  ) : added ? (
+                    <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>Added!</>
+                  ) : (
+                    <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>{outOfStock ? 'Out of Stock' : 'Add to Bag'}</>
+                  )}
                 </button>
               </div>
             </div>
 
-            <hr className="border-gray-100 mb-3"/>
+            <hr className="border-gray-100 mb-3" />
             {product.description && <AccordionRow title="Description">{product.description}</AccordionRow>}
 
             <div className="flex items-center justify-end pt-4 mt-auto border-t border-gray-100">
-              <a href={`/product/${product._id}`} className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
+              <a href={`/country/${INDIA_SLUG}/product/${product._id}`}
+                className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
                 View full page →
               </a>
             </div>
-            <div className="h-safe-bottom sm:h-0 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}/>
+            <div className="h-safe-bottom sm:h-0 flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
           </div>
         </div>
       </div>
@@ -600,17 +586,16 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product Card
+// ProductCard — Best Seller badge
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
-  const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
-  const colorName = data.color?.name ?? null
-  const discount = calcDiscount(data.exactPrice, data.discountPrice)
+  const imageUrl   = data.images?.[0] ? imgSrc(data.images[0]) : null
+  const colorName  = data.color?.name ?? null
+  const discount   = calcDiscount(data.exactPrice, data.discountPrice)
   const { rating, reviews } = fakeRating(data._id)
-  const newIn = isNewIn(data.createdAt)
   const outOfStock = data.stock === 0
-  const swatches = getSwatches(data)
+  const swatches   = getSwatches(data)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const touchedRef = useRef(false)
   const { addToCart, loading, added } = useAddToCart(data)
@@ -619,7 +604,10 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
     if (!touchedRef.current) {
       touchedRef.current = true
       setOverlayVisible(true)
-      const timer = setTimeout(() => { touchedRef.current = false; setOverlayVisible(false) }, 3000)
+      const timer = setTimeout(() => {
+        touchedRef.current = false
+        setOverlayVisible(false)
+      }, 3000)
       return () => clearTimeout(timer)
     }
   }, [])
@@ -634,11 +622,13 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
       >
         <div className="relative aspect-square w-full">
           {imageUrl ? (
-            <img src={imageUrl} alt={data.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+            <img src={imageUrl} alt={data.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-gray-300">
               <svg className="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
           )}
@@ -649,12 +639,12 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
           )}
         </div>
 
-        {/* Best Seller badge */}
+        {/* Best Seller badge on card */}
         {!outOfStock && (
           <div className="absolute left-2.5 top-2.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-1 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-1 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
               <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
               Best Seller
             </span>
@@ -662,27 +652,32 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         )}
 
         <div className={`absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-2.5 transition-transform duration-300 ease-out ${overlayVisible ? 'translate-y-0' : 'translate-y-full'}`}>
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
-            className="w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]"
-          >Quick View</button>
-          <button
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
+          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); onQuickView(data) }}
+            className="w-full rounded-xl bg-white/95 py-2 text-xs font-semibold text-gray-900 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-[0.97]">
+            Quick View
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); addToCart(1) }}
             disabled={outOfStock || loading}
             className={`w-full rounded-xl py-2 text-xs font-semibold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 ${
               outOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : loading ? 'bg-gray-800 text-white cursor-wait opacity-80'
-                : added ? 'bg-emerald-500 text-white shadow-md'
+                : added   ? 'bg-emerald-500 text-white shadow-md'
                 : 'bg-gray-900 text-white hover:bg-gray-700 shadow-md'
-            }`}
-          >
-            {loading
-              ? (<><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>Adding…</>)
-              : added
-              ? (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>Added!</>)
-              : outOfStock ? 'Out of Stock'
-              : (<><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>Add to Bag</>)
-            }
+            }`}>
+            {loading ? (
+              <><svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>Adding…</>
+            ) : added ? (
+              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>✓ Added to Bag!</>
+            ) : outOfStock ? 'Out of Stock' : (
+              <><svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>Add to Bag</>
+            )}
           </button>
         </div>
       </div>
@@ -691,7 +686,9 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         {swatches.length > 0 && (
           <div className="flex items-center gap-1.5 mb-1.5">
             {swatches.map((swatch, i) => (
-              <span key={i} title={swatch.name} className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default" style={{ backgroundColor: swatch.hex }}/>
+              <span key={i} title={swatch.name}
+                className="h-3.5 w-3.5 rounded-full border border-white shadow-sm ring-1 ring-gray-300 cursor-default"
+                style={{ backgroundColor: swatch.hex }} />
             ))}
           </div>
         )}
@@ -699,11 +696,17 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         <p className="text-[11px] sm:text-[13px] text-gray-400 mb-1.5">
           {colorName ? `${colorName.charAt(0).toUpperCase()}${colorName.slice(1)}` : data.category?.name ?? ''}
         </p>
+        {/* Always INR prices */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">{formatPrice(data.discountPrice)}</span>
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
+            {formatPrice(data.discountPrice)}
+          </span>
           {data.exactPrice > data.discountPrice && (
             <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
           )}
+        </div>
+        <div className="mt-1">
+          <StarRating rating={rating} reviews={reviews} />
         </div>
       </div>
     </div>
@@ -717,14 +720,16 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
 function ProductCardSkeleton() {
   return (
     <div className="flex flex-col">
-      <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200"/>
+      <div className="aspect-square w-full animate-pulse rounded-2xl sm:rounded-3xl bg-gray-200" />
       <div className="mt-3 space-y-2 px-0.5">
-        <div className="flex gap-1.5">{[0,1,2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200"/>)}</div>
-        <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200"/>
-        <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200"/>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => <div key={i} className="h-3.5 w-3.5 animate-pulse rounded-full bg-gray-200" />)}
+        </div>
+        <div className="h-4 w-3/4 animate-pulse rounded-full bg-gray-200" />
+        <div className="h-3 w-1/3 animate-pulse rounded-full bg-gray-200" />
         <div className="flex items-center gap-2">
-          <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200"/>
-          <div className="h-3 w-14 animate-pulse rounded-full bg-gray-200"/>
+          <div className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-3 w-14 animate-pulse rounded-full bg-gray-200" />
         </div>
       </div>
     </div>
@@ -732,10 +737,10 @@ function ProductCardSkeleton() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main Component
+// Props
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface SectionSliderProductCardProps {
+export interface BestSellersProps {
   className?: string
   heading?: string
   headingFontClassName?: string
@@ -743,94 +748,102 @@ export interface SectionSliderProductCardProps {
   subHeading?: string
   emblaOptions?: EmblaOptionsType
   pollInterval?: number
-  userEmail?: string
 }
 
-const BestSellers: FC<SectionSliderProductCardProps> = ({
+// ─────────────────────────────────────────────────────────────────────────────
+// BestSellers — India only, Best Seller featured products only
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BestSellers: FC<BestSellersProps> = ({
   className = '',
   headingFontClassName,
   headingClassName,
   heading,
-  subHeading = 'REY backpacks & bags',
+  subHeading = 'Our most-loved picks',
   emblaOptions = { slidesToScroll: 'auto' },
   pollInterval = POLL_INTERVAL,
 }) => {
-  const [products, setProducts] = useState<TApiProduct[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
 
-  // null = not yet resolved | string = resolved ID (empty string = not found in API)
-  const [bestSellerId, setBestSellerId] = useState<string | null>(null)
+  const apiUrl = `${BASE_URL}/api/countrywise?country=${INDIA_SLUG}`
+
+  const [products,  setProducts]  = useState<TApiProduct[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState<string | null>(null)
+  const [quickViewProduct, setQuickViewProduct] = useState<TApiProduct | null>(null)
   const isMounted = useRef(true)
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ ...emblaOptions, align: 'start', dragFree: false })
-  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } = useCarouselArrowButtons(emblaApi)
+  const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
+    useCarouselArrowButtons(emblaApi)
 
-  // ── Step 1: resolve "Best Seller" ID from /api/allFeaturedProducts/ ─────────
-  useEffect(() => {
-    isMounted.current = true
-    fetchBestSellerId().then((id) => {
-      if (isMounted.current) setBestSellerId(id ?? '')
-    })
-    return () => { isMounted.current = false }
-  }, [])
-
-  // ── Step 2: fetch & filter products once ID is resolved ────────────────────
+  // ── Fetch + filter India Best Sellers ─────────────────────────────────────
   const fetchProducts = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true)
       setError(null)
 
-      const res = await fetch(`${BASE_URL}/api/productview`, { cache: 'no-store' })
+      const res = await fetch(apiUrl, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const json = await res.json()
-      const all: TApiProduct[] = Array.isArray(json) ? json : (json.data ?? [])
 
-      // ── DEBUG: see exact field shape from your API in browser console ──────
-      if (all.length > 0) {
-        console.log('[BestSellers] sample product keys:', Object.keys(all[0]))
-        console.log('[BestSellers] sample featuredProduct field:', getFeaturedProductRaw(all[0]))
-        console.log('[BestSellers] bestSellerId being used:', bestSellerId)
-      }
-
-      // Filter: only products tagged as "Best Seller"
-      const filtered = bestSellerId
-        ? all.filter((p) => matchesBestSeller(getFeaturedProductRaw(p), bestSellerId))
+      const all: TApiProduct[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json.data)
+        ? json.data
         : []
 
-      console.log(`[BestSellers] total: ${all.length}, filtered (Best Seller): ${filtered.length}`)
+      // Step 1: keep only India products
+      const indiaProducts = all.filter(isIndiaProduct)
 
-      // Keep original order (as entered in admin) — or sort by createdAt if preferred
-      // filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // Step 2: keep only Best Sellers
+      const bestSellers = indiaProducts.filter(isBestSeller)
 
-      if (isMounted.current) setProducts(filtered)
-    } catch (err: any) {
-      if (isMounted.current) setError(err.message ?? 'Failed to load products')
+      // Fallback: if API already filtered by country, indiaProducts may equal all
+      const finalProducts = indiaProducts.length > 0 ? bestSellers : all.filter(isBestSeller)
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[BestSellers] apiUrl         →', apiUrl)
+        console.log('[BestSellers] total fetched  :', all.length)
+        console.log('[BestSellers] india products :', indiaProducts.length)
+        console.log('[BestSellers] best sellers   :', finalProducts.length)
+        if (all.length > 0) {
+          console.log('[BestSellers] sample product :', all[0])
+          console.log('[BestSellers] sample featured:', getFeaturedProductRaw(all[0]))
+        }
+      }
+
+      if (isMounted.current) setProducts(finalProducts)
+    } catch (err: unknown) {
+      if (isMounted.current)
+        setError(err instanceof Error ? err.message : 'Failed to load products')
     } finally {
       if (isMounted.current && !isBackground) setLoading(false)
     }
-  }, [bestSellerId])
+  }, [apiUrl])
 
-  // Run fetch when ID is resolved
   useEffect(() => {
-    if (bestSellerId !== null) fetchProducts(false)
-  }, [fetchProducts, bestSellerId])
+    isMounted.current = true
+    fetchProducts(false)
+    return () => { isMounted.current = false }
+  }, [fetchProducts])
 
-  // Background poll
   useEffect(() => {
-    if (!pollInterval || bestSellerId === null) return
+    if (!pollInterval) return
     const id = setInterval(() => fetchProducts(true), pollInterval)
     return () => clearInterval(id)
-  }, [fetchProducts, pollInterval, bestSellerId])
+  }, [fetchProducts, pollInterval])
 
   const handleQuickView = useCallback((product: TApiProduct) => setQuickViewProduct(product), [])
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <>
-      <CartToastContainer/>
+      <CartToastContainer />
 
-      <div className={`nc-SectionSliderProductCard ${className}`}>
+      <div className={`nc-BestSellers ${className}`}>
         <div className="relative">
           <Heading
             className={headingClassName}
@@ -849,7 +862,7 @@ const BestSellers: FC<SectionSliderProductCardProps> = ({
         {/* Loading skeletons */}
         {loading && (
           <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
-            {[0,1,2,3].map((i) => <ProductCardSkeleton key={i}/>)}
+            {[0, 1, 2, 3].map((i) => <ProductCardSkeleton key={i} />)}
           </div>
         )}
 
@@ -858,7 +871,8 @@ const BestSellers: FC<SectionSliderProductCardProps> = ({
           <div className="flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border border-red-100 bg-red-50 py-12 text-center px-4">
             <p className="text-sm font-semibold text-red-600">Failed to load products</p>
             <p className="mt-1 text-xs text-gray-400">{error}</p>
-            <button onClick={() => fetchProducts(false)} className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95">
+            <button onClick={() => fetchProducts(false)}
+              className="mt-4 rounded-full bg-gray-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-gray-700 active:scale-95">
               Retry
             </button>
           </div>
@@ -869,8 +883,9 @@ const BestSellers: FC<SectionSliderProductCardProps> = ({
           <div className="embla overflow-hidden" ref={emblaRef}>
             <div className="embla__container flex -ml-3 sm:-ml-5">
               {products.map((product) => (
-                <div key={product._id} className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0">
-                  <ProductCard data={product} onQuickView={handleQuickView}/>
+                <div key={product._id}
+                  className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0">
+                  <ProductCard data={product} onQuickView={handleQuickView} />
                 </div>
               ))}
             </div>
@@ -886,7 +901,7 @@ const BestSellers: FC<SectionSliderProductCardProps> = ({
       </div>
 
       {quickViewProduct && (
-        <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)}/>
+        <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} />
       )}
     </>
   )

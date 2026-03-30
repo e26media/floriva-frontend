@@ -6,16 +6,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 // =============================================================================
+//  CONSTANTS — hardcoded to India only
+// =============================================================================
+const INDIA_COUNTRY_NAME = "india";
+const INDIA_CURRENCY     = { symbol: "₹", code: "INR" };
+
+// =============================================================================
 //  TYPES
 // =============================================================================
-interface ProductImage {
-  url?: string;
-}
+interface ProductImage { url?: string; }
 
 interface ResolvedMeta {
   colorName:      string;
   categoryName:   string;
   countryName:    string;
+  countryId:      string;
   currencySymbol: string;
   currencyCode:   string;
 }
@@ -46,9 +51,10 @@ interface ToastState {
 }
 
 interface CheckoutData {
-  items:     CartItem[];
-  userEmail: string;
-  subtotal:  number;
+  items:       CartItem[];
+  userEmail:   string;
+  subtotal:    number;
+  countryName: string;
 }
 
 // =============================================================================
@@ -61,106 +67,10 @@ const DELETE_URL   = (id: string)    => `${BASE}/api/cartdelete/${id}`;
 const COLOR_URL    = (id: string)    => `${BASE}/api/allColors/${id}`;
 const CATEGORY_URL = (id: string)    => `${BASE}/api/allCategories/${id}`;
 const COUNTRY_URL  = (id: string)    => `${BASE}/api/allCountries/${id}`;
+const ALL_COUNTRIES_URL = `${BASE}/api/allCountries`;
 const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 
 const REFRESH_INTERVAL = 5000;
-
-// =============================================================================
-//  ✅ INDIA COUNTRY ID — only items with this country ID are shown in the cart
-// =============================================================================
-const INDIA_COUNTRY_ID = "69c3be966f74fc932c69981e";
-
-// =============================================================================
-//  IN-MEMORY CACHES
-// =============================================================================
-const colorCache:    Record<string, string> = {};
-const categoryCache: Record<string, string> = {};
-const countryCache:  Record<string, string> = {};
-
-// =============================================================================
-//  COUNTRY → CURRENCY MAP
-// =============================================================================
-const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
-  india:                    { symbol: "₹",   code: "INR" },
-  "united states":          { symbol: "$",   code: "USD" },
-  usa:                      { symbol: "$",   code: "USD" },
-  "united kingdom":         { symbol: "£",   code: "GBP" },
-  uk:                       { symbol: "£",   code: "GBP" },
-  europe:                   { symbol: "€",   code: "EUR" },
-  germany:                  { symbol: "€",   code: "EUR" },
-  france:                   { symbol: "€",   code: "EUR" },
-  italy:                    { symbol: "€",   code: "EUR" },
-  spain:                    { symbol: "€",   code: "EUR" },
-  japan:                    { symbol: "¥",   code: "JPY" },
-  china:                    { symbol: "¥",   code: "CNY" },
-  canada:                   { symbol: "CA$", code: "CAD" },
-  australia:                { symbol: "A$",  code: "AUD" },
-  switzerland:              { symbol: "Fr",  code: "CHF" },
-  brazil:                   { symbol: "R$",  code: "BRL" },
-  russia:                   { symbol: "₽",   code: "RUB" },
-  "south korea":            { symbol: "₩",   code: "KRW" },
-  mexico:                   { symbol: "MX$", code: "MXN" },
-  indonesia:                { symbol: "Rp",  code: "IDR" },
-  turkey:                   { symbol: "₺",   code: "TRY" },
-  "saudi arabia":           { symbol: "﷼",   code: "SAR" },
-  uae:                      { symbol: "د.إ", code: "AED" },
-  "united arab emirates":   { symbol: "د.إ", code: "AED" },
-  singapore:                { symbol: "S$",  code: "SGD" },
-  pakistan:                 { symbol: "₨",   code: "PKR" },
-  bangladesh:               { symbol: "৳",   code: "BDT" },
-  "sri lanka":              { symbol: "₨",   code: "LKR" },
-  nepal:                    { symbol: "₨",   code: "NPR" },
-  thailand:                 { symbol: "฿",   code: "THB" },
-  vietnam:                  { symbol: "₫",   code: "VND" },
-  philippines:              { symbol: "₱",   code: "PHP" },
-  malaysia:                 { symbol: "RM",  code: "MYR" },
-  nigeria:                  { symbol: "₦",   code: "NGN" },
-  "south africa":           { symbol: "R",   code: "ZAR" },
-  ghana:                    { symbol: "₵",   code: "GHS" },
-  kenya:                    { symbol: "KSh", code: "KES" },
-  egypt:                    { symbol: "E£",  code: "EGP" },
-  argentina:                { symbol: "$",   code: "ARS" },
-  colombia:                 { symbol: "$",   code: "COP" },
-  chile:                    { symbol: "$",   code: "CLP" },
-  peru:                     { symbol: "S/",  code: "PEN" },
-  poland:                   { symbol: "zł",  code: "PLN" },
-  sweden:                   { symbol: "kr",  code: "SEK" },
-  norway:                   { symbol: "kr",  code: "NOK" },
-  denmark:                  { symbol: "kr",  code: "DKK" },
-  "new zealand":            { symbol: "NZ$", code: "NZD" },
-  israel:                   { symbol: "₪",   code: "ILS" },
-  ukraine:                  { symbol: "₴",   code: "UAH" },
-};
-
-function currencyFor(countryName: string): { symbol: string; code: string } {
-  const key = countryName.trim().toLowerCase();
-  return CURRENCY_MAP[key] ?? { symbol: "₹", code: "INR" };
-}
-
-// =============================================================================
-//  ✅ FILTER — only show cart items whose product.country === INDIA_COUNTRY_ID
-// =============================================================================
-function isIndiaItem(item: CartItem): boolean {
-  const country = item.productId?.country;
-  if (!country) return false;
-  
-  // Raw ObjectId string (most common — API returns unpopulated ID)
-  if (typeof country === "string") {
-    return country === INDIA_COUNTRY_ID;
-  }
-  
-  // Populated object { _id, name }
-  if (country._id) {
-    return country._id === INDIA_COUNTRY_ID;
-  }
-  
-  // Fallback: check name
-  if (country.name) {
-    return country.name.trim().toLowerCase() === "india";
-  }
-  
-  return false;
-}
 
 // =============================================================================
 //  GENERIC HELPERS
@@ -171,9 +81,7 @@ function getUserEmail(): string {
     const raw = localStorage.getItem("floriva_user");
     if (!raw) return "";
     return (JSON.parse(raw) as { email?: string })?.email ?? "";
-  } catch {
-    return "";
-  }
+  } catch { return ""; }
 }
 
 function getImgSrc(images?: (string | ProductImage)[]): string | null {
@@ -213,11 +121,7 @@ function getPrice(p?: Product): number {
 
 function isSale(p?: Product): boolean {
   if (!p) return false;
-  return !!(
-    p.discountPrice &&
-    Number(p.discountPrice) > 0 &&
-    Number(p.discountPrice) < Number(p.exactPrice ?? 0)
-  );
+  return !!(p.discountPrice && Number(p.discountPrice) > 0 && Number(p.discountPrice) < Number(p.exactPrice ?? 0));
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -229,8 +133,12 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 // =============================================================================
-//  ID RESOLVERS  (cached)
+//  ID RESOLVERS (cached)
 // =============================================================================
+const colorCache:    Record<string, string>                     = {};
+const categoryCache: Record<string, string>                     = {};
+const countryCache:  Record<string, { id: string; name: string }> = {};
+
 async function resolveColor(val?: string | { _id?: string; name?: string }): Promise<string> {
   const direct = extractDirectName(val);
   if (direct) return direct;
@@ -240,7 +148,7 @@ async function resolveColor(val?: string | { _id?: string; name?: string }): Pro
   try {
     const res  = await fetch(COLOR_URL(id));
     if (!res.ok) return "";
-    const json = (await res.json()) as { success?: boolean; data?: { name?: string } };
+    const json = (await res.json()) as { data?: { name?: string } };
     const name = json?.data?.name ?? "";
     if (name) colorCache[id] = name;
     return name;
@@ -256,41 +164,39 @@ async function resolveCategory(val?: string | { _id?: string; name?: string }): 
   try {
     const res  = await fetch(CATEGORY_URL(id));
     if (!res.ok) return "";
-    const json = (await res.json()) as { success?: boolean; data?: { name?: string } };
+    const json = (await res.json()) as { data?: { name?: string } };
     const name = json?.data?.name ?? "";
     if (name) categoryCache[id] = name;
     return name;
   } catch { return ""; }
 }
 
-async function resolveCountry(val?: string | { _id?: string; name?: string }): Promise<string> {
+async function resolveCountry(val?: string | { _id?: string; name?: string }): Promise<{ id: string; name: string }> {
   const direct = extractDirectName(val);
-  if (direct) return direct;
+  if (direct) return { id: "", name: direct };
   const id = extractId(val);
-  if (!id) return "";
+  if (!id) return { id: "", name: "" };
   if (countryCache[id]) return countryCache[id];
   try {
     const res  = await fetch(COUNTRY_URL(id));
-    if (!res.ok) return "";
-    const json = (await res.json()) as { success?: boolean; data?: { name?: string } };
-    const name = json?.data?.name ?? "";
-    if (name) countryCache[id] = name;
-    return name;
-  } catch { return ""; }
+    if (!res.ok) return { id: "", name: "" };
+    const json = (await res.json()) as { data?: { _id?: string; name?: string } };
+    const name      = json?.data?.name ?? "";
+    const countryId = json?.data?._id  ?? id;
+    if (name) countryCache[id] = { id: countryId, name };
+    return { id: countryId, name };
+  } catch { return { id: "", name: "" }; }
 }
 
 // =============================================================================
 //  SAFE API FETCH
 // =============================================================================
 async function apiFetch(
-  url: string,
-  options: RequestInit = {}
+  url: string, options: RequestInit = {}
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   const res = await fetch(url, options);
   const ct  = res.headers.get("content-type") ?? "";
-  if (ct.includes("text/html")) {
-    throw new Error(`Server error at ${url} (${res.status})`);
-  }
+  if (ct.includes("text/html")) throw new Error(`Server error at ${url} (${res.status})`);
   const json = (await res.json()) as Record<string, unknown>;
   return { ok: res.ok, status: res.status, json };
 }
@@ -299,51 +205,38 @@ async function apiFetch(
 //  SVG ICONS
 // =============================================================================
 const IcoCheck   = ({ cls }: { cls: string }) => (
-  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
+  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" /></svg>
 );
 const IcoTrash   = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-    <path d="M10 11v6M14 11v6" />
-    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
   </svg>
 );
 const IcoMinus   = ({ cls }: { cls: string }) => (
-  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
+  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12" /></svg>
 );
 const IcoPlus    = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 const IcoArrowR  = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <line x1="5" y1="12" x2="19" y2="12" />
-    <polyline points="12 5 19 12 12 19" />
+    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
   </svg>
 );
 const IcoArrowL  = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <line x1="19" y1="12" x2="5" y2="12" />
-    <polyline points="12 19 5 12 12 5" />
+    <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
   </svg>
 );
 const IcoChevR   = ({ cls }: { cls: string }) => (
-  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
+  <svg className={cls} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
 );
 const IcoInfo    = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8" x2="12" y2="12" />
-    <line x1="12" y1="16" x2="12.01" y2="16" />
+    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 );
 const IcoSpin    = ({ cls }: { cls?: string }) => (
@@ -354,23 +247,18 @@ const IcoSpin    = ({ cls }: { cls?: string }) => (
 const IcoBag     = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.2} viewBox="0 0 24 24">
     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 01-8 0" />
+    <line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
   </svg>
 );
 const IcoImg     = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21 15 16 10 5 21" />
+    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
   </svg>
 );
 const IcoTruck   = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-    <rect x="1" y="3" width="15" height="13" rx="1" />
-    <path d="M16 8h4l3 5v3h-7V8z" />
-    <circle cx="5.5" cy="18.5" r="2.5" />
-    <circle cx="18.5" cy="18.5" r="2.5" />
+    <rect x="1" y="3" width="15" height="13" rx="1" /><path d="M16 8h4l3 5v3h-7V8z" />
+    <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
   </svg>
 );
 const IcoTag     = ({ cls }: { cls: string }) => (
@@ -381,17 +269,14 @@ const IcoTag     = ({ cls }: { cls: string }) => (
 );
 const IcoGlobe   = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
+    <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
 );
 const IcoCurrency = ({ cls }: { cls: string }) => (
   <svg className={cls} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M15 9.354A4 4 0 1 0 12 16" />
-    <line x1="12" y1="6" x2="12" y2="8" />
-    <line x1="12" y1="16" x2="12" y2="18" />
+    <circle cx="12" cy="12" r="10" /><path d="M15 9.354A4 4 0 1 0 12 16" />
+    <line x1="12" y1="6" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="18" />
   </svg>
 );
 
@@ -404,11 +289,8 @@ function Toast({ t }: { t: ToastState | null }) {
   return (
     <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium text-white shadow-2xl
       ${ok ? "bg-neutral-900 border-l-4 border-emerald-400" : "bg-red-950 border-l-4 border-red-400"}`}>
-      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-        ${ok ? "bg-emerald-400/20" : "bg-red-400/20"}`}>
-        {ok
-          ? <IcoCheck cls="h-3.5 w-3.5 text-emerald-400" />
-          : <IcoInfo  cls="h-3.5 w-3.5 text-red-400" />}
+      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${ok ? "bg-emerald-400/20" : "bg-red-400/20"}`}>
+        {ok ? <IcoCheck cls="h-3.5 w-3.5 text-emerald-400" /> : <IcoInfo cls="h-3.5 w-3.5 text-red-400" />}
       </div>
       <span className="max-w-xs">{t.message}</span>
     </div>
@@ -418,27 +300,22 @@ function Toast({ t }: { t: ToastState | null }) {
 // =============================================================================
 //  QUANTITY CONTROL
 // =============================================================================
-function QtyControl({
-  qty, stock, loading, onDec, onInc,
-}: {
+function QtyControl({ qty, stock, loading, onDec, onInc }: {
   qty: number; stock?: number | string; loading: boolean;
   onDec: () => void; onInc: () => void;
 }) {
   const max = stock && Number(stock) > 0 ? Number(stock) : 99;
   return (
     <div className="inline-flex items-center overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800">
-      <button type="button" onClick={onDec} disabled={qty <= 1 || loading}
-        aria-label="Decrease"
+      <button type="button" onClick={onDec} disabled={qty <= 1 || loading} aria-label="Decrease"
         className="flex h-10 w-10 items-center justify-center text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-white">
         <IcoMinus cls="h-4 w-4" />
       </button>
       <div className="flex h-10 min-w-[44px] items-center justify-center border-x border-neutral-200 bg-white px-2 dark:border-neutral-700 dark:bg-neutral-800">
-        {loading
-          ? <IcoSpin cls="h-4 w-4 text-neutral-400" />
+        {loading ? <IcoSpin cls="h-4 w-4 text-neutral-400" />
           : <span className="text-sm font-bold tabular-nums text-neutral-800 dark:text-neutral-100">{qty}</span>}
       </div>
-      <button type="button" onClick={onInc} disabled={qty >= max || loading}
-        aria-label="Increase"
+      <button type="button" onClick={onInc} disabled={qty >= max || loading} aria-label="Increase"
         className="flex h-10 w-10 items-center justify-center text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-white">
         <IcoPlus cls="h-4 w-4" />
       </button>
@@ -449,9 +326,7 @@ function QtyControl({
 // =============================================================================
 //  CART ITEM CARD
 // =============================================================================
-function CartItemCard({
-  item, isUpdating, isRemoving, onUpdateQty, onRemove, onMetaResolved,
-}: {
+function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove, onMetaResolved }: {
   item: CartItem; isUpdating: boolean; isRemoving: boolean;
   onUpdateQty: (id: string, qty: number) => void;
   onRemove:    (id: string) => void;
@@ -463,8 +338,8 @@ function CartItemCard({
   const [imgErr,      setImgErr]      = useState(false);
   const [metaLoading, setMetaLoading] = useState(true);
   const [meta, setMeta] = useState<ResolvedMeta>({
-    colorName: "", categoryName: "", countryName: "india",
-    currencySymbol: "₹", currencyCode: "INR",
+    colorName: "", categoryName: "", countryName: "India", countryId: "",
+    currencySymbol: INDIA_CURRENCY.symbol, currencyCode: INDIA_CURRENCY.code,
   });
 
   const colorKey    = typeof p?.color    === "string" ? p.color    : (p?.color    as { _id?: string })?._id ?? "";
@@ -474,20 +349,24 @@ function CartItemCard({
   useEffect(() => {
     let cancelled = false;
     setMetaLoading(true);
-
     Promise.all([
       resolveColor(p?.color),
       resolveCategory(p?.category),
       resolveCountry(p?.country),
-    ]).then(([colorName, categoryName, countryName]) => {
+    ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
-      const { symbol: currencySymbol, code: currencyCode } = currencyFor(countryName || "india");
-      const resolved: ResolvedMeta = { colorName, categoryName, countryName, currencySymbol, currencyCode };
+      const resolved: ResolvedMeta = {
+        colorName,
+        categoryName,
+        countryName:    countryResult.name || "India",
+        countryId:      countryResult.id,
+        currencySymbol: INDIA_CURRENCY.symbol,
+        currencyCode:   INDIA_CURRENCY.code,
+      };
       setMeta(resolved);
       setMetaLoading(false);
       onMetaResolved(cartId, resolved);
     });
-
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorKey, categoryKey, countryKey]);
@@ -496,7 +375,7 @@ function CartItemCard({
   const price     = getPrice(p);
   const sale      = isSale(p);
   const qty       = Number(item.quantity) || 1;
-  const sym       = meta.currencySymbol;
+  const sym       = INDIA_CURRENCY.symbol;
   const lineTotal = price * qty;
   const origTotal = Number(p?.exactPrice ?? 0) * qty;
   const savings   = sale ? origTotal - lineTotal : 0;
@@ -505,15 +384,13 @@ function CartItemCard({
     <div className={`group flex gap-4 py-6 transition-all duration-300 sm:gap-5
       ${isRemoving ? "pointer-events-none scale-95 opacity-10" : "opacity-100 scale-100"}`}>
 
-      {/* ── Image ── */}
+      {/* Image */}
       <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl border border-neutral-100 bg-neutral-50 sm:h-36 sm:w-28 dark:border-neutral-800 dark:bg-neutral-900">
         {src && !imgErr ? (
-          <Image
-            src={src} alt={p?.name ?? "Product"} fill
+          <Image src={src} alt={p?.name ?? "Product"} fill
             sizes="(max-width:640px) 96px, 112px"
             className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
-            onError={() => setImgErr(true)} unoptimized
-          />
+            onError={() => setImgErr(true)} unoptimized />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <IcoImg cls="h-10 w-10 text-neutral-300 dark:text-neutral-700" />
@@ -526,7 +403,7 @@ function CartItemCard({
         )}
       </div>
 
-      {/* ── Details ── */}
+      {/* Details */}
       <div className="flex flex-1 flex-col gap-2 min-w-0">
 
         {/* Category */}
@@ -568,7 +445,6 @@ function CartItemCard({
             </>
           ) : (
             <>
-              {/* Color */}
               {meta.colorName && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
                   <span
@@ -579,32 +455,26 @@ function CartItemCard({
                 </span>
               )}
 
-              {/* Country */}
-              {meta.countryName && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/40 dark:text-sky-400">
-                  <IcoGlobe cls="h-3 w-3 shrink-0" />
-                  <span className="capitalize">{meta.countryName}</span>
-                </span>
-              )}
+              {/* India country badge — always shown */}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/50 dark:bg-orange-950/40 dark:text-orange-400">
+                <IcoGlobe cls="h-3 w-3 shrink-0" />
+                <span>India</span>
+              </span>
 
-              {/* Currency */}
-              {meta.countryName && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400">
-                  <IcoCurrency cls="h-3 w-3 shrink-0" />
-                  <span>{meta.currencyCode} {meta.currencySymbol}</span>
-                </span>
-              )}
+              {/* INR currency badge — always shown */}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-400">
+                <IcoCurrency cls="h-3 w-3 shrink-0" />
+                <span>INR ₹</span>
+              </span>
             </>
           )}
 
-          {/* Stock */}
           {Number(p?.stock ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-400">
               <IcoCheck cls="h-3 w-3" /> In Stock ({p?.stock})
             </span>
           )}
 
-          {/* Savings */}
           {!metaLoading && sale && savings > 0 && (
             <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400">
               Save {fmtPrice(savings, sym)}
@@ -612,7 +482,6 @@ function CartItemCard({
           )}
         </div>
 
-        {/* Delivery */}
         {p?.deliveryInfo && (
           <div className="flex items-center gap-1.5">
             <IcoTruck cls="h-3.5 w-3.5 shrink-0 text-neutral-400" />
@@ -654,20 +523,15 @@ function CartItemCard({
 }
 
 // =============================================================================
-//  ORDER SUMMARY — India-only cart, always shows ₹
+//  ORDER SUMMARY — always INR / India
 // =============================================================================
-function OrderSummary({
-  items,
-  resolvedMetas,
-  onCheckout,
-}: {
+function OrderSummary({ items, resolvedMetas, onCheckout }: {
   items: CartItem[];
   resolvedMetas: Record<string, ResolvedMeta>;
   onCheckout: () => void;
 }) {
-  // Since we only ever show India items, symbol is always ₹
-  const displaySymbol = "₹";
-  const allResolved   = items.length > 0 && items.every((item) => !!resolvedMetas[item._id]);
+  const sym        = INDIA_CURRENCY.symbol;
+  const allResolved = items.length > 0 && items.every((item) => !!resolvedMetas[item._id]);
 
   const subtotal = items.reduce(
     (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1), 0
@@ -682,11 +546,12 @@ function OrderSummary({
   return (
     <div className="sticky top-6 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="border-b border-neutral-100 px-6 py-5 dark:border-neutral-800">
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Order Summary</h2>
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          Order Summary (India)
+        </h2>
       </div>
       <div className="space-y-5 p-6">
         <div className="space-y-3">
-
           <div className="flex justify-between text-sm">
             <span className="text-neutral-500 dark:text-neutral-400">
               Subtotal{" "}
@@ -694,7 +559,7 @@ function OrderSummary({
             </span>
             {allResolved ? (
               <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
-                {fmtPrice(subtotal, displaySymbol)}
+                {fmtPrice(subtotal, sym)}
               </span>
             ) : (
               <span className="inline-block h-4 w-20 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
@@ -706,7 +571,7 @@ function OrderSummary({
               <span className="text-red-500 dark:text-red-400">Discount savings</span>
               {allResolved ? (
                 <span className="font-semibold tabular-nums text-red-500 dark:text-red-400">
-                  -{fmtPrice(totalSavings, displaySymbol)}
+                  -{fmtPrice(totalSavings, sym)}
                 </span>
               ) : (
                 <span className="inline-block h-4 w-16 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
@@ -718,7 +583,7 @@ function OrderSummary({
             <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">Total</span>
             {allResolved ? (
               <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-                {fmtPrice(subtotal, displaySymbol)}
+                {fmtPrice(subtotal, sym)}
               </span>
             ) : (
               <span className="inline-block h-6 w-24 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
@@ -733,7 +598,7 @@ function OrderSummary({
         </button>
 
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {["Visa", "Mastercard", "AmEx", "PayPal"].map((label) => (
+          {["Visa", "Mastercard", "AmEx", "UPI", "PayTM"].map((label) => (
             <span key={label} className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-1 text-[10px] font-medium text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-600">
               {label}
             </span>
@@ -770,7 +635,6 @@ function CartSkeleton() {
               <div className="flex gap-2">
                 <div className="h-6 w-16 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
                 <div className="h-6 w-20 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
-                <div className="h-6 w-16 animate-pulse rounded-full bg-neutral-100 dark:bg-neutral-800" />
               </div>
               <div className="mt-auto flex gap-3 pt-2">
                 <div className="h-10 w-32 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800" />
@@ -796,9 +660,11 @@ function EmptyCart() {
       <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-neutral-100 ring-8 ring-neutral-50 dark:bg-neutral-800 dark:ring-neutral-900">
         <IcoBag cls="h-14 w-14 text-neutral-300 dark:text-neutral-600" />
       </div>
-      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">Your cart is empty</h2>
+      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
+        Your India cart is empty
+      </h2>
       <p className="mb-8 max-w-xs text-sm leading-relaxed text-neutral-400 dark:text-neutral-500">
-        Looks like you haven&apos;t added anything yet.
+        Looks like you haven&apos;t added any India products yet.
       </p>
       <Link href="/"
         className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-7 py-3.5 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] dark:bg-white dark:text-neutral-900">
@@ -814,7 +680,9 @@ function NotLoggedIn() {
       <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-neutral-100 ring-8 ring-neutral-50 dark:bg-neutral-800 dark:ring-neutral-900">
         <IcoBag cls="h-14 w-14 text-neutral-300 dark:text-neutral-600" />
       </div>
-      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">Please log in</h2>
+      <h2 className="mb-2 text-2xl font-bold tracking-tight text-neutral-800 dark:text-neutral-200">
+        Please log in
+      </h2>
       <p className="mb-8 max-w-xs text-sm text-neutral-400 dark:text-neutral-500">
         You need to be logged in to view your cart.
       </p>
@@ -827,13 +695,17 @@ function NotLoggedIn() {
 }
 
 // =============================================================================
-//  MAIN CART PAGE
+//  MAIN CART PAGE  —  Route: /cart  (no country in URL)
 // =============================================================================
 export default function CartPage() {
   const router = useRouter();
 
+  const [indiaCountryId,  setIndiaCountryId]  = useState<string>("");
+  const [isResolvingId,   setIsResolvingId]   = useState<boolean>(true);
+
   const [userEmail,     setUserEmail]     = useState<string>("");
   const [cartItems,     setCartItems]     = useState<CartItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<CartItem[]>([]);
   const [loading,       setLoading]       = useState<boolean>(true);
   const [updatingIds,   setUpdatingIds]   = useState<Set<string>>(new Set());
   const [removingIds,   setRemovingIds]   = useState<Set<string>>(new Set());
@@ -843,11 +715,30 @@ export default function CartPage() {
   const isMutating  = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Bootstrap ───────────────────────────────────────────────────────────────
+  // ── Bootstrap ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const email = getUserEmail();
-    setUserEmail(email);
-    if (!email) setLoading(false);
+    setUserEmail(getUserEmail());
+  }, []);
+
+  // ── Resolve India's MongoDB _id from the countries API ──────────────────────
+  useEffect(() => {
+    const resolveIndiaId = async () => {
+      setIsResolvingId(true);
+      try {
+        const res = await fetch(ALL_COUNTRIES_URL);
+        if (!res.ok) { setIsResolvingId(false); return; }
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const found = json.data.find(
+            (c: { name?: string; _id?: string }) =>
+              c.name?.toLowerCase() === INDIA_COUNTRY_NAME
+          );
+          if (found?._id) setIndiaCountryId(found._id);
+        }
+      } catch { /* ignore */ }
+      finally { setIsResolvingId(false); }
+    };
+    resolveIndiaId();
   }, []);
 
   const showToast = useCallback((message: string, type: ToastState["type"] = "success") => {
@@ -859,6 +750,31 @@ export default function CartPage() {
     setResolvedMetas((prev) => ({ ...prev, [cartId]: meta }));
   }, []);
 
+  // ── Filter: keep only items whose product.country matches India ─────────────
+  const filterIndiaItems = useCallback((items: CartItem[]): CartItem[] => {
+    return items.filter((item) => {
+      const productCountry = item.productId?.country;
+      if (!productCountry) return false;
+
+      if (typeof productCountry === "string") {
+        // Could be a MongoDB ID or a plain name
+        if (/^[a-f0-9]{24}$/i.test(productCountry)) {
+          // It's an ID — match against the resolved India ID
+          return indiaCountryId ? productCountry === indiaCountryId : false;
+        }
+        // Plain name
+        return productCountry.toLowerCase() === INDIA_COUNTRY_NAME;
+      }
+
+      // Object shape
+      const nameMatch = productCountry.name?.toLowerCase() === INDIA_COUNTRY_NAME;
+      const idMatch   = indiaCountryId
+        ? productCountry._id === indiaCountryId
+        : false;
+      return nameMatch || idMatch;
+    });
+  }, [indiaCountryId]);
+
   // ── Full cart fetch ──────────────────────────────────────────────────────────
   const fetchCart = useCallback(async (email: string) => {
     if (!email) return;
@@ -867,10 +783,7 @@ export default function CartPage() {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
       const all = json.success && Array.isArray(json.data) ? (json.data as CartItem[]) : [];
-      // ✅ Show ONLY India items — filter by INDIA_COUNTRY_ID
-      const indiaOnly = all.filter(isIndiaItem);
-      setCartItems(indiaOnly);
-      setResolvedMetas({});
+      setCartItems(all);
     } catch (err) {
       showToast(`Failed to load cart: ${(err as Error).message}`, "error");
       setCartItems([]);
@@ -886,17 +799,17 @@ export default function CartPage() {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
       if (json.success && Array.isArray(json.data)) {
-        // ✅ Filter here too so background refresh doesn't bring back non-India items
-        const indiaOnly = (json.data as CartItem[]).filter(isIndiaItem);
-        setCartItems(indiaOnly);
+        setCartItems(json.data as CartItem[]);
       }
     } catch { /* silent */ }
   }, []);
 
-  // ── Initial load ────────────────────────────────────────────────────────────
+  // ── Load cart once user email + India ID are ready ──────────────────────────
   useEffect(() => {
-    if (userEmail) fetchCart(userEmail);
-  }, [userEmail, fetchCart]);
+    if (userEmail && !isResolvingId) {
+      fetchCart(userEmail);
+    }
+  }, [userEmail, fetchCart, isResolvingId]);
 
   // ── Auto-refresh ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -904,6 +817,11 @@ export default function CartPage() {
     intervalRef.current = setInterval(() => silentFetch(userEmail), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [userEmail, silentFetch]);
+
+  // ── Re-filter whenever items or India ID changes ────────────────────────────
+  useEffect(() => {
+    setFilteredItems(cartItems.length > 0 ? filterIndiaItems(cartItems) : []);
+  }, [cartItems, filterIndiaItems]);
 
   // ── Update quantity ─────────────────────────────────────────────────────────
   const handleUpdateQty = useCallback(async (cartId: string, newQty: number) => {
@@ -937,11 +855,7 @@ export default function CartPage() {
     setRemovingIds((prev) => new Set(prev).add(cartId));
     const timer = setTimeout(() => {
       setCartItems((prev) => prev.filter((i) => i._id !== cartId));
-      setResolvedMetas((prev) => {
-        const next = { ...prev };
-        delete next[cartId];
-        return next;
-      });
+      setResolvedMetas((prev) => { const next = { ...prev }; delete next[cartId]; return next; });
     }, 300);
     try {
       const { json } = await apiFetch(DELETE_URL(cartId), { method: "DELETE" });
@@ -965,16 +879,29 @@ export default function CartPage() {
   // ── Checkout ────────────────────────────────────────────────────────────────
   const handleCheckout = useCallback(() => {
     const data: CheckoutData = {
-      items: cartItems, userEmail,
-      subtotal: cartItems.reduce(
+      items: filteredItems,
+      userEmail,
+      subtotal: filteredItems.reduce(
         (acc, item) => acc + getPrice(item.productId) * (Number(item.quantity) || 1), 0
       ),
+      countryName: INDIA_COUNTRY_NAME,
     };
     sessionStorage.setItem("checkout_data", JSON.stringify(data));
-    router.push("/checkout");
-  }, [cartItems, userEmail, router]);
+    router.push(`/checkout?country=india`);
+  }, [filteredItems, userEmail, router]);
 
-  const totalItems = cartItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+  const totalItems = filteredItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+
+  // ── Loading state (resolving India ID or fetching cart) ─────────────────────
+  if (isResolvingId || loading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+        <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+          <CartSkeleton />
+        </main>
+      </div>
+    );
+  }
 
   // ============================================================================
   return (
@@ -988,23 +915,25 @@ export default function CartPage() {
               Home
             </Link>
             <IcoChevR cls="h-3 w-3 text-neutral-300 dark:text-neutral-700" />
-            <span className="font-medium text-neutral-700 dark:text-neutral-300">Shopping Cart</span>
+            <span className="font-medium text-neutral-700 dark:text-neutral-300">Cart</span>
+            <IcoChevR cls="h-3 w-3 text-neutral-300 dark:text-neutral-700" />
+            <span className="font-medium text-orange-600 dark:text-orange-400">India</span>
           </nav>
 
           <div className="flex items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl">
-                Shopping Cart
+                Shopping Cart — India
               </h1>
-              {!loading && userEmail && (
+              {userEmail && (
                 <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">
-                  {cartItems.length === 0
-                    ? "Your cart is empty"
-                    : `${totalItems} ${totalItems === 1 ? "item" : "items"} · ${cartItems.length} ${cartItems.length === 1 ? "product" : "products"}`}
+                  {filteredItems.length === 0
+                    ? "Your India cart is empty"
+                    : `${totalItems} ${totalItems === 1 ? "item" : "items"} · ${filteredItems.length} ${filteredItems.length === 1 ? "product" : "products"} · India (INR ₹)`}
                 </p>
               )}
             </div>
-            {!loading && cartItems.length > 0 && (
+            {filteredItems.length > 0 && (
               <Link href="/"
                 className="hidden shrink-0 items-center gap-1.5 text-sm font-medium text-neutral-500 underline underline-offset-4 transition-colors hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 sm:flex">
                 <IcoArrowL cls="h-3.5 w-3.5" /> Continue Shopping
@@ -1014,17 +943,15 @@ export default function CartPage() {
         </div>
 
         {/* Content */}
-        {loading ? (
-          <CartSkeleton />
-        ) : !userEmail ? (
+        {!userEmail ? (
           <NotLoggedIn />
-        ) : cartItems.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <EmptyCart />
         ) : (
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
             <div className="min-w-0 flex-1">
               <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {cartItems.map((item, idx) => (
+                {filteredItems.map((item, idx) => (
                   <CartItemCard
                     key={item._id ?? idx}
                     item={item}
@@ -1045,7 +972,7 @@ export default function CartPage() {
             </div>
             <div className="w-full shrink-0 lg:w-[360px] xl:w-[390px]">
               <OrderSummary
-                items={cartItems}
+                items={filteredItems}
                 resolvedMetas={resolvedMetas}
                 onCheckout={handleCheckout}
               />

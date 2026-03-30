@@ -90,9 +90,10 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
           {/* ── Logo ── */}
-          <div className="flex items-center lg:flex-1">
+          <div className="flex items-center lg:flex-1 sm:ml-[20px]">
             <Logo />
           </div>
+         
 
           {/* ── Location Selector — LEFT side, desktop only (after logo) ── */}
           <div className="hidden lg:flex items-center ml-4">
@@ -115,6 +116,9 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
         </div>
+          <div className="flex items-center lg:hidden justify-center">
+  <LocationSelector />
+</div>
 
         {/* ── Category Nav row ── */}
         <div className="mx-4 hidden flex-2 lg:flex">
