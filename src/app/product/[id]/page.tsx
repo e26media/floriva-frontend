@@ -9,18 +9,32 @@ import { useParams } from "next/navigation";
 interface SubCategory { _id: string; name: string }
 interface Category    { _id: string; name: string; subCategories: SubCategory[] }
 interface Color       { _id: string; name: string }
+interface Country {
+  _id: string;
+  name: string;
+}
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: Category; subCategory: string; color: Color
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
+  country?: Country | string;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   HELPER: Get country name from product
+───────────────────────────────────────────────────────────────── */
+function getProductCountry(product: Product): string {
+  if (!product.country) return "";
+  if (typeof product.country === "string") return product.country.toLowerCase().trim();
+  if (product.country.name) return product.country.name.toLowerCase().trim();
+  return "";
 }
 
 /* ─────────────────────────────────────────────────────────────────
    CONSTANTS
 ───────────────────────────────────────────────────────────────── */
 const BASE =  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
-// const BASE = "http://localhost:7000";
 const img  = (p: string) => !p ? "" : p.startsWith("http") ? p : `${BASE}${p}`;
 const pct  = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0;
 
@@ -180,6 +194,15 @@ const AlertIcon = () => (
     <line x1="12" y1="16" x2="12.01" y2="16"/>
   </svg>
 );
+const IndiaFlag = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <rect x="2" y="4" width="20" height="16" rx="1" fill="#FF9933"/>
+    <rect x="2" y="8" width="20" height="8" fill="#FFFFFF"/>
+    <rect x="2" y="12" width="20" height="4" fill="#138808"/>
+    <circle cx="12" cy="12" r="3" fill="#000080"/>
+    <circle cx="12" cy="12" r="2" fill="#FFFFFF"/>
+  </svg>
+);
 
 /* ─────────────────────────────────────────────────────────────────
    TOAST CONTAINER
@@ -243,7 +266,7 @@ function Skeleton() {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   RELATED PRODUCT CARD
+   RELATED PRODUCT CARD (Only Indian Products)
 ───────────────────────────────────────────────────────────────── */
 function RelCard({ p }: { p: Product }) {
   const d = pct(p.exactPrice, p.discountPrice);
@@ -272,6 +295,8 @@ function RelCard({ p }: { p: Product }) {
             −{d}%
           </span>
         )}
+        {/* India Badge */}
+        
         <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <span className="bg-white/95 text-stone-900 text-xs font-bold px-4 py-2 rounded-lg tracking-wide">
             View Product
@@ -303,11 +328,11 @@ function RelCard({ p }: { p: Product }) {
 /* ─────────────────────────────────────────────────────────────────
    TOP NAV BAR
 ───────────────────────────────────────────────────────────────── */
-function TopBar({ name, cat, onShare, shared }: {
-  id: string; name: string; cat?: string; onShare?: () => void; shared?: boolean
+function TopBar({ id, name, cat, onShare, shared, isIndian }: {
+  id: string; name: string; cat?: string; onShare?: () => void; shared?: boolean; isIndian?: boolean;
 }) {
   return (
-    <nav className="sticky top-0  bg-amber-50/95 backdrop-blur-md border-b border-amber-100 shadow-sm z-1">
+    <nav className="sticky top-0 bg-amber-50/95 backdrop-blur-md border-b border-amber-100 shadow-sm z-10">
       <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
         <button
           onClick={() => window.history.back()}
@@ -331,12 +356,15 @@ function TopBar({ name, cat, onShare, shared }: {
           <span className="text-stone-300 shrink-0">/</span>
           <span className="text-stone-800 font-bold truncate">{name}</span>
         </div>
-        <button
-          onClick={onShare}
-          className="flex items-center gap-1.5 text-stone-500 hover:text-stone-900 text-sm font-medium transition-colors cursor-pointer bg-transparent border-none shrink-0"
-        >
-          <ShareIcon /> {shared ? "Copied!" : "Share"}
-        </button>
+        <div className="flex items-center gap-3">
+        
+          <button
+            onClick={onShare}
+            className="flex items-center gap-1.5 text-stone-500 hover:text-stone-900 text-sm font-medium transition-colors cursor-pointer bg-transparent border-none shrink-0"
+          >
+            <ShareIcon /> {shared ? "Copied!" : "Share"}
+          </button>
+        </div>
       </div>
     </nav>
   );
@@ -369,6 +397,7 @@ export default function ProductDetailPage() {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
   const [rawDebug, setRawDebug] = useState("");
+  const [isIndian, setIsIndian] = useState(false);
 
   const [imgIdx,   setImgIdx]   = useState(0);
   const [qty,      setQty]      = useState(1);
@@ -417,7 +446,7 @@ export default function ProductDetailPage() {
     return () => el.removeEventListener("scroll", updateArrows);
   }, [related, updateArrows]);
 
-  /* ── Fetch product ── */
+  /* ── Fetch product and filter to only Indian products ── */
   useEffect(() => {
     if (!id) { setError("No product ID in URL"); setLoading(false); return; }
     setLoading(true); setError(""); setProduct(null); setRelated([]);
@@ -429,7 +458,7 @@ export default function ProductDetailPage() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = JSON.parse(raw);
 
-        const p: Product =
+        let p: Product | null =
           d?._id           ? d            :
           d?.product?._id  ? d.product    :
           d?.data?._id     ? d.data       :
@@ -439,27 +468,48 @@ export default function ProductDetailPage() {
           null;
 
         if (!p) throw new Error("Product not found in API response");
-        setProduct(p);
+        
+        // Check if product is from India
+        const productCountry = getProductCountry(p);
+        const isIndianProduct = productCountry === "india";
+        
+        if (!isIndianProduct) {
+          throw new Error("This product is not available in India");
+        }
+        
+        setIsIndian(true);
         return p;
       })
       .then(p => {
+        setProduct(p);
         return fetch(`${BASE}/api/productview`)
           .then(r => r.json())
           .then(d => {
-            const all: Product[] =
+            let all: Product[] =
               Array.isArray(d)           ? d          :
               Array.isArray(d?.products) ? d.products :
               Array.isArray(d?.data)     ? d.data     :
               Array.isArray(d?.result)   ? d.result   : [];
 
-            const rel = all
+            // Filter to ONLY Indian products for related items
+            const indianProducts = all.filter(product => {
+              const productCountry = getProductCountry(product);
+              return productCountry === "india";
+            });
+
+            // Then filter by same category
+            const rel = indianProducts
               .filter(x => x._id !== p._id && x.category?.name === p.category?.name)
               .slice(0, 16);
+            
             setRelated(rel);
           })
           .catch(() => {});
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        setError(e.message);
+        setIsIndian(false);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -478,7 +528,6 @@ export default function ProductDetailPage() {
 
     setCartLoading(true);
 
-    // productId key with params id, quantity from qty state
     const result = await addToCartAPI(product._id, qty);
 
     setCartLoading(false);
@@ -516,7 +565,7 @@ export default function ProductDetailPage() {
   if (loading) return (
     <div className="min-h-screen bg-amber-50 font-sans">
       <style>{globalStyles}</style>
-      <TopBar id={id} name="Loading…" />
+      <TopBar id={id} name="Loading…" isIndian={false} />
       <Skeleton />
     </div>
   );
@@ -525,12 +574,22 @@ export default function ProductDetailPage() {
   if (error || !product) return (
     <div className="min-h-screen bg-amber-50 font-sans">
       <style>{globalStyles}</style>
-      <TopBar id={id} name="Not found" />
+      <TopBar id={id} name="Not found" isIndian={false} />
       <div className="max-w-2xl mx-auto px-6 mt-20">
         <div className="bg-white rounded-3xl p-10 border border-red-100 text-center shadow-xl">
-          <div className="text-6xl mb-5">🌸</div>
-          <h2 className="font-serif text-3xl font-bold mb-3 text-stone-900">Product not found</h2>
-          <p className="text-stone-500 text-sm mb-5">{error}</p>
+          <div className="text-6xl mb-5">🇮🇳</div>
+          {/* <h2 className="font-serif text-3xl font-bold mb-3 text-stone-900">Indian Products Only</h2> */}
+          <p className="text-stone-500 text-sm mb-5">
+            {error === "This product is not available in India" 
+              ? "This product is not available in the Indian collection." 
+              : error}
+          </p>
+          {error === "This product is not available in India" && (
+            <p className="text-[0.8rem] text-orange-600 mb-6 bg-orange-50 p-4 rounded-xl">
+              Floriva India only showcases products from our Indian collection. 
+              Please browse our Indian products for a delightful shopping experience.
+            </p>
+          )}
           {rawDebug && (
             <details className="text-left mb-5">
               <summary className="cursor-pointer text-xs text-orange-600 font-semibold">🔍 Debug: Raw API Response</summary>
@@ -539,15 +598,12 @@ export default function ProductDetailPage() {
               </pre>
             </details>
           )}
-          <p className="text-xs text-stone-400 mb-6">
-            Called: <code className="bg-amber-50 px-2 py-0.5 rounded-md">{`${BASE}/api/productview/${id}`}</code>
-          </p>
-          <button
-            onClick={() => window.history.back()}
+          {/* <button
+            onClick={() => window.location.href = "/allproduct"}
             className="inline-flex items-center gap-2.5 px-7 py-3 bg-stone-900 text-amber-50 rounded-xl text-sm font-semibold cursor-pointer border-none hover:bg-stone-700 transition-colors"
           >
-            <ArrowL /> Go Back
-          </button>
+            Browse Indian Products
+          </button> */}
         </div>
       </div>
     </div>
@@ -569,7 +625,14 @@ export default function ProductDetailPage() {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {/* ── TOP NAV ── */}
-      <TopBar id={id} name={product.name} cat={product.category?.name} onShare={doShare} shared={shared} />
+      <TopBar 
+        id={id} 
+        name={product.name} 
+        cat={product.category?.name} 
+        onShare={doShare} 
+        shared={shared}
+        isIndian={isIndian}
+      />
 
       {/* ══════════════════════════════════════════════
           PRODUCT SECTION
@@ -620,6 +683,12 @@ export default function ProductDetailPage() {
                   </span>
                 )}
               </div>
+
+              {/* India Badge */}
+              {/* <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+                <IndiaFlag />
+                <span className="text-[0.65rem] font-bold text-stone-700">Made in India</span>
+              </div> */}
 
               {/* Out of Stock overlay */}
               {product.stock === 0 && (
@@ -694,6 +763,7 @@ export default function ProductDetailPage() {
                   {product.category.name}
                 </span>
               )}
+             
             </div>
 
             {/* Product Name */}
@@ -712,7 +782,7 @@ export default function ProductDetailPage() {
               </div>
               <span className="text-[0.75rem] text-stone-400 font-medium">4.8 · 124 reviews</span>
               <span className="w-1 h-1 rounded-full bg-stone-300"/>
-              <span className="text-[0.75rem] text-orange-600 font-semibold">✓ Verified product</span>
+              {/* <span className="text-[0.75rem] text-orange-600 font-semibold">✓ Indian product</span> */}
             </div>
 
             <div className="h-px bg-gradient-to-r from-stone-200 to-transparent mb-6"/>
@@ -741,26 +811,6 @@ export default function ProductDetailPage() {
                 {product.color.name}
               </span>
             )}
-
-            {/* Stock status */}
-            {/* <div className="inline-flex items-center gap-2.5 mb-6 px-4 py-2.5 bg-white rounded-xl border border-stone-100 shadow-sm">
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{
-                  background: product.stock === 0 ? "#ef4444" : product.stock <= 5 ? "#f59e0b" : "#22c55e",
-                  boxShadow: product.stock > 0
-                    ? (product.stock <= 5 ? "0 0 0 3px rgba(245,158,11,.2)" : "0 0 0 3px rgba(34,197,94,.2)")
-                    : "none",
-                }}
-              />
-              <span className="text-[0.83rem] font-semibold text-stone-700">
-                {product.stock === 0
-                  ? "Out of stock"
-                  : product.stock <= 5
-                  ? `Only ${product.stock} left — order soon!`
-                  : `In stock · ${product.stock} units available`}
-              </span>
-            </div> */}
 
             {/* ── CTA: Qty + Add to Cart ── */}
             {product.stock > 0 && (
@@ -825,38 +875,6 @@ export default function ProductDetailPage() {
               </p>
             )}
 
-            {/* Wishlist */}
-            {/* <button
-              onClick={() => setWished(w => !w)}
-              className="w-full h-[50px] rounded-2xl font-semibold text-[0.88rem] flex items-center justify-center gap-2.5 mb-7 transition-all duration-200 cursor-pointer border-[1.5px]"
-              style={{
-                border: `1.5px solid ${wished ? "#c2673f" : "#e5ddd4"}`,
-                background: wished ? "#fff5ef" : "#fff",
-                color: wished ? "#c2673f" : "#7a6b5e",
-              }}
-            >
-              <HeartIcon on={wished} />
-              {wished ? "Saved to Wishlist" : "Add to Wishlist"}
-            </button> */}
-
-            {/* Trust Badges */}
-            {/* <div className="grid grid-cols-3 gap-2.5 mb-8">
-              {[
-                { ico: <TruckIcon />,   title: "Free Delivery",    sub: "On all orders" },
-                { ico: <RefreshIcon />, title: "7-Day Returns",    sub: "Hassle-free" },
-                { ico: <ShieldIcon />,  title: "Secure Packing",   sub: "Gift wrap option" },
-              ].map((b, i) => (
-                <div
-                  key={i}
-                  className="bg-white border border-stone-100 rounded-2xl px-2.5 py-3.5 flex flex-col items-center text-center gap-1.5 shadow-sm"
-                >
-                  <span className="text-orange-600">{b.ico}</span>
-                  <span className="text-[0.68rem] font-bold text-stone-800 leading-tight">{b.title}</span>
-                  <span className="text-[0.62rem] text-stone-400">{b.sub}</span>
-                </div>
-              ))}
-            </div> */}
-
             {/* ── TABS ── */}
             <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-md">
               {/* Tab headers */}
@@ -892,7 +910,7 @@ export default function ProductDetailPage() {
                     {[
                       { label: "Name",       value: product.name },
                       { label: "Category",   value: product.category?.name },
-                      // { label: "Sub Cat",    value: product.subCategory || "—" },
+                      // { label: "Origin",     value: "India", flag: true },
                       { label: "Color",      value: product.color?.name, swatch: true },
                       { label: "Stock",      value: `${product.stock} units` },
                       { label: "MRP",        value: `₹${product.exactPrice?.toLocaleString()}` },
@@ -911,7 +929,7 @@ export default function ProductDetailPage() {
                           {row.swatch && (
                             <span className="w-3 h-3 rounded-full shrink-0 border border-black/10" style={{ background: hexCol }}/>
                           )}
-                          {row.value}
+                        
                         </span>
                       </div>
                     ))}
@@ -921,7 +939,7 @@ export default function ProductDetailPage() {
                 {tab === "ship" && (
                   <div className="flex flex-col gap-4">
                     {[
-                      { ico: <TruckIcon />,   t: "Free Standard Delivery",    d: product.deliveryInfo || "Delivered within 5–7 business days" },
+                      { ico: <TruckIcon />,   t: "Free Standard Delivery",    d: product.deliveryInfo || "Delivered within 5–7 business days across India" },
                       { ico: <RefreshIcon />, t: "7-Day Return Policy",        d: "Hassle-free return or exchange within 7 days" },
                       { ico: <ShieldIcon />,  t: "Secure & Gift Packaging",    d: "Every order is carefully packed and optionally gift-wrapped" },
                     ].map((item, i) => (
@@ -963,7 +981,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* ══════════════════════════════════════════════
-          RELATED PRODUCTS SLIDER
+          RELATED PRODUCTS SLIDER (Only Indian Products)
       ══════════════════════════════════════════════ */}
       {related.length > 0 && (
         <section className="max-w-6xl mx-auto px-6 mt-20 pb-24">
@@ -975,6 +993,10 @@ export default function ProductDetailPage() {
               <h2 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-black text-stone-900 leading-tight">
                 You Might Also Love
               </h2>
+              {/* <div className="flex items-center gap-2 mt-2">
+                <IndiaFlag />
+                <span className="text-[0.7rem] text-stone-500 font-medium">Only Indian Products</span>
+              </div> */}
             </div>
             <div className="flex gap-2.5 shrink-0">
               <button
@@ -1024,16 +1046,13 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          <p className="text-center mt-5 text-[0.74rem] text-stone-400 font-medium">
-            {related.length} more product{related.length !== 1 ? "s" : ""} in {product.category?.name}
-          </p>
+          {/* <p className="text-center mt-5 text-[0.74rem] text-stone-400 font-medium">
+            {related.length} Indian product{related.length !== 1 ? "s" : ""} in {product.category?.name}
+          </p> */}
         </section>
       )}
 
       {/* ── FOOTER ── */}
-      <footer className="border-t border-stone-100 py-6 px-6 text-center text-[0.74rem] text-stone-400 bg-white tracking-wider">
-        Handcrafted with love &nbsp;·&nbsp; Free delivery on all orders &nbsp;·&nbsp; 7-day easy returns
-      </footer>
     </div>
   );
 }

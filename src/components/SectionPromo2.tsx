@@ -1,17 +1,34 @@
+'use client'
+
 import Logo from '@/components/Logo'
 import backgroundLineSvg from '@/images/Moon.svg'
 import rightImgDemo from '@/images/floriva/banner/4.png'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
-
 import clsx from 'clsx'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { FC } from 'react'
 
 export interface SectionPromo2Props {
   className?: string
 }
 
+// ─── Helper: build the correct /allproduct href ───────────────────────────────
+// /                        → /allproduct
+// /country/australia       → /country/australia/allproduct
+// /country/australia/xyz   → /country/australia/allproduct
+function buildAllProductHref(pathname: string): string {
+  const countryMatch = pathname.match(/^(\/country\/[^/]+)/)
+  if (countryMatch) {
+    return `${countryMatch[1]}/allproduct`
+  }
+  return '/allproduct'
+}
+
 const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
+  const pathname = usePathname()
+  const allProductHref = buildAllProductHref(pathname ?? '/')
+
   return (
     <div className={clsx(className, 'xl:pt-10 2xl:pt-12')}>
       <div className="relative flex flex-col rounded-2xl bg-yellow-50 p-4 pb-0 sm:rounded-[40px] sm:p-5 sm:pb-0 lg:flex-row lg:justify-end lg:p-14 xl:px-20 xl:py-24 2xl:py-32 dark:bg-neutral-800">
@@ -29,7 +46,8 @@ const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
             Fashion is a form of self-expression and autonomy at a particular period and place.
           </span>
           <div className="mt-6 flex space-x-2 sm:mt-12 sm:space-x-5">
-            <ButtonPrimary href="/allproduct">Discover more</ButtonPrimary>
+            {/* ✅ Dynamic country-aware href */}
+            <ButtonPrimary href={allProductHref}>Discover more</ButtonPrimary>
           </div>
         </div>
 

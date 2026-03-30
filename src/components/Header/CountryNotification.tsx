@@ -41,7 +41,7 @@ const CountryNotification: FC<Props> = ({ countryName: propCountryName }) => {
   }, [pathname, propCountryName]);
 
   return (
-    <div className="w-full border-b" style={{ backgroundColor: '#A35194', borderBottomColor: '#8a3f7a' }}>
+    <div className="w-full border-b " style={{ backgroundColor: '#A35194', borderBottomColor: '#8a3f7a' }}>
       <div className="max-w-7xl mx-auto flex items-center justify-center gap-3 py-2 px-4 text-sm sm:text-base">
         {/* Text */}
         <p className="font-medium text-white">

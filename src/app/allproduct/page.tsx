@@ -1,19 +1,26 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
-import { useRouter, useSearchParams, useParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams, usePathname } from "next/navigation";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string; }
 interface Category    { _id: string; name: string; subCategories: SubCategory[]; }
 interface Color       { _id: string; name: string; }
+interface Country {
+  _id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+}
 interface Product {
   _id: string; name: string; title: string; description: string;
   exactPrice: number; discountPrice: number;
-  category: Category; subCategory: string | { _id: string };
+  category: Category; subCategory: string | { _id: string } | null;
   color: Color; stock: number; deliveryInfo: string;
   images: string[]; createdAt: string;
-  country?: string;
+  country?: Country | string;
   currency?: string;
 }
 interface Filters {
@@ -26,24 +33,35 @@ interface Filters {
 
 // ─── Country → Currency map ────────────────────────────────────────────────────
 const COUNTRY_CURRENCY: Record<string, { symbol: string; code: string; name: string; flag: string }> = {
-  australia:       { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
-  india:           { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
-  usa:             { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  "united states": { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  uk:              { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  "united kingdom":{ symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  canada:          { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
-  newzealand:      { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  "new zealand":   { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  singapore:       { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
-  uae:             { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
-  germany:         { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
-  france:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
-  japan:           { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
+  australia:        { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
+  india:            { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
+  usa:              { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  "united states":  { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  uk:               { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  "united kingdom": { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  canada:           { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
+  newzealand:       { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  "new zealand":    { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  singapore:        { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
+  uae:              { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
+  germany:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
+  france:           { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
+  japan:            { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
+  iran:             { symbol: "﷼",   code: "IRR", name: "Iranian Rial",        flag: "🇮🇷" },
 };
 
-const getCurrency = (country: string) =>
-  COUNTRY_CURRENCY[country.toLowerCase()] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🌐" };
+const getCurrency = (country: string) => {
+  const normalizedCountry = country?.toLowerCase().trim() || "";
+  return COUNTRY_CURRENCY[normalizedCountry] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🇮🇳" };
+};
+
+// ─── Helper to get country name from product ───────────────────────────────────
+const getProductCountry = (product: Product): string => {
+  if (!product.country) return "";
+  if (typeof product.country === "string") return product.country.toLowerCase().trim();
+  if (product.country.name) return product.country.name.toLowerCase().trim();
+  return "";
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const BASE     = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
@@ -61,14 +79,17 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-const getSubId = (p: Product): string =>
-  typeof p.subCategory === "object" ? (p.subCategory as any)?._id ?? "" : p.subCategory ?? "";
+const getSubId = (p: Product): string => {
+  if (!p.subCategory) return "";
+  if (typeof p.subCategory === "object") return (p.subCategory as any)?._id ?? "";
+  return p.subCategory ?? "";
+};
 
 const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 
 const fmtPrice = (amount: number, symbol: string) => `${symbol}${amount.toLocaleString()}`;
 
-// ─── Icons ─────────────────────────────────────────────────────────────────────
+// ─── Icons (keep existing icons) ─────────────────────────────────────────────
 const IcoCart = ({ s = 16 }: { s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
@@ -492,9 +513,15 @@ function Pagination({ page, total, perPage, onChange }: {
 
 // ─── Main Page Inner ───────────────────────────────────────────────────────────
 function AllProductsPageInner() {
-  // Extract country from URL: /country/[country]/allproduct
+  const pathname = usePathname();
   const params = useParams();
-  const country = ((params?.country as string) ?? "").toLowerCase().trim();
+  
+  // Determine if we're on a country-specific page or the main allproduct page
+  const isCountryPage = pathname?.includes('/country/');
+  // Get country from URL if on country page: /country/[country]/allproduct
+  const countryFromUrl = isCountryPage ? (params?.country as string) || "" : "";
+  // Default to India for the main /allproduct page
+  const country = countryFromUrl.toLowerCase().trim() || "india";
 
   const searchParams = useSearchParams();
   const urlColor = searchParams.get("color") ?? "";
@@ -527,45 +554,65 @@ function AllProductsPageInner() {
     setError("");
     setAllProducts([]);
 
-    // Build API URL with country parameter if country exists
-    const apiUrl = country
-      ? `${BASE}/api/productview?country=${encodeURIComponent(country)}`
-      : `${BASE}/api/productview`;
-
-    fetch(apiUrl)
+    // Fetch all products first
+    fetch(`${BASE}/api/productview`)
       .then(r => {
         if (!r.ok) throw new Error(`Server error ${r.status}`);
         return r.json();
       })
       .then(data => {
-        // Normalise response data
-        let productsList: Product[] = Array.isArray(data)
-          ? data
-          : data.products ?? data.data ?? data.result ?? [];
-
-        // Apply client-side country filter as fallback (for cases where API doesn't filter)
-        if (country && productsList.length > 0) {
-          const hasCountryField = productsList.some(
-            p => p.country !== undefined && p.country !== null && String(p.country).trim() !== ""
-          );
-          if (hasCountryField) {
-            productsList = productsList.filter(
-              p => String(p.country ?? "").toLowerCase().trim() === country
-            );
-          }
+        // Normalise response data - your API returns { success: true, data: [...] }
+        let productsList: Product[] = [];
+        if (data.success && Array.isArray(data.data)) {
+          productsList = data.data;
+        } else if (Array.isArray(data)) {
+          productsList = data;
+        } else if (data.products) {
+          productsList = data.products;
+        } else if (data.data) {
+          productsList = data.data;
+        } else {
+          productsList = data.result || [];
         }
 
-        setAllProducts(productsList);
+        console.log("Total products fetched:", productsList.length);
+        
+        // Filter by country based on URL
+        // For /allproduct - show only India products
+        // For /country/[country]/allproduct - show products for that country
+        let filteredProducts = productsList;
+        
+        if (country) {
+          filteredProducts = productsList.filter(p => {
+            const productCountry = getProductCountry(p);
+            const match = productCountry === country;
+            if (match) {
+              console.log(`✅ Product "${p.name}" matches country: ${productCountry}`);
+            } else {
+              console.log(`❌ Product "${p.name}" does not match. Product country: "${productCountry}", Expected: "${country}"`);
+            }
+            return match;
+          });
+          
+          console.log(`Filtered by country "${country}": ${filteredProducts.length} products found`);
+        } else {
+          console.log("No country filter applied, showing all products");
+        }
+        
+        setAllProducts(filteredProducts);
 
         // Set max price filter based on products
-        if (productsList.length) {
+        if (filteredProducts.length) {
           setFilters(f => ({
             ...f,
-            maxPrice: Math.max(...productsList.map(p => p.discountPrice)),
+            maxPrice: Math.max(...filteredProducts.map(p => p.discountPrice)),
           }));
         }
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        console.error("Fetch error:", e);
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }, [country]);
 
@@ -574,7 +621,16 @@ function AllProductsPageInner() {
     fetch(`${BASE}/api/categoryview`)
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(d => {
-        const categoriesList: Category[] = Array.isArray(d) ? d : d.categories ?? d.data ?? [];
+        let categoriesList: Category[] = [];
+        if (d.success && Array.isArray(d.data)) {
+          categoriesList = d.data;
+        } else if (Array.isArray(d)) {
+          categoriesList = d;
+        } else if (d.categories) {
+          categoriesList = d.categories;
+        } else if (d.data) {
+          categoriesList = d.data;
+        }
         setAllCatData(categoriesList);
       })
       .catch(e => console.warn("Category fetch failed:", e));
@@ -621,12 +677,8 @@ function AllProductsPageInner() {
 
   const totalActive = filters.categories.length + selectedSubNames.length + (filters.color ? 1 : 0);
 
-  const headingText =
-    selectedSubNames.length === 1 ? selectedSubNames[0]
-      : filters.categories.length === 1 ? filters.categories[0]
-      : filters.color ? `${capitalize(filters.color)} Flowers`
-      : country ? `${capitalize(country)} Collection`
-      : "All Flowers";
+  const headingText = country ? `${capitalize(country)} Collection` : "All Flowers";
+  const isMainPage = !pathname?.includes('/country/');
 
   return (
     <>
@@ -678,33 +730,19 @@ function AllProductsPageInner() {
                   <nav className="flex items-center gap-2 text-[.77rem] text-[#b0a090] mb-3 flex-wrap">
                     <a href="/" className="hover:text-[#1e1610] transition-colors">Home</a>
                     <span>/</span>
-                    {country && (
+                    {isMainPage ? (
+                      <span className="text-[#7a6b5e]">All Products</span>
+                    ) : (
                       <>
-                        <a href={`/country/${country}`} className="hover:text-[#1e1610] transition-colors capitalize">{country}</a>
+                        <a href="/allproduct" className="hover:text-[#1e1610] transition-colors">All Products</a>
                         <span>/</span>
-                      </>
-                    )}
-                    <span className="text-[#7a6b5e]">Shop</span>
-                    {filters.categories.length === 1 && (
-                      <>
-                        <span>/</span>
-                        <button type="button" onClick={() => handleFilters({ ...filters, categories: [], subCategories: [] })}
-                          className="text-[#7a6b5e] hover:text-[#1e1610] bg-transparent border-none cursor-pointer transition-colors">
-                          {filters.categories[0]}
-                        </button>
-                      </>
-                    )}
-                    {selectedSubNames.length === 1 && (
-                      <>
-                        <span>/</span>
-                        <span className="text-[#1e1610] font-medium">{selectedSubNames[0]}</span>
+                        <span className="capitalize">{country}</span>
                       </>
                     )}
                   </nav>
 
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      {/* Title with country and currency badge */}
                       <div className="flex items-center gap-3 flex-wrap mb-1">
                         <h1 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight">
                           {headingText}
@@ -724,40 +762,43 @@ function AllProductsPageInner() {
                       </div>
                       <p className="text-[.84rem] text-[#7a6b5e]">
                         <strong className="text-[#1e1610] font-semibold">{filtered.length}</strong>
-                        {" "}of{" "}
-                        <strong className="text-[#1e1610] font-semibold">{allProducts.length}</strong> products
+                        {" "}products available
                         {" · prices in "}
                         <span className="font-semibold text-[#b5623b]">{currency.symbol} {currency.code}</span>
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button type="button" onClick={() => setMobSb(true)}
-                        className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
-                        <IcoFilter />Filters
-                        {totalActive > 0 && (
-                          <span className="ml-0.5 bg-[#1e1610] text-white text-[.58rem] w-[17px] h-[17px] rounded-full flex items-center justify-center font-bold">{totalActive}</span>
-                        )}
-                      </button>
-                      <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}
-                        className="px-3.5 py-2 border border-[#e6ddd3] rounded-lg text-sm bg-white cursor-pointer outline-none focus:border-[#b5623b] transition-all">
-                        <option value="newest">Newest First</option>
-                        <option value="price-asc">Price: Low → High</option>
-                        <option value="price-desc">Price: High → Low</option>
-                        <option value="name">Name A–Z</option>
-                      </select>
-                    </div>
+                    {filtered.length > 0 && (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button type="button" onClick={() => setMobSb(true)}
+                          className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
+                          <IcoFilter />Filters
+                          {totalActive > 0 && (
+                            <span className="ml-0.5 bg-[#1e1610] text-white text-[.58rem] w-[17px] h-[17px] rounded-full flex items-center justify-center font-bold">{totalActive}</span>
+                          )}
+                        </button>
+                        <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}
+                          className="px-3.5 py-2 border border-[#e6ddd3] rounded-lg text-sm bg-white cursor-pointer outline-none focus:border-[#b5623b] transition-all">
+                          <option value="newest">Newest First</option>
+                          <option value="price-asc">Price: Low → High</option>
+                          <option value="price-desc">Price: High → Low</option>
+                          <option value="name">Name A–Z</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {allProducts.length === 0 ? (
+                {allProducts.length === 0 && !loading && !error ? (
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
                     <div className="text-5xl">{currency.flag}</div>
                     <p className="text-[1rem] font-serif font-semibold text-[#1e1610]">
-                      No products for {capitalize(country)}
+                      No products available for {capitalize(country)}
                     </p>
-                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[320px]">
-                      Make sure your products have a <code className="bg-[#f0ebe3] px-1 rounded text-[.8rem]">country</code> field set to <strong>"{country}"</strong> in your database.
+                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[380px]">
+                      Make sure your products have a{" "}
+                      <code className="bg-[#f0ebe3] px-1.5 py-0.5 rounded text-[.8rem]">country</code>{" "}
+                      field with name <strong className="text-[#b5623b]">"{country}"</strong>.
                     </p>
                   </div>
                 ) : paginated.length === 0 ? (

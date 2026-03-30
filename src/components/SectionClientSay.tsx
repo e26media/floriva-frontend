@@ -205,10 +205,10 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
   const orbitReviewers = data.filter((_, i) => i !== selectedIndex).slice(0, 6)
 
   return (
-    <div className={clsx('relative py-20 px-4', className)}>
+    <div className={clsx('relative  ', className)}>
 
       {/* ── Section header ─────────────────────────────────── */}
-      <div className="text-center mb-16">
+      <div className="text-center ">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-400 mb-3">
           {subHeading}
         </p>
@@ -221,7 +221,7 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
       <div className="relative mx-auto max-w-lg">
 
         {/* ── Orbit ring (desktop only) ── */}
-        <div className="hidden md:block">
+        {/* <div className="hidden md:block">
           {orbitReviewers.map((reviewer, idx) => (
             <OrbitAvatar
               key={reviewer.id}
@@ -229,7 +229,7 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
               style={ORBIT_STYLES[idx] ?? {}}
             />
           ))}
-        </div>
+        </div> */}
 
         {/* ── Central active avatar ── */}
         <div className="flex justify-center mb-10">
@@ -336,7 +336,7 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
         </div>
 
         {/* ── Mobile avatar strip ── */}
-        <div className="mt-8 flex md:hidden items-center justify-center gap-2 overflow-x-auto pb-1 px-2">
+        {/* <div className="mt-8 flex md:hidden items-center justify-center gap-2 overflow-x-auto pb-1 px-2">
           {data.map((reviewer, idx) => (
             <button
               type="button"
@@ -364,7 +364,7 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
               </div>
             </button>
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* ── Keyframe animations ── */}

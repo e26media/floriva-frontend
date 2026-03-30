@@ -296,7 +296,7 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
       `}</style>
 
       <div
-        className="vp-animate-in fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+        className="vp-animate-in fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm mt-80"
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <div className="vp-shell relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl shadow-black/15 border border-gray-100/80">
@@ -501,7 +501,9 @@ export default function CountryCart() {
         <HugeiconsIcon icon={ShoppingCart02Icon} size={24} color="currentColor" strokeWidth={1.5} />
       </button>
 
-      <button onClick={() => setShowVendorPopup(true)} title="Join as Vendor"
+     
+
+<button onClick={() => setShowVendorPopup(true)} title="Join as Vendor"
         className=" md:block relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
         <HugeiconsIcon icon={Store02Icon} size={24} color="currentColor" strokeWidth={1.5} />
       </button>

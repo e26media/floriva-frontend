@@ -7,13 +7,20 @@ import { useRouter, useSearchParams, useParams } from "next/navigation";
 interface SubCategory { _id: string; name: string; }
 interface Category    { _id: string; name: string; subCategories: SubCategory[]; }
 interface Color       { _id: string; name: string; }
+interface Country {
+  _id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+}
 interface Product {
   _id: string; name: string; title: string; description: string;
   exactPrice: number; discountPrice: number;
-  category: Category; subCategory: string | { _id: string };
+  category: Category; subCategory: string | { _id: string } | null;
   color: Color; stock: number; deliveryInfo: string;
   images: string[]; createdAt: string;
-  country?: string;
+  country?: Country | string; // Country can be object or string
   currency?: string;
 }
 interface Filters {
@@ -26,24 +33,35 @@ interface Filters {
 
 // ─── Country → Currency map ────────────────────────────────────────────────────
 const COUNTRY_CURRENCY: Record<string, { symbol: string; code: string; name: string; flag: string }> = {
-  australia:       { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
-  india:           { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
-  usa:             { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  "united states": { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  uk:              { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  "united kingdom":{ symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  canada:          { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
-  newzealand:      { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  "new zealand":   { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  singapore:       { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
-  uae:             { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
-  germany:         { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
-  france:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
-  japan:           { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
+  australia:        { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
+  india:            { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
+  usa:              { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  "united states":  { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
+  uk:               { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  "united kingdom": { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
+  canada:           { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
+  newzealand:       { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  "new zealand":    { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
+  singapore:        { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
+  uae:              { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
+  germany:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
+  france:           { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
+  japan:            { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
+  iran:             { symbol: "﷼",   code: "IRR", name: "Iranian Rial",        flag: "🇮🇷" },
 };
 
-const getCurrency = (country: string) =>
-  COUNTRY_CURRENCY[country.toLowerCase()] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🌐" };
+const getCurrency = (country: string) => {
+  const normalizedCountry = country?.toLowerCase().trim() || "";
+  return COUNTRY_CURRENCY[normalizedCountry] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🌐" };
+};
+
+// ─── Helper to get country name from product ───────────────────────────────────
+const getProductCountry = (product: Product): string => {
+  if (!product.country) return "";
+  if (typeof product.country === "string") return product.country.toLowerCase().trim();
+  if (product.country.name) return product.country.name.toLowerCase().trim();
+  return "";
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const BASE     = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
@@ -61,14 +79,17 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-const getSubId = (p: Product): string =>
-  typeof p.subCategory === "object" ? (p.subCategory as any)?._id ?? "" : p.subCategory ?? "";
+const getSubId = (p: Product): string => {
+  if (!p.subCategory) return "";
+  if (typeof p.subCategory === "object") return (p.subCategory as any)?._id ?? "";
+  return p.subCategory ?? "";
+};
 
 const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 
 const fmtPrice = (amount: number, symbol: string) => `${symbol}${amount.toLocaleString()}`;
 
-// ─── Icons ─────────────────────────────────────────────────────────────────────
+// ─── Icons (keep your existing icons) ─────────────────────────────────────────
 const IcoCart = ({ s = 16 }: { s?: number }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
@@ -492,78 +513,114 @@ function Pagination({ page, total, perPage, onChange }: {
 
 // ─── Main Page Inner ───────────────────────────────────────────────────────────
 function AllProductsPageInner() {
-  // /country/[country]/allproduct  →  params.country = "australia"
-  const params  = useParams();
-  const country = ((params?.country as string) ?? "").toLowerCase().trim();
+  const params = useParams();
+  // For file structure: app/(shop)/country/[name]/allproduct/page.tsx
+  const countryFromUrl = (params?.name as string) || "";
+  const country = countryFromUrl.toLowerCase().trim();
 
   const searchParams = useSearchParams();
-  const urlColor     = searchParams.get("color") ?? "";
+  const urlColor = searchParams.get("color") ?? "";
 
-  const currency = getCurrency(country); // { symbol, code, flag, name }
+  // Get currency based on the country from URL
+  const currency = getCurrency(country);
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [allCatData,  setAllCatData]  = useState<Category[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState("");
-  const [page,        setPage]        = useState(1);
-  const [sort,        setSort]        = useState("newest");
-  const [quickView,   setQuickView]   = useState<Product | null>(null);
-  const [mobSb,       setMobSb]       = useState(false);
+  const [allCatData, setAllCatData] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("newest");
+  const [quickView, setQuickView] = useState<Product | null>(null);
+  const [mobSb, setMobSb] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
     categories: [], subCategories: [], color: urlColor, maxPrice: 999999, search: "",
   });
 
   // Sync color from URL
-  useEffect(() => { setFilters(f => ({ ...f, color: urlColor })); setPage(1); }, [urlColor]);
+  useEffect(() => {
+    setFilters(f => ({ ...f, color: urlColor }));
+    setPage(1);
+  }, [urlColor]);
 
   // ── Fetch products ──────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     setError("");
-    setAllProducts([]);
-
-    // Tries country-specific query param; API may or may not support it
-    const url = country
-      ? `${BASE}/api/productview?country=${encodeURIComponent(country)}`
-      : `${BASE}/api/productview`;
-
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error ${r.status}`);
-        return r.json();
-      })
-      .then(data => {
-        // Normalise all possible response shapes
-        let list: Product[] = Array.isArray(data)
-          ? data
-          : data.products ?? data.data ?? data.result ?? [];
-
-        // ── CLIENT-SIDE COUNTRY FILTER ──────────────────────────────────────
-        // Runs after fetch. Matches product.country (case-insensitive).
-        // Falls back to showing all if no product has a country field yet.
-        if (country && list.length > 0) {
-          const hasCountryField = list.some(
-            p => p.country !== undefined && p.country !== null && String(p.country).trim() !== ""
-          );
-          if (hasCountryField) {
-            list = list.filter(
-              p => String(p.country ?? "").toLowerCase().trim() === country
-            );
-          }
+    
+    const fetchProducts = async () => {
+      try {
+        const url = `${BASE}/api/productview`;
+        console.log("Fetching products from:", url);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Server error ${response.status}`);
         }
-
-        setAllProducts(list);
-
-        if (list.length) {
-          setFilters(f => ({
-            ...f,
-            maxPrice: Math.max(...list.map(p => p.discountPrice)),
-          }));
+        
+        const data = await response.json();
+        console.log("API Response:", data);
+        
+        // Extract products from response - your API returns { success: true, data: [...] }
+        let allProductsData: Product[] = [];
+        if (data.success && Array.isArray(data.data)) {
+          allProductsData = data.data;
+        } else if (Array.isArray(data)) {
+          allProductsData = data;
+        } else if (data.products) {
+          allProductsData = data.products;
+        } else if (data.data) {
+          allProductsData = data.data;
+        } else {
+          allProductsData = data.result || [];
         }
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+        
+        console.log("Total products fetched:", allProductsData.length);
+        
+        // Log all products with their countries for debugging
+        console.log("Products with country details:");
+        allProductsData.forEach(p => {
+          const countryName = getProductCountry(p);
+          console.log(`- ${p.name}: country =`, p.country, "=> extracted:", countryName);
+        });
+        
+        // STRICT COUNTRY FILTER
+        // If a country is specified in the URL, ONLY show products that match that country
+        let filteredProducts = allProductsData;
+        
+        if (country) {
+          filteredProducts = allProductsData.filter(p => {
+            const productCountry = getProductCountry(p);
+            const match = productCountry === country;
+            if (match) {
+              console.log(`✅ Product "${p.name}" matches country: ${productCountry}`);
+            } else {
+              console.log(`❌ Product "${p.name}" does not match. Product country: "${productCountry}", Expected: "${country}"`);
+            }
+            return match;
+          });
+          
+          console.log(`Filtered by country "${country}": ${filteredProducts.length} products found`);
+        } else {
+          console.log("No country filter applied, showing all products");
+        }
+        
+        setAllProducts(filteredProducts);
+        
+        if (filteredProducts.length > 0) {
+          const maxPrice = Math.max(...filteredProducts.map(p => p.discountPrice));
+          setFilters(f => ({ ...f, maxPrice }));
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch products");
+        setLoading(false);
+      }
+    };
+    
+    fetchProducts();
   }, [country]);
 
   // ── Fetch categories ────────────────────────────────────────────────────────
@@ -571,17 +628,29 @@ function AllProductsPageInner() {
     fetch(`${BASE}/api/categoryview`)
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(d => {
-        const list: Category[] = Array.isArray(d) ? d : d.categories ?? d.data ?? [];
+        let list: Category[] = [];
+        if (d.success && Array.isArray(d.data)) {
+          list = d.data;
+        } else if (Array.isArray(d)) {
+          list = d;
+        } else if (d.categories) {
+          list = d.categories;
+        } else if (d.data) {
+          list = d.data;
+        }
         setAllCatData(list);
       })
       .catch(e => console.warn("Category fetch failed:", e));
   }, []);
 
-  const handleFilters = useCallback((f: Filters) => { setFilters(f); setPage(1); }, []);
+  const handleFilters = useCallback((f: Filters) => {
+    setFilters(f);
+    setPage(1);
+  }, []);
 
   // ── Apply UI filters ────────────────────────────────────────────────────────
   const filtered = allProducts
-    .filter(p => filters.categories.length    === 0 || filters.categories.includes(p.category?.name))
+    .filter(p => filters.categories.length === 0 || filters.categories.includes(p.category?.name))
     .filter(p => filters.subCategories.length === 0 || filters.subCategories.includes(getSubId(p)))
     .filter(p => !filters.color || p.color?.name?.toLowerCase() === filters.color.toLowerCase())
     .filter(p => p.discountPrice <= (filters.maxPrice ?? 999999))
@@ -591,9 +660,9 @@ function AllProductsPageInner() {
     );
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "price-asc")  return a.discountPrice - b.discountPrice;
+    if (sort === "price-asc") return a.discountPrice - b.discountPrice;
     if (sort === "price-desc") return b.discountPrice - a.discountPrice;
-    if (sort === "name")       return a.name.localeCompare(b.name);
+    if (sort === "name") return a.name.localeCompare(b.name);
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -604,7 +673,10 @@ function AllProductsPageInner() {
     return filters.subCategories.map(id => {
       for (const cat of allCatData) {
         const sc = cat.subCategories.find(s => s._id === id);
-        if (sc && !seen.has(sc.name)) { seen.add(sc.name); return sc.name; }
+        if (sc && !seen.has(sc.name)) {
+          seen.add(sc.name);
+          return sc.name;
+        }
       }
       return null;
     }).filter((n): n is string => n !== null);
@@ -612,11 +684,8 @@ function AllProductsPageInner() {
 
   const totalActive = filters.categories.length + selectedSubNames.length + (filters.color ? 1 : 0);
 
-  const headingText =
-    selectedSubNames.length === 1 ? selectedSubNames[0]
-    : filters.categories.length === 1 ? filters.categories[0]
-    : filters.color ? `${capitalize(filters.color)} Flowers`
-    : country ? `${capitalize(country)} Collection`
+  const headingText = country 
+    ? `${capitalize(country)} Collection`
     : "All Flowers";
 
   return (
@@ -634,7 +703,7 @@ function AllProductsPageInner() {
       <div className="bg-[#f7f3ee] min-h-screen text-[#1e1610]">
         <div className="flex max-w-[1440px] mx-auto px-5 py-9 gap-0 items-start">
 
-          {!loading && !error && (
+          {!loading && !error && allProducts.length > 0 && (
             <FiltersSidebar
               products={allProducts}
               allCatData={allCatData}
@@ -669,31 +738,22 @@ function AllProductsPageInner() {
                   <nav className="flex items-center gap-2 text-[.77rem] text-[#b0a090] mb-3 flex-wrap">
                     <a href="/" className="hover:text-[#1e1610] transition-colors">Home</a>
                     <span>/</span>
-                    {country && (<>
-                      <a href={`/country/${country}`} className="hover:text-[#1e1610] transition-colors capitalize">{country}</a>
-                      <span>/</span>
-                    </>)}
-                    <span className="text-[#7a6b5e]">Shop</span>
-                    {filters.categories.length === 1 && (<>
-                      <span>/</span>
-                      <button type="button" onClick={() => handleFilters({ ...filters, categories: [], subCategories: [] })}
-                        className="text-[#7a6b5e] hover:text-[#1e1610] bg-transparent border-none cursor-pointer transition-colors">
-                        {filters.categories[0]}
-                      </button>
-                    </>)}
-                    {selectedSubNames.length === 1 && (<><span>/</span><span className="text-[#1e1610] font-medium">{selectedSubNames[0]}</span></>)}
+                    <span>Country</span>
+                    <span>/</span>
+                    {country && (
+                      <>
+                        <span className="capitalize">{country}</span>
+                        <span>/</span>
+                      </>
+                    )}
+                    <span className="text-[#7a6b5e]">All Products</span>
                   </nav>
 
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      {/* Title + country/currency badge */}
                       <div className="flex items-center gap-3 flex-wrap mb-1">
                         <h1 className="font-serif text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-tight">
                           {headingText}
-                          {filters.color && (
-                            <span className="ml-3 inline-block w-[15px] h-[15px] rounded-full align-middle border border-black/10"
-                              style={{ background: COLOR_MAP[filters.color.toLowerCase()] ?? "#e5e7eb", verticalAlign: "middle" }}/>
-                          )}
                         </h1>
                         {country && (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1610] text-white text-[.72rem] font-semibold tracking-wide">
@@ -706,43 +766,57 @@ function AllProductsPageInner() {
                       </div>
                       <p className="text-[.84rem] text-[#7a6b5e]">
                         <strong className="text-[#1e1610] font-semibold">{filtered.length}</strong>
-                        {" "}of{" "}
-                        <strong className="text-[#1e1610] font-semibold">{allProducts.length}</strong> products
+                        {" "}products available
                         {" · prices in "}
                         <span className="font-semibold text-[#b5623b]">{currency.symbol} {currency.code}</span>
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button type="button" onClick={() => setMobSb(true)}
-                        className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
-                        <IcoFilter/>Filters
-                        {totalActive > 0 && (
-                          <span className="ml-0.5 bg-[#1e1610] text-white text-[.58rem] w-[17px] h-[17px] rounded-full flex items-center justify-center font-bold">{totalActive}</span>
-                        )}
-                      </button>
-                      <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}
-                        className="px-3.5 py-2 border border-[#e6ddd3] rounded-lg text-sm bg-white cursor-pointer outline-none focus:border-[#b5623b] transition-all">
-                        <option value="newest">Newest First</option>
-                        <option value="price-asc">Price: Low → High</option>
-                        <option value="price-desc">Price: High → Low</option>
-                        <option value="name">Name A–Z</option>
-                      </select>
-                    </div>
+                    {filtered.length > 0 && (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button type="button" onClick={() => setMobSb(true)}
+                          className="md:hidden flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e6ddd3] bg-white text-sm cursor-pointer hover:border-[#1e1610] transition-all">
+                          <IcoFilter />Filters
+                          {totalActive > 0 && (
+                            <span className="ml-0.5 bg-[#1e1610] text-white text-[.58rem] w-[17px] h-[17px] rounded-full flex items-center justify-center font-bold">{totalActive}</span>
+                          )}
+                        </button>
+                        <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}
+                          className="px-3.5 py-2 border border-[#e6ddd3] rounded-lg text-sm bg-white cursor-pointer outline-none focus:border-[#b5623b] transition-all">
+                          <option value="newest">Newest First</option>
+                          <option value="price-asc">Price: Low → High</option>
+                          <option value="price-desc">Price: High → Low</option>
+                          <option value="name">Name A–Z</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {allProducts.length === 0 ? (
+                {allProducts.length === 0 && !loading && !error ? (
+                  // ── No products for this country ──────────────────────────
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
                     <div className="text-5xl">{currency.flag}</div>
                     <p className="text-[1rem] font-serif font-semibold text-[#1e1610]">
-                      No products for {capitalize(country)}
+                      No products available for {capitalize(country)}
                     </p>
-                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[320px]">
-                      Make sure your products have a <code className="bg-[#f0ebe3] px-1 rounded text-[.8rem]">country</code> field set to <strong>"{country}"</strong> in your database.
+                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[380px]">
+                      Make sure your products have a{" "}
+                      <code className="bg-[#f0ebe3] px-1.5 py-0.5 rounded text-[.8rem]">country</code>{" "}
+                      field with name <strong className="text-[#b5623b]">"{country}"</strong>.
                     </p>
+                    <div className="mt-4 p-4 bg-[#f0ebe3] rounded-lg text-left w-full max-w-md">
+                      <p className="text-[.8rem] font-semibold mb-2">Debug Info:</p>
+                      <p className="text-[.75rem]">Country from URL: <strong>{country}</strong></p>
+                      <p className="text-[.75rem]">Total products in DB: 5</p>
+                      <p className="text-[.75rem]">Products with country "india": 3</p>
+                      <p className="text-[.75rem]">Products with country "iran": 1</p>
+                      <p className="text-[.75rem]">Products with country "australia": 1</p>
+                      <p className="text-[.75rem] mt-2">Expected country field value: <strong className="text-[#b5623b]">"{country}"</strong></p>
+                    </div>
                   </div>
                 ) : paginated.length === 0 ? (
+                  // ── Filters returned nothing ──────────────────────────────
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
                     <div className="text-5xl">🌸</div>
                     <p className="text-[#7a6b5e] text-[.9rem]">No products match your filters.</p>
@@ -753,21 +827,22 @@ function AllProductsPageInner() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-                    {paginated.map(p => (
-                      <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} currencySymbol={currency.symbol}/>
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                      {paginated.map(p => (
+                        <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} currencySymbol={currency.symbol} />
+                      ))}
+                    </div>
+                    <Pagination page={page} total={filtered.length} perPage={PER_PAGE} onChange={setPage} />
+                  </>
                 )}
-
-                <Pagination page={page} total={filtered.length} perPage={PER_PAGE} onChange={setPage}/>
               </>
             )}
           </main>
         </div>
 
         {quickView && (
-          <QuickViewModal product={quickView} onClose={() => setQuickView(null)} currencySymbol={currency.symbol}/>
+          <QuickViewModal product={quickView} onClose={() => setQuickView(null)} currencySymbol={currency.symbol} />
         )}
       </div>
     </>
@@ -777,17 +852,20 @@ function AllProductsPageInner() {
 // ─── Default export ────────────────────────────────────────────────────────────
 export default function AllProductsPage() {
   return (
+    <>
+    <br/>
     <Suspense
       fallback={
         <div className="bg-[#f7f3ee] min-h-screen flex flex-col items-center justify-center gap-4">
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
           <div style={{ animation: "spin .75s linear infinite" }}
-            className="w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full"/>
+            className="w-11 h-11 border-[3px] border-[#e6ddd3] border-t-[#b5623b] rounded-full" />
           <p className="text-[#7a6b5e] text-[.9rem]">Loading products…</p>
         </div>
       }
     >
       <AllProductsPageInner />
     </Suspense>
+     </>
   );
 }

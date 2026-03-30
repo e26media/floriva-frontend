@@ -9,19 +9,34 @@ import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import clsx from 'clsx'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { FC, useEffect, useState } from 'react'
 import { useSwipeable } from 'react-swipeable'
 import { useInterval } from 'react-use'
 
-// DEMO DATA
-const data = [
+// ─── Helper: build the correct /allproduct href ───────────────────────────────
+// Rules:
+//   /                          → /allproduct
+//   /country/australia         → /country/australia/allproduct
+//   /country/australia/        → /country/australia/allproduct
+//   /country/australia/xyz     → /country/australia/allproduct  (stays in same country)
+function buildAllProductHref(pathname: string): string {
+  // Match /country/<slug> at the start of the path
+  const countryMatch = pathname.match(/^(\/country\/[^/]+)/)
+  if (countryMatch) {
+    return `${countryMatch[1]}/allproduct`
+  }
+  return '/allproduct'
+}
+
+// ─── DEMO DATA ────────────────────────────────────────────────────────────────
+const slides = [
   {
     id: 1,
     imageUrl: heroImage1.src,
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/allproduct',
   },
   {
     id: 2,
@@ -29,7 +44,6 @@ const data = [
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/allproduct',
   },
   {
     id: 3,
@@ -37,7 +51,6 @@ const data = [
     heading: 'Exclusive collection <br /> for everyone',
     subHeading: 'In this season, find the best 🔥',
     btnText: 'Explore shop now',
-    btnHref: '/allproduct',
   },
 ]
 
@@ -46,122 +59,102 @@ interface Props {
 }
 
 let TIME_OUT: NodeJS.Timeout | null = null
-const SectionHero2: FC<Props> = ({ className = '' }) => {
-  // =================
 
+const SectionHero2: FC<Props> = ({ className = '' }) => {
+  const pathname = usePathname()
+
+  // Compute the correct allproduct href based on the current route
+  const allProductHref = buildAllProductHref(pathname ?? '/')
+
+  // ─── Slider state ────────────────────────────────────────────────────────
   const [isSlided, setIsSlided] = useState(false)
   const [indexActive, setIndexActive] = useState(0)
   const [isRunning, toggleIsRunning] = useState(true)
 
   const handlers = useSwipeable({
-    onSwipedLeft: () => {
-      handleClickNext()
-    },
-    onSwipedRight: () => {
-      handleClickPrev()
-    },
+    onSwipedLeft: () => handleClickNext(),
+    onSwipedRight: () => handleClickPrev(),
     trackMouse: true,
   })
 
   useEffect(() => {
-    if (isSlided || !indexActive) {
-      return
-    }
+    if (isSlided || !indexActive) return
     setIsSlided(true)
   }, [indexActive, isSlided])
 
   useInterval(
-    () => {
-      handleAutoNext()
-    },
+    () => handleAutoNext(),
     isRunning ? 5000 : 999999
   )
 
   const handleAutoNext = () => {
-    setIndexActive((state) => {
-      if (state >= data.length - 1) {
-        return 0
-      }
-      return state + 1
-    })
+    setIndexActive((state) => (state >= slides.length - 1 ? 0 : state + 1))
   }
 
   const handleClickNext = () => {
-    setIndexActive((state) => {
-      if (state >= data.length - 1) {
-        return 0
-      }
-      return state + 1
-    })
+    setIndexActive((state) => (state >= slides.length - 1 ? 0 : state + 1))
     handleAfterClick()
   }
 
   const handleClickPrev = () => {
-    setIndexActive((state) => {
-      if (state === 0) {
-        return data.length - 1
-      }
-      return state - 1
-    })
+    setIndexActive((state) => (state === 0 ? slides.length - 1 : state - 1))
     handleAfterClick()
   }
 
   const handleAfterClick = () => {
     toggleIsRunning(false)
-    if (TIME_OUT) {
-      clearTimeout(TIME_OUT)
-    }
-    TIME_OUT = setTimeout(() => {
-      toggleIsRunning(true)
-    }, 1000)
+    if (TIME_OUT) clearTimeout(TIME_OUT)
+    TIME_OUT = setTimeout(() => toggleIsRunning(true), 1000)
   }
 
-  // ===================================================
-
+  // ─── Render a single slide ────────────────────────────────────────────────
   const renderItem = (index: number) => {
     const isActive = indexActive === index
-    const item = data[index]
+    const item = slides[index]
 
     return (
       <div
+        key={index}
         className={clsx(
           'fade--animation relative flex flex-col gap-10 overflow-hidden py-14 pl-container sm:py-20 lg:flex-row lg:items-center',
           isActive ? 'flex' : 'hidden'
         )}
-        key={index}
       >
-        {/* BG */}
+        {/* Background */}
         <div className="absolute inset-0 -z-10 bg-[#E3FFE6]">
           <Image
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             className="absolute h-full w-full object-contain"
             src={backgroundLineSvg}
-            alt="hero"
+            alt="hero background"
           />
         </div>
 
-        {/* DOTS */}
+        {/* Dot indicators */}
         <div className="absolute start-1/2 bottom-4 flex -translate-x-1/2 justify-center rtl:translate-x-1/2">
-          {data.map((_, index) => {
-            const isActive = indexActive === index
+          {slides.map((_, dotIndex) => {
+            const isDotActive = indexActive === dotIndex
             return (
               <div
-                key={index}
+                key={dotIndex}
                 onClick={() => {
-                  setIndexActive(index)
+                  setIndexActive(dotIndex)
                   handleAfterClick()
                 }}
                 className="relative cursor-pointer px-1 py-1.5"
               >
                 <div className="relative h-1 w-20 rounded-md bg-white shadow-xs">
-                  {isActive && <div className={`absolute inset-0 rounded-md bg-neutral-900 fade--animation__dot`} />}
+                  {isDotActive && (
+                    <div className="absolute inset-0 rounded-md bg-neutral-900 fade--animation__dot" />
+                  )}
                 </div>
               </div>
             )
           })}
         </div>
 
+        {/* Text content */}
         <div className="relative flex max-w-5xl flex-1/2 flex-col items-start fade--animation__left">
           <span className="block text-base font-medium text-neutral-700 fade--animation__subheading md:text-xl">
             {item.subHeading}
@@ -171,12 +164,17 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
             dangerouslySetInnerHTML={{ __html: item.heading }}
           />
 
-          <ButtonPrimary className="mt-10 fade--animation__button sm:mt-20" href={item.btnHref || '#'}>
+          {/* ✅ Button uses the dynamic country-aware href */}
+          <ButtonPrimary
+            className="mt-10 fade--animation__button sm:mt-20"
+            href={allProductHref}
+          >
             <span className="me-2">{item.btnText}</span>
             <HugeiconsIcon icon={Search01Icon} size={20} />
           </ButtonPrimary>
         </div>
 
+        {/* Hero image */}
         <div className="relative -z-10 flex-1/2 lg:pr-10">
           <Image
             sizes="(max-width: 768px) 100vw, 60vw"
@@ -192,14 +190,17 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     )
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className={clsx('relative z-[1]', className)} {...handlers}>
-      {data.map((_, index) => renderItem(index))}
+      {slides.map((_, index) => renderItem(index))}
 
+      {/* Next arrow */}
       <button
         type="button"
         className="absolute inset-y-px end-0 z-10 hidden items-center justify-center px-10 text-neutral-700 lg:flex"
         onClick={handleClickNext}
+        aria-label="Next slide"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -212,10 +213,13 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
       </button>
+
+      {/* Prev arrow */}
       <button
         type="button"
         className="absolute inset-y-px start-0 z-10 hidden items-center justify-center px-10 text-neutral-700 lg:flex"
         onClick={handleClickPrev}
+        aria-label="Previous slide"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

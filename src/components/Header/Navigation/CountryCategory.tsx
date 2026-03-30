@@ -1,10 +1,10 @@
-// components/CountryCategory.tsx  (or wherever your component lives)
+// components/CountryCategory.tsx
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { ChevronDownIcon } from '@heroicons/react/24/solid'
+import { useParams, usePathname } from 'next/navigation'
+import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/solid'
 import clsx from 'clsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,155 +35,102 @@ const API_URL =
 const POLL_INTERVAL = 30_000
 
 // ─── Helper: build correct href ───────────────────────────────────────────────
-// If countryName is known  → /country/india/category/[id]
-// Otherwise fallback       → /category/[id]
 
 function buildCategoryHref(id: string, countryName?: string | null) {
   if (countryName) return `/country/${countryName}/category/${id}`
   return `/category/${id}`
 }
 
-// ─── Sub-item link ─────────────────────────────────────────────────────────────
+// ─── Category Item Component ───────────────────────────────────────────────────
 
-const SubCategoryLink = ({
-  sub,
-  countryName,
-  onClick,
-}: {
-  sub: SubCategory
-  countryName?: string | null
-  onClick?: () => void
-}) => (
-  <li>
-    <Link
-      href={buildCategoryHref(sub._id, countryName)}
-      onClick={onClick}
-      className="block rounded-md px-4 py-2 text-sm font-normal text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white transition-colors"
-    >
-      {sub.name}
-    </Link>
-  </li>
-)
-
-// ─── Dropdown Menu Item ────────────────────────────────────────────────────────
-
-const CategoryDropdown = ({
-  category,
-  countryName,
-}: {
+interface CategoryItemProps {
   category: Category
   countryName?: string | null
-}) => {
-  const hasChildren = Array.isArray(category.subCategories) && category.subCategories.length > 0
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLLIElement>(null)
+  onNavigate?: () => void
+}
 
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    document.addEventListener('touchstart', handler)
-    return () => {
-      document.removeEventListener('mousedown', handler)
-      document.removeEventListener('touchstart', handler)
-    }
-  }, [open])
+const CategoryItem = ({ category, countryName, onNavigate }: CategoryItemProps) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const hasChildren = category.subCategories?.length > 0
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+  const toggleOpen = () => {
+    if (hasChildren) {
+      setIsOpen(!isOpen)
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [])
+  }
+
+  const handleLinkClick = () => {
+    if (!hasChildren && onNavigate) {
+      onNavigate()
+    }
+  }
+
+  const handleSubLinkClick = () => {
+    if (onNavigate) {
+      onNavigate()
+    }
+  }
 
   return (
-    <li ref={ref} className="relative group menu-item">
-      {/* Parent category link — also scoped to country if available */}
-      <Link
-        href={buildCategoryHref(category._id, countryName)}
-        aria-haspopup={hasChildren ? 'listbox' : undefined}
-        aria-expanded={hasChildren ? open : undefined}
-        onMouseEnter={() => hasChildren && setOpen(true)}
-        onMouseLeave={() => hasChildren && setOpen(false)}
-        onFocus={() => hasChildren && setOpen(true)}
-        onBlur={(e) => {
-          if (!ref.current?.contains(e.relatedTarget as Node)) setOpen(false)
-        }}
-        className="flex items-center self-center rounded-full px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 lg:text-[15px] xl:px-5 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors"
-      >
-        {category.name}
-        {hasChildren && (
-          <ChevronDownIcon
-            className={clsx(
-              'ml-1 -mr-1 h-4 w-4 text-neutral-400 transition-transform duration-200',
-              open && 'rotate-180',
-            )}
-            aria-hidden="true"
-          />
-        )}
-      </Link>
-
-      {/* Dropdown panel */}
-      {hasChildren && (
-        <div
-          role="listbox"
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-          className={clsx(
-            'absolute top-full left-0 z-50 w-52 pt-1',
-            'transition-all duration-200 ease-out',
-            open
-              ? 'visible opacity-100 translate-y-0 pointer-events-auto'
-              : 'invisible opacity-0 translate-y-1 pointer-events-none',
-          )}
+    <div className="border-b border-neutral-200 dark:border-neutral-700">
+      {/* Category Header */}
+      <div className="flex items-center justify-between">
+        <Link
+          href={buildCategoryHref(category._id, countryName)}
+          onClick={handleLinkClick}
+          className="flex-1 py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
         >
-          <ul className="rounded-lg bg-white py-2 text-sm shadow-lg ring-1 ring-black/5 dark:bg-neutral-900 dark:ring-white/10">
-            {category.subCategories.map((sub) => (
-              <SubCategoryLink
-                key={sub._id}
-                sub={sub}
-                countryName={countryName}
-                onClick={() => setOpen(false)}
-              />
-            ))}
-          </ul>
+          {category.name}
+        </Link>
+        
+        {hasChildren && (
+          <button
+            onClick={toggleOpen}
+            className="p-3 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors"
+            aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${category.name}`}
+          >
+            <ChevronDownIcon
+              className={clsx(
+                'h-4 w-4 transition-transform duration-200',
+                isOpen && 'rotate-180'
+              )}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Subcategories */}
+      {hasChildren && isOpen && (
+        <div className="bg-neutral-50 dark:bg-neutral-800/50">
+          {category.subCategories.map((sub) => (
+            <Link
+              key={sub._id}
+              href={buildCategoryHref(sub._id, countryName)}
+              onClick={handleSubLinkClick}
+              className="block py-2.5 px-8 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
+            >
+              {sub.name}
+            </Link>
+          ))}
         </div>
       )}
-    </li>
+    </div>
   )
 }
 
 // ─── Skeleton loader ───────────────────────────────────────────────────────────
 
-const NAV_SKELETON_WIDTHS = [120, 90, 110, 80, 100] as const
-
-const NavSkeleton = () => (
-  <ul className="flex gap-1" aria-label="Loading navigation">
-    {NAV_SKELETON_WIDTHS.map((w, i) => (
-      <li key={i} aria-hidden="true">
-        <div
-          className="h-9 animate-pulse rounded-full bg-neutral-200 dark:bg-neutral-700"
-          style={{ width: w }}
-        />
-      </li>
+const CategorySkeleton = () => (
+  <div className="space-y-2">
+    {[1, 2, 3, 4, 5].map((i) => (
+      <div key={i} className="border-b border-neutral-200 dark:border-neutral-700">
+        <div className="flex items-center justify-between py-3 px-4">
+          <div className="h-5 w-32 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+          <div className="h-4 w-4 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+        </div>
+      </div>
     ))}
-  </ul>
-)
-
-// ─── Static nav link ──────────────────────────────────────────────────────────
-
-const StaticNavLink = ({ href, label }: { href: string; label: string }) => (
-  <li>
-    <Link
-      href={href}
-      className="flex items-center self-center rounded-full px-4 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 lg:text-[15px] xl:px-5 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors"
-    >
-      {label}
-    </Link>
-  </li>
+  </div>
 )
 
 // ─── Custom hook: fetch with polling ──────────────────────────────────────────
@@ -243,52 +190,147 @@ function useCategoryData(apiUrl: string) {
 export interface CategoryNavProps {
   className?: string
   apiUrl?: string
-  /** Pass explicitly, OR leave undefined to auto-read from URL params */
   countryName?: string
+  showHomeLink?: boolean
+  showAllProductsLink?: boolean
+  showCloseButton?: boolean
+  onClose?: () => void
+  isOpen?: boolean
 }
 
-const CountryCategory = ({ className, apiUrl = API_URL, countryName: propCountry }: CategoryNavProps) => {
+const CountryCategory = ({ 
+  className, 
+  apiUrl = API_URL, 
+  countryName: propCountry,
+  showHomeLink = true,
+  showAllProductsLink = true,
+  showCloseButton = true,
+  onClose,
+  isOpen = true
+}: CategoryNavProps) => {
   const { categories, loading, error } = useCategoryData(apiUrl)
-
-  // ✅ Auto-detect country from URL params if not passed as prop
-  // Works inside /country/[name]/... routes automatically
+  const pathname = usePathname()
+  
+  // Auto-detect country from URL params if not passed as prop
   const params = useParams()
   const countryName = propCountry ?? (params?.name as string | undefined) ?? null
 
-  if (loading) return <NavSkeleton />
+  // Close sidebar when route changes (navigation occurs)
+  useEffect(() => {
+    if (isOpen && onClose) {
+      onClose()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]) // Close when pathname changes
 
-  if (error) {
+  // Handle close button click
+  const handleClose = () => {
+    if (onClose) {
+      onClose()
+    }
+  }
+
+  // Handle navigation from links
+  const handleNavigate = () => {
+    if (onClose) {
+      onClose()
+    }
+  }
+
+  if (loading) {
     return (
-      <p role="alert" className="text-sm text-red-500 dark:text-red-400">
-        Failed to load categories: {error}
-      </p>
+      <div className={clsx('w-full', className)}>
+        <CategorySkeleton />
+      </div>
     )
   }
 
-  if (!categories.length) return null
+  if (error) {
+    return (
+      <div className={clsx('rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400', className)}>
+        <p className="text-sm">Failed to load categories: {error}</p>
+      </div>
+    )
+  }
+
+  if (!categories.length) {
+    return (
+      <div className={clsx('text-center text-neutral-500 dark:text-neutral-400', className)}>
+        <p className="text-sm">No categories available</p>
+      </div>
+    )
+  }
 
   return (
-    <nav aria-label="Category navigation">
-      <ul className={clsx('flex flex-wrap items-center gap-1', className)}>
-        <StaticNavLink href="/" label="Home" />
-        {/* If inside a country page, link "All Products" scoped to country */}
-        <StaticNavLink
-          href={countryName ? `/country/${countryName}` : '/allproduct'}
-          label={countryName ? `All in ${countryName}` : 'All Products'}
-        />
-   <StaticNavLink
-  href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
-  label="All Products"
-/>
-        {categories.map((category) => (
-          <CategoryDropdown
-            key={category._id}
-            category={category}
-            countryName={countryName}
-          />
-        ))}
-      </ul>
-    </nav>
+    <div className={clsx('flex flex-col h-full', className)}>
+      {/* Header with Close Button */}
+      {showCloseButton && onClose && (
+        <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 p-4">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+            {countryName ? `${countryName.charAt(0).toUpperCase() + countryName.slice(1)}` : 'Menu'}
+          </h2>
+          <button
+            onClick={handleClose}
+            className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800 transition-colors"
+            aria-label="Close menu"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Navigation Items */}
+      <nav className={clsx('flex-1 overflow-y-auto', !showCloseButton && 'pt-2')} aria-label="Category navigation">
+        <div className="space-y-1">
+          {/* Home Link */}
+          {showHomeLink && (
+            <div className="border-b border-neutral-200 dark:border-neutral-700">
+              <Link
+                href="/"
+                onClick={handleNavigate}
+                className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Home
+              </Link>
+            </div>
+          )}
+
+          {/* All Products Links */}
+          {showAllProductsLink && (
+            <>
+              <div className="border-b border-neutral-200 dark:border-neutral-700">
+                <Link
+                  href={countryName ? `/country/${countryName}` : '/allproduct'}
+                  onClick={handleNavigate}
+                  className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  {countryName ? `All in ${countryName}` : 'All Products'}
+                </Link>
+              </div>
+              <div className="border-b border-neutral-200 dark:border-neutral-700">
+                <Link
+                  href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
+                  onClick={handleNavigate}
+                  className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                >
+                  All Products
+                </Link>
+              </div>
+            </>
+          )}
+
+          {/* Categories */}
+          {categories.map((category) => (
+            <CategoryItem
+              key={category._id}
+              category={category}
+              countryName={countryName}
+              onNavigate={handleNavigate}
+            />
+          ))}
+        </div>
+      </nav>
+    </div>
   )
 }
 

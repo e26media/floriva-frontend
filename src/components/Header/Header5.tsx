@@ -93,7 +93,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
           {/* ── Logo ── */}
-          <div className="flex items-center lg:flex-1 sm:ml-[20px]">
+            <div className="flex flex-1 items-center justify-end gap-x-2.5 sm:gap-x-5">
             <Logo />
           </div>
 

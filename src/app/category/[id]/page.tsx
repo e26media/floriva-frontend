@@ -11,12 +11,25 @@ interface Category {
   subCategories: SubCategory[]
 }
 interface Color { _id: string; name: string }
+interface Country {
+  _id: string;
+  name: string;
+}
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: Category; subCategory: string; color: Color
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
+  country?: Country | string;
 }
+
+// ─── Helper to get country name from product ───────────────────────────────────
+const getProductCountry = (product: Product): string => {
+  if (!product.country) return "";
+  if (typeof product.country === "string") return product.country.toLowerCase().trim();
+  if (product.country.name) return product.country.name.toLowerCase().trim();
+  return "";
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
@@ -350,7 +363,7 @@ export default function CategoryPage() {
     setError('')
 
     Promise.all([
-      // Fetch ALL categories (no 404 risk — no ID in URL)
+      // Fetch ALL categories
       fetch(`${BASE}/api/categoryview`)
         .then(r => {
           if (!r.ok) throw new Error(`Failed to load categories (${r.status})`)
@@ -364,10 +377,40 @@ export default function CategoryPage() {
         }),
     ])
       .then(([catData, prodData]) => {
-        const categories: Category[] = catData.categories ?? []
-        const products: Product[] = Array.isArray(prodData)
-          ? prodData
-          : prodData.products ?? prodData.data ?? []
+        // Extract categories from response
+        let categories: Category[] = [];
+        if (catData.success && Array.isArray(catData.data)) {
+          categories = catData.data;
+        } else if (Array.isArray(catData)) {
+          categories = catData;
+        } else if (catData.categories) {
+          categories = catData.categories;
+        } else if (catData.data) {
+          categories = catData.data;
+        }
+
+        // Extract products from response
+        let allProductsData: Product[] = [];
+        if (prodData.success && Array.isArray(prodData.data)) {
+          allProductsData = prodData.data;
+        } else if (Array.isArray(prodData)) {
+          allProductsData = prodData;
+        } else if (prodData.products) {
+          allProductsData = prodData.products;
+        } else if (prodData.data) {
+          allProductsData = prodData.data;
+        } else {
+          allProductsData = prodData.result || [];
+        }
+
+        // Filter products to ONLY show INDIAN products
+        // Default to India for the category page
+        const indianProducts = allProductsData.filter(p => {
+          const productCountry = getProductCountry(p);
+          return productCountry === 'india';
+        });
+
+        console.log(`Total products: ${allProductsData.length}, Indian products: ${indianProducts.length}`);
 
         let matchedCategory: Category | null = null
         let matchedSubId = 'all'
@@ -393,8 +436,8 @@ export default function CategoryPage() {
           throw new Error('Category not found. Please check the URL.')
         }
 
-        // Only keep products that belong to this category
-        const categoryProducts = products.filter(
+        // Only keep INDIAN products that belong to this category
+        const categoryProducts = indianProducts.filter(
           p => p.category?._id === matchedCategory!._id
         )
 
@@ -402,7 +445,10 @@ export default function CategoryPage() {
         setActiveSub(matchedSubId)
         setAllProducts(categoryProducts)
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        console.error("Error:", e);
+        setError(e.message);
+      })
       .finally(() => setLoading(false))
   }, [urlId])
 
@@ -472,6 +518,16 @@ export default function CategoryPage() {
         {!loading && !error && category && (
           <div className="max-w-[1440px] mx-auto px-6 py-10 page-enter">
 
+            {/* India Badge */}
+            <div className="mb-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1610] text-white text-[0.72rem] font-semibold tracking-wide">
+                <span>🇮🇳</span>
+                <span>India</span>
+                <span className="opacity-50">·</span>
+                <span>INR</span>
+              </span>
+            </div>
+
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-[0.78rem] text-[#b0a090] mb-8 flex-wrap">
               <Link href="/" className="hover:text-[#b5623b] transition-colors">Home</Link>
@@ -497,7 +553,7 @@ export default function CategoryPage() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[0.7rem] uppercase tracking-[0.18em] text-[#b5623b] font-semibold mb-1.5">
-                    Collection
+                    Indian Collection
                   </p>
                   <h1 className="font-serif text-[clamp(2rem,5vw,3.2rem)] font-bold leading-none text-[#1e1610]">
                     {activeSubName ?? category.name}
@@ -567,7 +623,7 @@ export default function CategoryPage() {
             <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
               <p className="text-[0.84rem] text-[#7a6b5e]">
                 <strong className="text-[#1e1610] font-semibold">{filtered.length}</strong>{' '}
-                product{filtered.length !== 1 ? 's' : ''} found
+                Indian product{filtered.length !== 1 ? 's' : ''} found
               </p>
               <select
                 className="px-3.5 py-2 border border-[#e6ddd3] rounded-lg text-sm bg-white text-[#1e1610] cursor-pointer outline-none focus:border-[#b5623b] transition-all duration-200"
@@ -585,11 +641,11 @@ export default function CategoryPage() {
             {paginated.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[340px] gap-4 text-center">
                 <div className="text-[3rem]">🌸</div>
-                <p className="font-serif text-[1.15rem] font-semibold">No products found</p>
+                <p className="font-serif text-[1.15rem] font-semibold">No Indian products found</p>
                 <p className="text-[0.84rem] text-[#7a6b5e]">
                   {activeSub !== 'all'
-                    ? 'No products in this subcategory yet.'
-                    : 'This category has no products yet.'}
+                    ? 'No Indian products in this subcategory yet.'
+                    : 'This category has no Indian products yet.'}
                 </p>
                 {activeSub !== 'all' && (
                   <button

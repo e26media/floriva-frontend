@@ -116,7 +116,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
         </div>
-          <div className="flex items-center lg:hidden justify-center">
+          <div className="flex items-center lg:hidden justify-start ">
   <LocationSelector />
 </div>
 

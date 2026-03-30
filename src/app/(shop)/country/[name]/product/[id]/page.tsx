@@ -997,7 +997,7 @@ export default function ProductDetailPage() {
             • RelCard receives `currencyInfo` derived from country,
               so prices show A$ / AUD rate — not ₹
       ───────────────────────────────────────────────────────────────── */}
-      {related.length > 0 && (
+      {/* {related.length > 0 && (
         <section className="max-w-6xl mx-auto px-6 mt-20 pb-24">
           <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
             <div>
@@ -1054,7 +1054,6 @@ export default function ProductDetailPage() {
                   style={{ scrollSnapAlign: "start", animationDelay: `${Math.min(i, 8) * 0.05}s` }}
                   className="animate-fade-up"
                 >
-                  {/* ✅ Pass country (from URL params) and currencyInfo to each card */}
                   <RelCard
                     p={p}
                     country={country}
@@ -1069,11 +1068,10 @@ export default function ProductDetailPage() {
             {related.length} more product{related.length !== 1 ? "s" : ""} in {product.category?.name}
           </p>
         </section>
-      )}
+      )} */}
 
-      <footer className="border-t border-stone-100 py-6 px-6 text-center text-[0.74rem] text-stone-400 bg-white tracking-wider">
-        Handcrafted with love &nbsp;·&nbsp; Free delivery on all orders &nbsp;·&nbsp; 7-day easy returns
-      </footer>
+      <br/>
+      <br/>
     </div>
   );
 }
