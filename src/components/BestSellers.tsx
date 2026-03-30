@@ -26,7 +26,7 @@ export interface TApiProduct {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
   category: TCategory | null; subCategory: string | null; color: TColor | null
-  country?: TCountry | null
+  country?: TCountry | string | null  // ← Fixed: allow string type
   stock: number; deliveryInfo: string; images: string[]
   featuredProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
   FeaturedProduct?: TFeaturedProduct | TFeaturedProduct[] | string | string[] | null
