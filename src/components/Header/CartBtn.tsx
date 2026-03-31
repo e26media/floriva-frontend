@@ -5,6 +5,8 @@ import { ShoppingCart02Icon, Store02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useRouter } from 'next/navigation'
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
+
 /* ─── Types ─────────────────────────────────────────────────── */
 interface VendorFormData {
   vendorName: string
@@ -28,7 +30,6 @@ interface FieldErrors {
 function parseValidationErrors(message: string): FieldErrors {
   const errors: FieldErrors = {}
 
-  // E11000 duplicate key errors
   if (message.includes('E11000') && message.includes('email')) {
     errors.email = 'This email is already registered'
     return errors
@@ -38,7 +39,6 @@ function parseValidationErrors(message: string): FieldErrors {
     return errors
   }
 
-  // Mongoose validation: "Vendor validation failed: name: ..., address: ..., phone: ..."
   if (message.includes('validation failed')) {
     if (message.includes('name'))    errors.vendorName    = 'Vendor name is required'
     if (message.includes('address')) errors.vendorAddress = 'Address is required'
@@ -193,7 +193,6 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
 
   const set = (key: keyof VendorFormData, value: string | File | null) => {
     setForm((f) => ({ ...f, [key]: value }))
-    // Clear field error on edit
     const ek = key as keyof FieldErrors
     if (fieldErrors[ek]) {
       setFieldErrors((prev) => {
@@ -242,7 +241,7 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
       if (form.vendorPhoto) formData.append('photo',     form.vendorPhoto)
       if (form.shopPhoto)   formData.append('shopPhoto', form.shopPhoto)
 
-      const res = await fetch('http://localhost:7000/api/vendor', { method: 'POST', body: formData })
+      const res = await fetch(`${BASE_URL}/api/vendor`, { method: 'POST', body: formData })
 
       if (!res.ok) {
         let errMessage = `Server error: ${res.status}`
@@ -252,7 +251,6 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
         const parsed = parseValidationErrors(errMessage)
         setFieldErrors(parsed)
         setShowBanner(true)
-        // If step-1 fields errored, jump back
         if (parsed.vendorName || parsed.vendorAddress) setStep(1)
         return
       }
@@ -395,20 +393,6 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
                       <input className={inputCls} placeholder="e.g. KA/MNG/2024/00123"
                         value={form.shopLicence} onChange={(e) => set('shopLicence', e.target.value)} />
                     </Field>
-
-                    {/* Review */}
-                    {/* <div className="rounded-2xl p-4 text-xs leading-relaxed"
-                      style={{ background: 'linear-gradient(135deg,rgba(124,76,163,.04),rgba(234,90,123,.04))', border: '1px solid rgba(234,90,123,.12)' }}>
-                      <p className="font-syne text-[10px] font-bold tracking-widest uppercase mb-2.5" style={{ color: '#7C4CA3' }}>
-                        Review
-                      </p>
-                      <div className="flex flex-col gap-1 text-gray-500">
-                        <span>🏷 <span className="font-semibold text-gray-700">{form.vendorName || '—'}</span></span>
-                        <span>📍 {form.vendorAddress || '—'}</span>
-                        <span>📷 Vendor photo: <span className="text-gray-600">{form.vendorPhoto?.name ?? '—'}</span></span>
-                        <span>🏪 Shop photo: <span className="text-gray-600">{form.shopPhoto?.name ?? '—'}</span></span>
-                      </div>
-                    </div> */}
                   </>
                 )}
               </div>

@@ -25,7 +25,7 @@ const DEMO_DATA = [
     id: 2,
     img: HIW2img,
     imgDark: HIW2img,
-    title: 'Add to bag',
+    title: 'Add to Cart',
     desc: 'Easily select the correct items and add them to the cart',
   },
   {

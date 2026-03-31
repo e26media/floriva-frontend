@@ -62,7 +62,7 @@ const ProductCard: FC<Props> = ({ className = '', data, isLiked }) => {
           color={selectedOptions?.find((option) => option.name === 'Color')?.value}
         >
           <ShoppingBagIcon className="-ml-1 size-3.5" />
-          <span>Add to bag</span>
+          <span>Add to Cart</span>
         </AddToCardButton>
 
         <button
