@@ -277,7 +277,7 @@ function CartToastContainer() {
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-xs font-bold mb-0.5 ${isError ? 'text-red-600' : 'text-emerald-600'}`}>
-                {isError ? 'Error' : '✓ Added to Bag!'}
+                {isError ? 'Error' : ' Added to Cart!'}
               </p>
               {isError ? (
                 <p className="text-xs text-gray-700 line-clamp-2">{toast.message}</p>
@@ -901,7 +901,7 @@ function ProductCard({
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
-                ✓ Added to Bag!
+                 Added to Cart!
               </>
             ) : outOfStock ? (
               'Out of Stock'

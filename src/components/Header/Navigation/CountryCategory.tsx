@@ -264,7 +264,7 @@ const MobileDirectView = ({
       <nav className={clsx('flex-1 overflow-y-auto', !onClose && 'pt-2')} aria-label="Mobile category navigation">
         <div className="space-y-1">
           {/* Home Link */}
-          {showHomeLink && (
+          {/* {showHomeLink && (
             <div className="border-b border-neutral-200 dark:border-neutral-700">
               <Link
                 href="/"
@@ -274,7 +274,7 @@ const MobileDirectView = ({
                 Home
               </Link>
             </div>
-          )}
+          )} */}
 
           {/* All Products Links */}
           {showAllProductsLink && (
