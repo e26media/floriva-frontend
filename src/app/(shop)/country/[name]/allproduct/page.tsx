@@ -793,28 +793,23 @@ function AllProductsPageInner() {
                   </div>
                 </div>
 
+
+
                 {allProducts.length === 0 && !loading && !error ? (
                   // ── No products for this country ──────────────────────────
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">
-                    <div className="text-5xl">{currency.flag}</div>
+                    {/* <div className="text-5xl">{currency.flag}</div> */}
                     <p className="text-[1rem] font-serif font-semibold text-[#1e1610]">
-                      No products available for {capitalize(country)}
+                      <div className="text-[3rem]">🌸</div> No {capitalize(country)} products found 
                     </p>
-                    <p className="text-[.84rem] text-[#7a6b5e] max-w-[380px]">
+                    {/* <p className="text-[.84rem] text-[#7a6b5e] max-w-[380px]">
                       Make sure your products have a{" "}
                       <code className="bg-[#f0ebe3] px-1.5 py-0.5 rounded text-[.8rem]">country</code>{" "}
                       field with name <strong className="text-[#b5623b]">"{country}"</strong>.
-                    </p>
-                    <div className="mt-4 p-4 bg-[#f0ebe3] rounded-lg text-left w-full max-w-md">
-                      <p className="text-[.8rem] font-semibold mb-2">Debug Info:</p>
-                      <p className="text-[.75rem]">Country from URL: <strong>{country}</strong></p>
-                      <p className="text-[.75rem]">Total products in DB: 5</p>
-                      <p className="text-[.75rem]">Products with country "india": 3</p>
-                      <p className="text-[.75rem]">Products with country "iran": 1</p>
-                      <p className="text-[.75rem]">Products with country "australia": 1</p>
-                      <p className="text-[.75rem] mt-2">Expected country field value: <strong className="text-[#b5623b]">"{country}"</strong></p>
-                    </div>
+                    </p> */}
+                    
                   </div>
+                  
                 ) : paginated.length === 0 ? (
                   // ── Filters returned nothing ──────────────────────────────
                   <div className="flex flex-col items-center justify-center min-h-[320px] gap-4 text-center">

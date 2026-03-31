@@ -496,9 +496,9 @@ export default function CountryCategoryPage() {
         {/* Error */}
         {!loading && error && (
           <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-6">
-            <div className="text-4xl">😕</div>
-            <p className="font-serif text-xl font-semibold">Something went wrong</p>
-            <p className="text-[0.86rem] text-[#7a6b5e] max-w-sm">{error}</p>
+            <div className="text-4xl">🌸</div>
+            <p className="font-serif text-xl font-semibold">No  products found</p>
+            {/* <p className="text-[0.86rem] text-[#7a6b5e] max-w-sm">{error}</p> */}
             <button
               onClick={() => router.back()}
               className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1e1610] text-[#f7f3ee] text-sm border-none cursor-pointer hover:bg-[#7a3e22] transition-all duration-200 mt-2"
