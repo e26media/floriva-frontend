@@ -43,8 +43,9 @@ const Logo: React.FC<LogoProps> = ({ className = 'shrink-0', ...props }) => {
             
             // sizes="(max-width: 768px) 100vw, 50vw"
             src={backgroundLineSvg}
-        className="!w-40 md:!w-70"
+        className="!w-40 md:!w-70   "
             alt="hero"
+            
           />
       {/* <img src="" alt="Logo" className="h-8 w-auto" /> */}
     </Link>

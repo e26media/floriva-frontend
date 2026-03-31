@@ -85,14 +85,17 @@ const StickyHeader: FC<StickyHeaderProps> = ({
         <div className="container flex h-20 justify-between">
 
           {/* ── Mobile hamburger ── */}
-          <div className="flex flex-1 items-center lg:hidden">
+          <div className="flex flex-1 items-center lg:hidden gap-5">
             <HamburgerBtnMenu />
+            <div className="flex items-start lg:flex-1 ml-[20px] sm:ml-0 ">
+  <Logo />
+</div>
           </div>
 
           {/* ── Logo ── */}
-          <div className="flex items-center lg:flex-1 sm:ml-[20px]">
-            <Logo />
-          </div>
+         {/* <div className="flex items-start lg:flex-1 ml-[20px] sm:ml-0">
+  <Logo />
+</div> */}
          
 
           {/* ── Location Selector — LEFT side, desktop only (after logo) ── */}
