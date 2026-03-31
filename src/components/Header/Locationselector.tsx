@@ -31,59 +31,58 @@ export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
-// Map country name (lowercase) → emoji flag
 const FLAG_MAP: Record<string, string> = {
-  india:              '🇮🇳',
-  usa:                '🇺🇸',
-  'united states':    '🇺🇸',
-  'united kingdom':   '🇬🇧',
-  uk:                 '🇬🇧',
-  canada:             '🇨🇦',
-  australia:          '🇦🇺',
-  uae:                '🇦🇪',
-  'united arab emirates': '🇦🇪',
-  germany:            '🇩🇪',
-  france:             '🇫🇷',
-  japan:              '🇯🇵',
-  china:              '🇨🇳',
-  brazil:             '🇧🇷',
-  mexico:             '🇲🇽',
-  italy:              '🇮🇹',
-  spain:              '🇪🇸',
-  russia:             '🇷🇺',
-  'south korea':      '🇰🇷',
-  netherlands:        '🇳🇱',
-  switzerland:        '🇨🇭',
-  sweden:             '🇸🇪',
-  norway:             '🇳🇴',
-  denmark:            '🇩🇰',
-  finland:            '🇫🇮',
-  singapore:          '🇸🇬',
-  'new zealand':      '🇳🇿',
-  portugal:           '🇵🇹',
-  turkey:             '🇹🇷',
-  indonesia:          '🇮🇩',
-  malaysia:           '🇲🇾',
-  thailand:           '🇹🇭',
-  philippines:        '🇵🇭',
-  pakistan:           '🇵🇰',
-  bangladesh:         '🇧🇩',
-  'sri lanka':        '🇱🇰',
-  nepal:              '🇳🇵',
-  egypt:              '🇪🇬',
-  'saudi arabia':     '🇸🇦',
-  qatar:              '🇶🇦',
-  kuwait:             '🇰🇼',
-  bahrain:            '🇧🇭',
-  oman:               '🇴🇲',
-  kenya:              '🇰🇪',
-  nigeria:            '🇳🇬',
-  'south africa':     '🇿🇦',
-  ghana:              '🇬🇭',
-  argentina:          '🇦🇷',
-  colombia:           '🇨🇴',
-  chile:              '🇨🇱',
-  peru:               '🇵🇪',
+  india:                      '🇮🇳',
+  usa:                        '🇺🇸',
+  'united states':            '🇺🇸',
+  'united kingdom':           '🇬🇧',
+  uk:                         '🇬🇧',
+  canada:                     '🇨🇦',
+  australia:                  '🇦🇺',
+  uae:                        '🇦🇪',
+  'united arab emirates':     '🇦🇪',
+  germany:                    '🇩🇪',
+  france:                     '🇫🇷',
+  japan:                      '🇯🇵',
+  china:                      '🇨🇳',
+  brazil:                     '🇧🇷',
+  mexico:                     '🇲🇽',
+  italy:                      '🇮🇹',
+  spain:                      '🇪🇸',
+  russia:                     '🇷🇺',
+  'south korea':              '🇰🇷',
+  netherlands:                '🇳🇱',
+  switzerland:                '🇨🇭',
+  sweden:                     '🇸🇪',
+  norway:                     '🇳🇴',
+  denmark:                    '🇩🇰',
+  finland:                    '🇫🇮',
+  singapore:                  '🇸🇬',
+  'new zealand':              '🇳🇿',
+  portugal:                   '🇵🇹',
+  turkey:                     '🇹🇷',
+  indonesia:                  '🇮🇩',
+  malaysia:                   '🇲🇾',
+  thailand:                   '🇹🇭',
+  philippines:                '🇵🇭',
+  pakistan:                   '🇵🇰',
+  bangladesh:                 '🇧🇩',
+  'sri lanka':                '🇱🇰',
+  nepal:                      '🇳🇵',
+  egypt:                      '🇪🇬',
+  'saudi arabia':             '🇸🇦',
+  qatar:                      '🇶🇦',
+  kuwait:                     '🇰🇼',
+  bahrain:                    '🇧🇭',
+  oman:                       '🇴🇲',
+  kenya:                      '🇰🇪',
+  nigeria:                    '🇳🇬',
+  'south africa':             '🇿🇦',
+  ghana:                      '🇬🇭',
+  argentina:                  '🇦🇷',
+  colombia:                   '🇨🇴',
+  chile:                      '🇨🇱',
+  peru:                       '🇵🇪',
 }
 
 export function getFlag(name: string): string {
@@ -105,7 +104,6 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
   const [loading, setLoading]                 = useState(false)
   const [fetchError, setFetchError]           = useState('')
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
-  const [city, setCity]                       = useState('')
   const [dropdownOpen, setDropdownOpen]       = useState(false)
   const [search, setSearch]                   = useState('')
 
@@ -114,20 +112,17 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
   const dropdownMenuRef = useRef<HTMLDivElement>(null)
   const searchRef       = useRef<HTMLInputElement>(null)
 
-  // ── Filtered countries based on search ────────────────────────────────────
+  // ── Filtered list ──────────────────────────────────────────────────────────
   const filteredCountries = countries.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  // ── Fetch countries dynamically on open ───────────────────────────────────
-  useEffect(() => {
-    if (!isOpen) return
-
+  // ── Fetch on open ──────────────────────────────────────────────────────────
+  const fetchCountries = () => {
     setFetchError('')
     setLoading(true)
     setCountries([])
     setSelectedCountry(null)
-
     fetch(`${BASE_URL}/api/allCountries`)
       .then((res) => {
         if (!res.ok) throw new Error(`Server error: ${res.status}`)
@@ -139,13 +134,17 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
         setCountries(data)
         setSelectedCountry(data[0])
       })
-      .catch((err: Error) => {
+      .catch((err: Error) =>
         setFetchError(err.message || 'Failed to load countries. Please try again.')
-      })
+      )
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    if (isOpen) fetchCountries()
   }, [isOpen])
 
-  // ── Auto-focus search when dropdown opens ─────────────────────────────────
+  // ── Auto-focus search on dropdown open ────────────────────────────────────
   useEffect(() => {
     if (dropdownOpen) {
       setSearch('')
@@ -153,7 +152,7 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
     }
   }, [dropdownOpen])
 
-  // ── Close dropdown on outside click ───────────────────────────────────────
+  // ── Outside click closes dropdown ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -164,66 +163,44 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // ── Prevent background scroll when dropdown overflows ─────────────────────
+  // ── Trap scroll inside dropdown list ──────────────────────────────────────
   useEffect(() => {
-    if (dropdownOpen && dropdownMenuRef.current) {
-      const el = dropdownMenuRef.current
-      const handleWheel = (e: WheelEvent) => {
-        const { scrollTop, scrollHeight, clientHeight } = el
-        const atTop    = scrollTop === 0
-        const atBottom = scrollTop + clientHeight >= scrollHeight
-        if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) e.preventDefault()
-      }
-      el.addEventListener('wheel', handleWheel, { passive: false })
-      return () => el.removeEventListener('wheel', handleWheel)
+    if (!dropdownOpen || !dropdownMenuRef.current) return
+    const el = dropdownMenuRef.current
+    const onWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el
+      const atTop    = scrollTop === 0
+      const atBottom = scrollTop + clientHeight >= scrollHeight
+      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) e.preventDefault()
     }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
   }, [dropdownOpen])
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) onClose()
   }
 
   const handleContinue = () => {
     if (!selectedCountry) return
-    onConfirm(selectedCountry, city.trim())
-  }
-
-  const handleRetry = () => {
-    setFetchError('')
-    setLoading(true)
-    fetch(`${BASE_URL}/api/allCountries`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Server error: ${res.status}`)
-        return res.json()
-      })
-      .then((json) => {
-        const data: Country[] = Array.isArray(json) ? json : (json.data ?? [])
-        if (data.length === 0) throw new Error('No countries returned.')
-        setCountries(data)
-        setSelectedCountry(data[0])
-      })
-      .catch((err: Error) => setFetchError(err.message))
-      .finally(() => setLoading(false))
+    onConfirm(selectedCountry, '')
   }
 
   if (!isOpen) return null
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div
       className="fixed inset-0 z-[999] flex items-start justify-center pt-14 px-4
                  bg-[#eeeeee] lg:bg-transparent"
       onClick={handleBackdropClick}
     >
-      {/* Card */}
       <div
         ref={modalRef}
-        className="w-full max-w-[480px] bg-white rounded-2xl shadow-2xl overflow-visible"
+        className="w-full max-w-[480px] bg-white rounded-2xl shadow-2xl"
         style={{ animation: 'modalIn 0.25s ease-out' }}
       >
         {/* ── Header ── */}
-        <div className="flex items-start justify-between px-5 pt-5 pb-3">
+        <div className="flex items-start justify-between px-5 pt-5 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-[#B4538F]/10 flex items-center justify-center shrink-0">
               <svg className="w-5 h-5 text-[#B4538F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,7 +219,6 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
               </p>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -259,7 +235,7 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
         {/* ── Body ── */}
         <div className="px-5 pb-5 space-y-4">
 
-          {/* ── Loading State ── */}
+          {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center gap-2 py-8">
               <svg className="w-5 h-5 text-[#B4538F] animate-spin" fill="none" viewBox="0 0 24 24">
@@ -270,7 +246,7 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
             </div>
           )}
 
-          {/* ── Error State ── */}
+          {/* Error */}
           {!loading && fetchError && (
             <div className="flex flex-col items-center gap-3 py-6">
               <div className="flex items-center gap-2">
@@ -283,36 +259,38 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
               </div>
               <button
                 type="button"
-                onClick={handleRetry}
-                className="text-xs font-semibold text-[#B4538F] underline underline-offset-2 hover:text-[#9f3e7a] transition-colors"
+                onClick={fetchCountries}
+                className="text-xs font-semibold text-[#B4538F] underline underline-offset-2
+                           hover:text-[#9f3e7a] transition-colors"
               >
                 Try again
               </button>
             </div>
           )}
 
-          {/* ── Country Dropdown (only when data ready) ── */}
+          {/* Dropdown */}
           {!loading && !fetchError && countries.length > 0 && (
             <div className="relative" ref={dropdownRef}>
               <label className="block text-xs font-medium text-gray-700 mb-1.5">
                 Select Country
               </label>
 
-              {/* ── Trigger Button ── */}
+              {/* Trigger */}
               <button
                 type="button"
                 onClick={() => setDropdownOpen((v) => !v)}
                 aria-haspopup="listbox"
                 aria-expanded={dropdownOpen}
                 className={clsx(
-                  'w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium bg-white transition-all duration-200',
+                  'w-full flex items-center justify-between px-4 py-3 rounded-xl border',
+                  'text-sm font-medium bg-white transition-all duration-200',
                   dropdownOpen
                     ? 'border-[#B4538F] ring-2 ring-[#B4538F]/20 shadow-sm'
                     : 'border-gray-200 hover:border-[#B4538F]/50 hover:shadow-sm',
                 )}
               >
                 <div className="flex items-center gap-2.5">
-                  {/* <span className="text-lg leading-none">{getFlag(selectedCountry?.name ?? '')}</span> */}
+                  {/* <span className="text-xl leading-none">{getFlag(selectedCountry?.name ?? '')}</span> */}
                   <span className="text-gray-800 font-semibold">
                     {selectedCountry ? capitalize(selectedCountry.name) : 'Select Country'}
                   </span>
@@ -328,13 +306,17 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
                 </svg>
               </button>
 
-              {/* ── Dropdown Panel ── */}
+              {/* Panel */}
               {dropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
 
-                  {/* Search Box */}
-                  <div className="px-3 py-2.5 border-b border-gray-100">
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 focus-within:border-[#B4538F] focus-within:ring-1 focus-within:ring-[#B4538F]/20 transition-all">
+                  {/* Search */}
+                  <div className="px-3 pt-3 pb-2">
+                    <div className={clsx(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50',
+                      'border border-gray-200 focus-within:border-[#B4538F]',
+                      'focus-within:ring-1 focus-within:ring-[#B4538F]/20 transition-all',
+                    )}>
                       <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -348,11 +330,8 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
                         className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none"
                       />
                       {search && (
-                        <button
-                          type="button"
-                          onClick={() => setSearch('')}
-                          className="text-gray-300 hover:text-gray-500 transition-colors"
-                        >
+                        <button type="button" onClick={() => setSearch('')}
+                          className="text-gray-300 hover:text-gray-500 transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                           </svg>
@@ -361,72 +340,76 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
                     </div>
                   </div>
 
-                  {/* Country List */}
-                  <div
-                    ref={dropdownMenuRef}
-                    className="country-scroll overflow-y-auto overscroll-contain"
-                    style={{
-                      maxHeight: '260px',
-                      scrollBehavior: 'smooth',
-                      WebkitOverflowScrolling: 'touch',
-                    }}
-                  >
-                    {filteredCountries.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-gray-400">
-                        No countries found for &ldquo;{search}&rdquo;
-                      </div>
-                    ) : (
-                      filteredCountries.map((country, index) => {
-                        const isSelected = selectedCountry?._id === country._id
-                        const isLast     = index === filteredCountries.length - 1
-                        return (
-                          <button
-                            key={country._id}
-                            type="button"
-                            onClick={() => { setSelectedCountry(country); setDropdownOpen(false) }}
-                            className={clsx(
-                              'w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors',
-                              !isLast && 'border-b border-gray-100',
-                              isSelected
-                                ? 'bg-[#B4538F]/5'
-                                : 'hover:bg-gray-50',
-                            )}
-                          >
-                            {/* Flag */}
-                            {/* <span className="text-xl leading-none shrink-0">
-                              {getFlag(country.name)}
-                            </span> */}
-
-                            {/* Name */}
-                            <span className={clsx(
-                              'flex-1 font-medium',
-                              isSelected ? 'text-[#B4538F]' : 'text-gray-800',
-                            )}>
-                              {capitalize(country.name)}
-                            </span>
-
-                            {/* Radio Button */}
-                            <span className={clsx(
-                              'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-                              isSelected
-                                ? 'border-[#B4538F] bg-[#B4538F]'
-                                : 'border-gray-300 bg-white',
-                            )}>
-                              {isSelected && (
-                                <span className="w-2 h-2 rounded-full bg-white" />
+                  {/* ── Scrollable List with visible scrollbar ── */}
+                  <div className="relative">
+                    <div
+                      ref={dropdownMenuRef}
+                      id="country-list"
+                      style={{
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#D1B4C8 #F3EBF0',
+                      }}
+                    >
+                      {filteredCountries.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-gray-400">
+                          No countries found for &ldquo;{search}&rdquo;
+                        </div>
+                      ) : (
+                        filteredCountries.map((country, index) => {
+                          const isSelected = selectedCountry?._id === country._id
+                          const isLast     = index === filteredCountries.length - 1
+                          return (
+                            <button
+                              key={country._id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCountry(country)
+                                setDropdownOpen(false)
+                              }}
+                              className={clsx(
+                                'w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors',
+                                !isLast && 'border-b border-gray-100',
+                                isSelected ? 'bg-[#B4538F]/5' : 'hover:bg-gray-50',
                               )}
-                            </span>
-                          </button>
-                        )
-                      })
-                    )}
+                            >
+                              {/* Flag */}
+                              {/* <span className="text-xl leading-none shrink-0 w-7 text-center">
+                                {getFlag(country.name)}
+                              </span> */}
+
+                              {/* Name */}
+                              <span className={clsx(
+                                'flex-1 font-medium',
+                                isSelected ? 'text-[#B4538F]' : 'text-gray-800',
+                              )}>
+                                {capitalize(country.name)}
+                              </span>
+
+                              {/* Radio */}
+                              <span className={clsx(
+                                'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                                isSelected
+                                  ? 'border-[#B4538F] bg-[#B4538F]'
+                                  : 'border-gray-300 bg-white',
+                              )}>
+                                {isSelected && <span className="w-2 h-2 rounded-full bg-white" />}
+                              </span>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
                   </div>
+
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Continue Button ── */}
+          {/* Continue */}
           <button
             type="button"
             onClick={handleContinue}
@@ -443,17 +426,34 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
         </div>
       </div>
 
-      {/* ── Animations & Scrollbar ── */}
+      {/* ── Global styles: animation + webkit scrollbar ── */}
       <style>{`
         @keyframes modalIn {
           from { opacity: 0; transform: translateY(-10px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .country-scroll::-webkit-scrollbar              { width: 5px; }
-        .country-scroll::-webkit-scrollbar-track        { background: transparent; }
-        .country-scroll::-webkit-scrollbar-thumb        { background: #d1d5db; border-radius: 10px; }
-        .country-scroll::-webkit-scrollbar-thumb:hover  { background: #9ca3af; }
-        .overscroll-contain                             { overscroll-behavior: contain; }
+
+        /* Webkit (Chrome / Safari / Edge) — styled scrollbar */
+        #country-list::-webkit-scrollbar {
+          width: 6px;
+        }
+        #country-list::-webkit-scrollbar-track {
+          background: #F3EBF0;
+          border-radius: 10px;
+        }
+        #country-list::-webkit-scrollbar-thumb {
+          background: #D1B4C8;
+          border-radius: 10px;
+        }
+        #country-list::-webkit-scrollbar-thumb:hover {
+          background: #B4538F;
+        }
+        
+        /* Firefox scrollbar styling */
+        #country-list {
+          scrollbar-width: thin;
+          scrollbar-color: #D1B4C8 #F3EBF0;
+        }
       `}</style>
     </div>
   )
@@ -476,7 +476,6 @@ export default function LocationSelector() {
 
   return (
     <>
-      {/* ── Trigger Button ── */}
       <button
         type="button"
         onClick={() => setModalOpen(true)}
@@ -490,10 +489,7 @@ export default function LocationSelector() {
         )}
       >
         <div className="flex items-center gap-1.5">
-          <svg
-            className="w-4 h-4 text-[#B4538F] shrink-0"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
+          <svg className="w-4 h-4 text-[#B4538F] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
