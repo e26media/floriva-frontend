@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { ShoppingCart02Icon, Store02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useRouter } from 'next/navigation'
@@ -64,41 +64,80 @@ function useImagePreview() {
 }
 
 /* ─── Upload Box ─────────────────────────────────────────────── */
+/*
+  FIX: Replaced div+ref.click() approach with a proper <label> wrapping
+  the <input type="file">. On iOS and Android, programmatic .click() on
+  a file input triggered from a div's onClick is blocked by the browser's
+  security model. A <label htmlFor=...> natively activates its input on
+  any tap/click without JS, which mobile browsers fully support.
+*/
 function UploadBox({
-  label, sublabel, preview, onFile, accept = 'image/*', icon,
+  id,
+  label,
+  sublabel,
+  preview,
+  onFile,
+  accept = 'image/*',
+  icon,
 }: {
-  label: string; sublabel?: string; preview: string | null
-  onFile: (f: File | null) => void; accept?: string; icon: string
+  id: string
+  label: string
+  sublabel?: string
+  preview: string | null
+  onFile: (f: File | null) => void
+  accept?: string
+  icon: string
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
   return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      className="relative cursor-pointer rounded-2xl border-2 border-dashed border-[#EA5A7B]/20 bg-[#EA5A7B]/[0.02] overflow-hidden aspect-[4/3] transition-all duration-200 hover:border-[#EA5A7B]/50 hover:bg-[#EA5A7B]/[0.05] group"
+    <label
+      htmlFor={id}
+      className="relative cursor-pointer rounded-2xl border-2 border-dashed border-[#EA5A7B]/20 bg-[#EA5A7B]/[0.02] overflow-hidden aspect-[4/3] transition-all duration-200 hover:border-[#EA5A7B]/50 hover:bg-[#EA5A7B]/[0.05] group block"
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
-      <input ref={inputRef} type="file" accept={accept} className="hidden"
-        onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      {/* Hidden file input — id links it to the label above */}
+      <input
+        id={id}
+        type="file"
+        accept={accept}
+        className="sr-only"
+        onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+        // Allow re-selecting the same file on mobile
+        onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
+      />
+
       {preview ? (
         <>
           <img src={preview} alt={label} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-            <span className="text-white text-xs font-semibold bg-black/30 px-3 py-1 rounded-full">Change</span>
+            <span className="text-white text-xs font-semibold bg-black/30 px-3 py-1 rounded-full">
+              Change
+            </span>
           </div>
         </>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3">
           <span className="text-2xl">{icon}</span>
           <span className="text-[11px] font-semibold text-gray-400 text-center leading-tight">{label}</span>
-          {sublabel && <span className="text-[10px] text-gray-300 text-center">{sublabel}</span>}
+          {sublabel && (
+            <span className="text-[10px] text-gray-300 text-center">{sublabel}</span>
+          )}
         </div>
       )}
-    </div>
+    </label>
   )
 }
 
 /* ─── Field wrapper ──────────────────────────────────────────── */
-function Field({ label, optional, error, children }: {
-  label: string; optional?: boolean; error?: string; children: React.ReactNode
+function Field({
+  label,
+  optional,
+  error,
+  children,
+}: {
+  label: string
+  optional?: boolean
+  error?: string
+  children: React.ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -125,11 +164,19 @@ function Field({ label, optional, error, children }: {
 }
 
 /* ─── Input classes ──────────────────────────────────────────── */
-const inputCls = 'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all duration-150 focus:border-[#EA5A7B]/50 focus:bg-white focus:ring-2 focus:ring-[#EA5A7B]/10'
-const inputErrCls = 'w-full px-3.5 py-2.5 rounded-xl border border-[#EA5A7B]/50 bg-red-50/60 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all duration-150 ring-2 ring-[#EA5A7B]/10'
+const inputCls =
+  'w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all duration-150 focus:border-[#EA5A7B]/50 focus:bg-white focus:ring-2 focus:ring-[#EA5A7B]/10'
+const inputErrCls =
+  'w-full px-3.5 py-2.5 rounded-xl border border-[#EA5A7B]/50 bg-red-50/60 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all duration-150 ring-2 ring-[#EA5A7B]/10'
 
 /* ─── Validation Banner ──────────────────────────────────────── */
-function ValidationBanner({ errors, onClose }: { errors: FieldErrors; onClose: () => void }) {
+function ValidationBanner({
+  errors,
+  onClose,
+}: {
+  errors: FieldErrors
+  onClose: () => void
+}) {
   const messages = [
     errors.vendorName,
     errors.vendorAddress,
@@ -184,12 +231,17 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
   const [showBanner, setShowBanner] = useState(false)
 
   const [form, setForm] = useState<VendorFormData>({
-    vendorName: '', vendorAddress: '', email: '', phone: '',
-    shopLicence: '', vendorPhoto: null, shopPhoto: null,
+    vendorName: '',
+    vendorAddress: '',
+    email: '',
+    phone: '',
+    shopLicence: '',
+    vendorPhoto: null,
+    shopPhoto: null,
   })
 
   const vendorImg = useImagePreview()
-  const shopImg   = useImagePreview()
+  const shopImg = useImagePreview()
 
   const set = (key: keyof VendorFormData, value: string | File | null) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -209,7 +261,11 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
     const errs: FieldErrors = {}
     if (!form.vendorName.trim())    errs.vendorName    = 'Vendor name is required'
     if (!form.vendorAddress.trim()) errs.vendorAddress = 'Address is required'
-    if (Object.keys(errs).length > 0) { setFieldErrors(errs); setShowBanner(true); return false }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs)
+      setShowBanner(true)
+      return false
+    }
     return true
   }
 
@@ -217,9 +273,14 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
   const validateStep2 = (): boolean => {
     const errs: FieldErrors = {}
     if (!form.email.trim()) errs.email = 'Email is required'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email address'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      errs.email = 'Enter a valid email address'
     if (!form.phone.trim()) errs.phone = 'Phone number is required'
-    if (Object.keys(errs).length > 0) { setFieldErrors(errs); setShowBanner(true); return false }
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs)
+      setShowBanner(true)
+      return false
+    }
     return true
   }
 
@@ -241,12 +302,19 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
       if (form.vendorPhoto) formData.append('photo',     form.vendorPhoto)
       if (form.shopPhoto)   formData.append('shopPhoto', form.shopPhoto)
 
-      const res = await fetch(`${BASE_URL}/api/vendor`, { method: 'POST', body: formData })
+      const res = await fetch(`${BASE_URL}/api/vendor`, {
+        method: 'POST',
+        body: formData,
+      })
 
       if (!res.ok) {
         let errMessage = `Server error: ${res.status}`
-        try { const j = await res.json(); errMessage = j.message ?? errMessage }
-        catch { errMessage = (await res.text()) || errMessage }
+        try {
+          const j = await res.json()
+          errMessage = j.message ?? errMessage
+        } catch {
+          errMessage = (await res.text()) || errMessage
+        }
 
         const parsed = parseValidationErrors(errMessage)
         setFieldErrors(parsed)
@@ -257,7 +325,12 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
 
       setSubmitted(true)
     } catch (err: unknown) {
-      setFieldErrors({ general: err instanceof Error ? err.message : 'Something went wrong. Please try again.' })
+      setFieldErrors({
+        general:
+          err instanceof Error
+            ? err.message
+            : 'Something went wrong. Please try again.',
+      })
       setShowBanner(true)
     } finally {
       setIsLoading(false)
@@ -287,9 +360,10 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
       >
         {/* Modal */}
         <div className="vp-shell relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl shadow-black/15 border border-gray-100/80">
-
-          <div className="h-1 w-full rounded-t-3xl"
-            style={{ background: 'linear-gradient(90deg,#7C4CA3,#B95592,#EA5A7B)' }} />
+          <div
+            className="h-1 w-full rounded-t-3xl"
+            style={{ background: 'linear-gradient(90deg,#7C4CA3,#B95592,#EA5A7B)' }}
+          />
 
           {!submitted ? (
             <>
@@ -303,8 +377,10 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
                     {step === 1 ? 'Basic info & photos' : 'Contact details & licence'}
                   </p>
                 </div>
-                <button onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-base text-gray-300 hover:text-[#EA5A7B] hover:bg-[#EA5A7B]/10 transition-all duration-150 flex-shrink-0 mt-0.5">
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-base text-gray-300 hover:text-[#EA5A7B] hover:bg-[#EA5A7B]/10 transition-all duration-150 flex-shrink-0 mt-0.5"
+                >
                   ✕
                 </button>
               </div>
@@ -312,8 +388,17 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
               {/* Step pills */}
               <div className="flex items-center gap-2 px-7 mt-4">
                 {[1, 2].map((s) => (
-                  <div key={s} className="h-1 rounded-full transition-all duration-300"
-                    style={{ width: 36, background: step >= s ? 'linear-gradient(90deg,#7C4CA3,#EA5A7B)' : '#e5e7eb' }} />
+                  <div
+                    key={s}
+                    className="h-1 rounded-full transition-all duration-300"
+                    style={{
+                      width: 36,
+                      background:
+                        step >= s
+                          ? 'linear-gradient(90deg,#7C4CA3,#EA5A7B)'
+                          : '#e5e7eb',
+                    }}
+                  />
                 ))}
                 <span className="ml-auto text-[10px] font-bold tracking-widest uppercase text-gray-300">
                   Step {step} / 2
@@ -326,72 +411,138 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
               <div className="px-7 py-5 flex flex-col gap-4">
                 {step === 1 ? (
                   <>
-                    {showBanner && (fieldErrors.vendorName || fieldErrors.vendorAddress) && (
-                      <ValidationBanner
-                        errors={{ vendorName: fieldErrors.vendorName, vendorAddress: fieldErrors.vendorAddress }}
-                        onClose={() => {
-                          setFieldErrors((p) => { const n = {...p}; delete n.vendorName; delete n.vendorAddress; return n })
-                          setShowBanner(false)
-                        }}
-                      />
-                    )}
+                    {showBanner &&
+                      (fieldErrors.vendorName || fieldErrors.vendorAddress) && (
+                        <ValidationBanner
+                          errors={{
+                            vendorName: fieldErrors.vendorName,
+                            vendorAddress: fieldErrors.vendorAddress,
+                          }}
+                          onClose={() => {
+                            setFieldErrors((p) => {
+                              const n = { ...p }
+                              delete n.vendorName
+                              delete n.vendorAddress
+                              return n
+                            })
+                            setShowBanner(false)
+                          }}
+                        />
+                      )}
 
                     <Field label="Vendor / Shop Name" error={fieldErrors.vendorName}>
-                      <input className={fieldErrors.vendorName ? inputErrCls : inputCls}
-                        placeholder="e.g. Sunrise Traders" value={form.vendorName}
-                        onChange={(e) => set('vendorName', e.target.value)} />
+                      <input
+                        className={fieldErrors.vendorName ? inputErrCls : inputCls}
+                        placeholder="e.g. Sunrise Traders"
+                        value={form.vendorName}
+                        onChange={(e) => set('vendorName', e.target.value)}
+                      />
                     </Field>
 
                     <Field label="Vendor Address" error={fieldErrors.vendorAddress}>
-                      <textarea className={(fieldErrors.vendorAddress ? inputErrCls : inputCls) + ' resize-none min-h-[72px]'}
-                        placeholder="Street, City, State, PIN code..." value={form.vendorAddress}
-                        onChange={(e) => set('vendorAddress', e.target.value)} />
+                      <textarea
+                        className={
+                          (fieldErrors.vendorAddress ? inputErrCls : inputCls) +
+                          ' resize-none min-h-[72px]'
+                        }
+                        placeholder="Street, City, State, PIN code..."
+                        value={form.vendorAddress}
+                        onChange={(e) => set('vendorAddress', e.target.value)}
+                      />
                     </Field>
 
                     <div className="h-px bg-gray-100" />
 
                     <div>
-                      <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-2">Photos</p>
+                      <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-2">
+                        Photos
+                      </p>
                       <div className="grid grid-cols-2 gap-3">
-                        <UploadBox label="Vendor Photo" sublabel="Your profile picture"
-                          preview={vendorImg.preview} icon="🧑‍💼"
-                          onFile={(f) => { set('vendorPhoto', f); vendorImg.handleFile(f) }} />
-                        <UploadBox label="Shop Photo" sublabel="Storefront / interior"
-                          preview={shopImg.preview} icon="🏪"
-                          onFile={(f) => { set('shopPhoto', f); shopImg.handleFile(f) }} />
+                        {/*
+                          KEY FIX: Each UploadBox now receives a unique `id` prop.
+                          The <label htmlFor={id}> inside UploadBox links directly
+                          to the <input id={id}>, making the entire box a native
+                          file-picker trigger — no JS .click() needed, works on
+                          iOS Safari, Chrome Android, and all mobile browsers.
+                        */}
+                        <UploadBox
+                          id="vendor-photo-input"
+                          label="Vendor Photo"
+                          sublabel="Your profile picture"
+                          preview={vendorImg.preview}
+                          icon="🧑‍💼"
+                          onFile={(f) => {
+                            set('vendorPhoto', f)
+                            vendorImg.handleFile(f)
+                          }}
+                        />
+                        <UploadBox
+                          id="shop-photo-input"
+                          label="Shop Photo"
+                          sublabel="Storefront / interior"
+                          preview={shopImg.preview}
+                          icon="🏪"
+                          onFile={(f) => {
+                            set('shopPhoto', f)
+                            shopImg.handleFile(f)
+                          }}
+                        />
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
-                    {showBanner && (fieldErrors.email || fieldErrors.phone || fieldErrors.general) && (
-                      <ValidationBanner
-                        errors={{ email: fieldErrors.email, phone: fieldErrors.phone, general: fieldErrors.general }}
-                        onClose={() => {
-                          setFieldErrors((p) => { const n = {...p}; delete n.email; delete n.phone; delete n.general; return n })
-                          setShowBanner(false)
-                        }}
-                      />
-                    )}
+                    {showBanner &&
+                      (fieldErrors.email || fieldErrors.phone || fieldErrors.general) && (
+                        <ValidationBanner
+                          errors={{
+                            email: fieldErrors.email,
+                            phone: fieldErrors.phone,
+                            general: fieldErrors.general,
+                          }}
+                          onClose={() => {
+                            setFieldErrors((p) => {
+                              const n = { ...p }
+                              delete n.email
+                              delete n.phone
+                              delete n.general
+                              return n
+                            })
+                            setShowBanner(false)
+                          }}
+                        />
+                      )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Email" error={fieldErrors.email}>
-                        <input className={fieldErrors.email ? inputErrCls : inputCls}
-                          type="email" placeholder="you@example.com" value={form.email}
-                          onChange={(e) => set('email', e.target.value)} />
+                        <input
+                          className={fieldErrors.email ? inputErrCls : inputCls}
+                          type="email"
+                          placeholder="you@example.com"
+                          value={form.email}
+                          onChange={(e) => set('email', e.target.value)}
+                        />
                       </Field>
                       <Field label="Phone" error={fieldErrors.phone}>
-                        <input className={fieldErrors.phone ? inputErrCls : inputCls}
-                          type="tel" placeholder="+91 98765 43210" value={form.phone}
-                          onChange={(e) => set('phone', e.target.value)} />
+                        <input
+                          className={fieldErrors.phone ? inputErrCls : inputCls}
+                          type="tel"
+                          placeholder="+91 98765 43210"
+                          value={form.phone}
+                          onChange={(e) => set('phone', e.target.value)}
+                        />
                       </Field>
                     </div>
 
                     <div className="h-px bg-gray-100" />
 
                     <Field label="Shop Licence Number" optional>
-                      <input className={inputCls} placeholder="e.g. KA/MNG/2024/00123"
-                        value={form.shopLicence} onChange={(e) => set('shopLicence', e.target.value)} />
+                      <input
+                        className={inputCls}
+                        placeholder="e.g. KA/MNG/2024/00123"
+                        value={form.shopLicence}
+                        onChange={(e) => set('shopLicence', e.target.value)}
+                      />
                     </Field>
                   </>
                 )}
@@ -401,35 +552,66 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
               <div className="px-7 pb-7 flex gap-3">
                 {step === 1 ? (
                   <>
-                    <button onClick={onClose}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150">
+                    <button
+                      onClick={onClose}
+                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150"
+                    >
                       Cancel
                     </button>
                     <button
-                      onClick={() => { if (validateStep1()) { setShowBanner(false); setStep(2) } }}
+                      onClick={() => {
+                        if (validateStep1()) {
+                          setShowBanner(false)
+                          setStep(2)
+                        }
+                      }}
                       className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99]"
-                      style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.32)' }}>
+                      style={{
+                        background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
+                        boxShadow: '0 4px 18px rgba(234,90,123,.32)',
+                      }}
+                    >
                       Continue →
                     </button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => { setStep(1); setShowBanner(false) }} disabled={isLoading}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150 disabled:opacity-40">
+                    <button
+                      onClick={() => {
+                        setStep(1)
+                        setShowBanner(false)
+                      }}
+                      disabled={isLoading}
+                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150 disabled:opacity-40"
+                    >
                       ← Back
                     </button>
-                    <button onClick={handleSubmit} disabled={isLoading}
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isLoading}
                       className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.32)' }}>
+                      style={{
+                        background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
+                        boxShadow: '0 4px 18px rgba(234,90,123,.32)',
+                      }}
+                    >
                       {isLoading ? (
                         <>
                           <svg className="spinner w-4 h-4" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeOpacity=".3" />
-                            <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                            <circle
+                              cx="12" cy="12" r="10"
+                              stroke="white" strokeWidth="3" strokeOpacity=".3"
+                            />
+                            <path
+                              d="M12 2a10 10 0 0 1 10 10"
+                              stroke="white" strokeWidth="3" strokeLinecap="round"
+                            />
                           </svg>
                           Submitting…
                         </>
-                      ) : 'Submit Registration'}
+                      ) : (
+                        'Submit Registration'
+                      )}
                     </button>
                   </>
                 )}
@@ -438,20 +620,32 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
           ) : (
             /* Success */
             <div className="flex flex-col items-center gap-5 px-8 py-14 text-center">
-              <div className="vp-pop-in w-20 h-20 rounded-full flex items-center justify-center text-white text-4xl font-bold"
-                style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 0 40px rgba(234,90,123,.35)' }}>
+              <div
+                className="vp-pop-in w-20 h-20 rounded-full flex items-center justify-center text-white text-4xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
+                  boxShadow: '0 0 40px rgba(234,90,123,.35)',
+                }}
+              >
                 ✓
               </div>
               <div>
-                <h3 className="font-syne text-xl font-extrabold text-gray-800">You're registered!</h3>
+                <h3 className="font-syne text-xl font-extrabold text-gray-800">
+                  You're registered!
+                </h3>
                 <p className="text-sm text-gray-400 mt-2 leading-relaxed">
                   Your vendor profile has been submitted.<br />
                   We'll review and activate your account within 24 hours.
                 </p>
               </div>
-              <button onClick={onClose}
+              <button
+                onClick={onClose}
                 className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.3)' }}>
+                style={{
+                  background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
+                  boxShadow: '0 4px 18px rgba(234,90,123,.3)',
+                }}
+              >
                 Done
               </button>
             </div>
@@ -469,13 +663,19 @@ export default function CartBtn() {
 
   return (
     <>
-      <button onClick={() => router.push('/cart')} title="Cart"
-        className="relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
+      <button
+        onClick={() => router.push('/cart')}
+        title="Cart"
+        className="relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800"
+      >
         <HugeiconsIcon icon={ShoppingCart02Icon} size={24} color="currentColor" strokeWidth={1.5} />
       </button>
 
-      <button onClick={() => setShowVendorPopup(true)} title="Join as Vendor"
-        className=" md:block relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
+      <button
+        onClick={() => setShowVendorPopup(true)}
+        title="Join as Vendor"
+        className="md:block relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800"
+      >
         <HugeiconsIcon icon={Store02Icon} size={24} color="currentColor" strokeWidth={1.5} />
       </button>
 
