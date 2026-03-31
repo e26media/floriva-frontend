@@ -93,9 +93,9 @@ const StickyHeader: FC<StickyHeaderProps> = ({
           </div>
 
           {/* ── Logo ── */}
-         {/* <div className="flex items-start lg:flex-1 ml-[20px] sm:ml-0">
+         <div className=" hidden flex items-start lg:flex-1 ml-[20px] sm:ml-0">
   <Logo />
-</div> */}
+</div>
          
 
           {/* ── Location Selector — LEFT side, desktop only (after logo) ── */}
