@@ -5,55 +5,61 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import StripePaymentForm from "@/components/StripePaymentForm";
+
+// Initialize Stripe outside of the component to prevent multiple initializations
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
 // =============================================================================
 //  CURRENCY CONFIG
 // =============================================================================
 const COUNTRY_CURRENCY_MAP: Record<string, { currency: string; symbol: string; locale: string }> = {
-  australia:            { currency: "AUD", symbol: "A$",  locale: "en-AU" },
-  au:                   { currency: "AUD", symbol: "A$",  locale: "en-AU" },
-  "united states":      { currency: "USD", symbol: "$",   locale: "en-US" },
-  us:                   { currency: "USD", symbol: "$",   locale: "en-US" },
-  usa:                  { currency: "USD", symbol: "$",   locale: "en-US" },
-  "united kingdom":     { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  uk:                   { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  gb:                   { currency: "GBP", symbol: "£",   locale: "en-GB" },
-  canada:               { currency: "CAD", symbol: "C$",  locale: "en-CA" },
-  ca:                   { currency: "CAD", symbol: "C$",  locale: "en-CA" },
-  india:                { currency: "INR", symbol: "₹",   locale: "en-IN" },
-  in:                   { currency: "INR", symbol: "₹",   locale: "en-IN" },
-  europe:               { currency: "EUR", symbol: "€",   locale: "en-DE" },
-  germany:              { currency: "EUR", symbol: "€",   locale: "de-DE" },
-  de:                   { currency: "EUR", symbol: "€",   locale: "de-DE" },
-  france:               { currency: "EUR", symbol: "€",   locale: "fr-FR" },
-  fr:                   { currency: "EUR", symbol: "€",   locale: "fr-FR" },
-  japan:                { currency: "JPY", symbol: "¥",   locale: "ja-JP" },
-  jp:                   { currency: "JPY", symbol: "¥",   locale: "ja-JP" },
-  china:                { currency: "CNY", symbol: "¥",   locale: "zh-CN" },
-  cn:                   { currency: "CNY", symbol: "¥",   locale: "zh-CN" },
-  singapore:            { currency: "SGD", symbol: "S$",  locale: "en-SG" },
-  sg:                   { currency: "SGD", symbol: "S$",  locale: "en-SG" },
-  "new zealand":        { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
-  nz:                   { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
+  australia: { currency: "AUD", symbol: "A$", locale: "en-AU" },
+  au: { currency: "AUD", symbol: "A$", locale: "en-AU" },
+  "united states": { currency: "USD", symbol: "$", locale: "en-US" },
+  us: { currency: "USD", symbol: "$", locale: "en-US" },
+  usa: { currency: "USD", symbol: "$", locale: "en-US" },
+  "united kingdom": { currency: "GBP", symbol: "£", locale: "en-GB" },
+  uk: { currency: "GBP", symbol: "£", locale: "en-GB" },
+  gb: { currency: "GBP", symbol: "£", locale: "en-GB" },
+  canada: { currency: "CAD", symbol: "C$", locale: "en-CA" },
+  ca: { currency: "CAD", symbol: "C$", locale: "en-CA" },
+  india: { currency: "INR", symbol: "₹", locale: "en-IN" },
+  in: { currency: "INR", symbol: "₹", locale: "en-IN" },
+  europe: { currency: "EUR", symbol: "€", locale: "en-DE" },
+  germany: { currency: "EUR", symbol: "€", locale: "de-DE" },
+  de: { currency: "EUR", symbol: "€", locale: "de-DE" },
+  france: { currency: "EUR", symbol: "€", locale: "fr-FR" },
+  fr: { currency: "EUR", symbol: "€", locale: "fr-FR" },
+  japan: { currency: "JPY", symbol: "¥", locale: "ja-JP" },
+  jp: { currency: "JPY", symbol: "¥", locale: "ja-JP" },
+  china: { currency: "CNY", symbol: "¥", locale: "zh-CN" },
+  cn: { currency: "CNY", symbol: "¥", locale: "zh-CN" },
+  singapore: { currency: "SGD", symbol: "S$", locale: "en-SG" },
+  sg: { currency: "SGD", symbol: "S$", locale: "en-SG" },
+  "new zealand": { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
+  nz: { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
   "united arab emirates": { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  uae:                  { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  ae:                   { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  switzerland:          { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  ch:                   { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  "south korea":        { currency: "KRW", symbol: "₩",  locale: "ko-KR" },
-  kr:                   { currency: "KRW", symbol: "₩",  locale: "ko-KR" },
-  brazil:               { currency: "BRL", symbol: "R$",  locale: "pt-BR" },
-  br:                   { currency: "BRL", symbol: "R$",  locale: "pt-BR" },
-  mexico:               { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  mx:                   { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  "south africa":       { currency: "ZAR", symbol: "R",   locale: "en-ZA" },
-  za:                   { currency: "ZAR", symbol: "R",   locale: "en-ZA" },
-  sweden:               { currency: "SEK", symbol: "kr",  locale: "sv-SE" },
-  se:                   { currency: "SEK", symbol: "kr",  locale: "sv-SE" },
-  norway:               { currency: "NOK", symbol: "kr",  locale: "nb-NO" },
-  no:                   { currency: "NOK", symbol: "kr",  locale: "nb-NO" },
-  denmark:              { currency: "DKK", symbol: "kr",  locale: "da-DK" },
-  dk:                   { currency: "DKK", symbol: "kr",  locale: "da-DK" },
+  uae: { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
+  ae: { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
+  switzerland: { currency: "CHF", symbol: "CHF", locale: "de-CH" },
+  ch: { currency: "CHF", symbol: "CHF", locale: "de-CH" },
+  "south korea": { currency: "KRW", symbol: "₩", locale: "ko-KR" },
+  kr: { currency: "KRW", symbol: "₩", locale: "ko-KR" },
+  brazil: { currency: "BRL", symbol: "R$", locale: "pt-BR" },
+  br: { currency: "BRL", symbol: "R$", locale: "pt-BR" },
+  mexico: { currency: "MXN", symbol: "MX$", locale: "es-MX" },
+  mx: { currency: "MXN", symbol: "MX$", locale: "es-MX" },
+  "south africa": { currency: "ZAR", symbol: "R", locale: "en-ZA" },
+  za: { currency: "ZAR", symbol: "R", locale: "en-ZA" },
+  sweden: { currency: "SEK", symbol: "kr", locale: "sv-SE" },
+  se: { currency: "SEK", symbol: "kr", locale: "sv-SE" },
+  norway: { currency: "NOK", symbol: "kr", locale: "nb-NO" },
+  no: { currency: "NOK", symbol: "kr", locale: "nb-NO" },
+  denmark: { currency: "DKK", symbol: "kr", locale: "da-DK" },
+  dk: { currency: "DKK", symbol: "kr", locale: "da-DK" },
 };
 
 const DEFAULT_CURRENCY = { currency: "USD", symbol: "$", locale: "en-US" };
@@ -109,10 +115,11 @@ interface FormState {
 // =============================================================================
 //  API CONFIG
 // =============================================================================
-const BASE_URL         = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 const CREATE_ORDER_URL = `${BASE_URL}/api/createorder`;
+const CONFIRM_PAYMENT_URL = `${BASE_URL}/api/confirm-payment`;
 const CONFIRM_CART_URL = `${BASE_URL}/api/confirm-order`;
-const IMAGE_BASE       = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || "http://localhost:7000";
+const IMAGE_BASE = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || "http://localhost:7000";
 
 // =============================================================================
 //  HELPERS
@@ -141,7 +148,7 @@ function getImgSrc(images?: (string | ProductImage)[]): string | null {
 function getPrice(p?: Product): number {
   if (!p) return 0;
   const exact = Number(p.exactPrice ?? 0);
-  const disc  = Number(p.discountPrice ?? 0);
+  const disc = Number(p.discountPrice ?? 0);
   return disc > 0 && disc < exact ? disc : exact;
 }
 
@@ -150,7 +157,7 @@ function getPrice(p?: Product): number {
 // =============================================================================
 async function safeFetch(url: string, options: RequestInit = {}): Promise<Record<string, unknown>> {
   const res = await fetch(url, options);
-  const ct  = res.headers.get("content-type") ?? "";
+  const ct = res.headers.get("content-type") ?? "";
   if (ct.includes("text/html")) {
     throw new Error(`Server returned HTML for ${url} (status ${res.status}). Check backend is running.`);
   }
@@ -164,7 +171,7 @@ async function safeFetch(url: string, options: RequestInit = {}): Promise<Record
 // =============================================================================
 //  SVG ICONS
 // =============================================================================
-const IcoSpin  = ({ c }: { c?: string }) => (
+const IcoSpin = ({ c }: { c?: string }) => (
   <svg className={`animate-spin ${c ?? ""}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
     <path d="M21 12a9 9 0 11-6.219-8.56" />
   </svg>
@@ -179,14 +186,14 @@ const IcoChevR = ({ c }: { c: string }) => (
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
-const IcoInfo  = ({ c }: { c: string }) => (
+const IcoInfo = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="8"  x2="12"    y2="12" />
+    <line x1="12" y1="8" x2="12" y2="12" />
     <line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 );
-const IcoLock  = ({ c }: { c: string }) => (
+const IcoLock = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="3" y="11" width="18" height="11" rx="2" />
     <path d="M7 11V7a5 5 0 0110 0v4" />
@@ -196,36 +203,36 @@ const IcoTruck = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="1" y="3" width="15" height="13" rx="1" />
     <path d="M16 8h4l3 5v3h-7V8z" />
-    <circle cx="5.5"  cy="18.5" r="2.5" />
+    <circle cx="5.5" cy="18.5" r="2.5" />
     <circle cx="18.5" cy="18.5" r="2.5" />
   </svg>
 );
-const IcoCard  = ({ c }: { c: string }) => (
+const IcoCard = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="1" y="4" width="22" height="16" rx="2" />
     <line x1="1" y1="10" x2="23" y2="10" />
   </svg>
 );
-const IcoCash  = ({ c }: { c: string }) => (
+const IcoCash = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <rect x="2" y="6" width="20" height="12" rx="2" />
     <circle cx="12" cy="12" r="3" />
     <path d="M6 12h.01M18 12h.01" />
   </svg>
 );
-const IcoUser  = ({ c }: { c: string }) => (
+const IcoUser = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
-const IcoMap   = ({ c }: { c: string }) => (
+const IcoMap = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
     <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" />
     <circle cx="12" cy="10" r="3" />
   </svg>
 );
-const IcoBag   = ({ c }: { c: string }) => (
+const IcoBag = ({ c }: { c: string }) => (
   <svg className={c} fill="none" stroke="currentColor" strokeWidth={1.2} viewBox="0 0 24 24">
     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
     <line x1="3" y1="6" x2="21" y2="6" />
@@ -406,9 +413,9 @@ function OrderItemRow({
 }) {
   const [imgErr, setImgErr] = useState(false);
   const p = item.productId;
-  const src   = getImgSrc(p?.images);
+  const src = getImgSrc(p?.images);
   const price = getPrice(p);
-  const qty   = item.quantity || 1;
+  const qty = item.quantity || 1;
 
   return (
     <div className="flex items-center gap-3 py-3 first:pt-0">
@@ -516,21 +523,22 @@ function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency
 //  MAIN CHECKOUT PAGE CONTENT (with useSearchParams)
 // =============================================================================
 function CheckoutPageContent() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   // ── Read ?country= param ──────────────────────────────────────────────────
-  const countryParam   = searchParams.get("country");
-  const currencyInfo   = getCurrencyInfo(countryParam);
+  const countryParam = searchParams.get("country");
+  const currencyInfo = getCurrencyInfo(countryParam);
   const { currency, symbol: currencySymbol, locale } = currencyInfo;
 
-  const [cartItems,     setCartItems]     = useState<CartItem[]>([]);
-  const [submitting,    setSubmitting]    = useState(false);
-  const [toast,         setToast]         = useState<ToastState | null>(null);
-  const [errors,        setErrors]        = useState<Partial<Record<keyof FormState, string>>>({});
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "online">("cash_on_delivery");
-  const [success,       setSuccess]       = useState(false);
-  const [doneOrderId,   setDoneOrderId]   = useState("");
+  const [success, setSuccess] = useState(false);
+  const [doneOrderId, setDoneOrderId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
 
   const [form, setForm] = useState<FormState>({
     firstName: "", lastName: "", email: "", phone: "",
@@ -555,10 +563,10 @@ function CheckoutPageContent() {
     const user = getUserData();
     setForm((f) => ({
       ...f,
-      email:     user.email     ?? "",
-      firstName: user.firstName ?? (user.name?.split(" ")[0])                ?? "",
-      lastName:  user.lastName  ?? (user.name?.split(" ").slice(1).join(" ")) ?? "",
-      phone:     user.phone     ?? "",
+      email: user.email ?? "",
+      firstName: user.firstName ?? (user.name?.split(" ")[0]) ?? "",
+      lastName: user.lastName ?? (user.name?.split(" ").slice(1).join(" ")) ?? "",
+      phone: user.phone ?? "",
     }));
   }, []);
 
@@ -588,15 +596,15 @@ function CheckoutPageContent() {
   // ── Validation ─────────────────────────────────────────────────────────────
   const validate = (): Partial<Record<keyof FormState, string>> => {
     const e: Partial<Record<keyof FormState, string>> = {};
-    if (!form.firstName.trim())             e.firstName             = "Required";
-    if (!form.lastName.trim())              e.lastName              = "Required";
-    if (!form.email.trim())                 e.email                 = "Required";
+    if (!form.firstName.trim()) e.firstName = "Required";
+    if (!form.lastName.trim()) e.lastName = "Required";
+    if (!form.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email";
-    if (!form.streetAddress1.trim())        e.streetAddress1        = "Required";
-    if (!form.city.trim())                  e.city                  = "Required";
+    if (!form.streetAddress1.trim()) e.streetAddress1 = "Required";
+    if (!form.city.trim()) e.city = "Required";
     if (!form.stateProvinceRegionId.trim()) e.stateProvinceRegionId = "Required";
-    if (!form.postalCode.trim())            e.postalCode            = "Required";
-    if (!form.country.trim())               e.country               = "Required";
+    if (!form.postalCode.trim()) e.postalCode = "Required";
+    if (!form.country.trim()) e.country = "Required";
     return e;
   };
 
@@ -623,54 +631,108 @@ function CheckoutPageContent() {
     setSubmitting(true);
 
     const payload = {
-      userEmail:    form.email,
+      userEmail: form.email,
       paymentMethod,
       currency,
       products: cartItems.map((item) => ({
-        product:  item.productId._id,
+        product: item.productId._id,
         quantity: item.quantity || 1,
       })),
       totalAmount: subtotal,
       shippingAddress: {
-        streetAddress1:        form.streetAddress1.trim(),
-        streetAddress2:        form.streetAddress2.trim(),
-        city:                  form.city.trim(),
+        streetAddress1: form.streetAddress1.trim(),
+        streetAddress2: form.streetAddress2.trim(),
+        city: form.city.trim(),
         stateProvinceRegionId: form.stateProvinceRegionId.trim(),
-        postalCode:            form.postalCode.trim(),
-        country:               form.country.trim(),
+        postalCode: form.postalCode.trim(),
+        country: form.country.trim(),
       },
     };
 
     try {
-      // Step 1 — Create the order
+      // Step 1 — Create the order intent on backend
       const json = await safeFetch(CREATE_ORDER_URL, {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(payload),
+        body: JSON.stringify(payload),
       });
 
-      // Step 2 — Mark cart items as "success" so cart becomes empty
+      const order = json.order as { _id?: string } | undefined;
+      const orderId = order?._id ?? (json.orderId as string) ?? "";
+      
+      // Save order ID for reference when payment succeeds
+      setDoneOrderId(orderId);
+
+      // --- If Online Payment, we stop here and show the Stripe Card Input ---
+      if (paymentMethod === "online" && json.clientSecret) {
+        setClientSecret(json.clientSecret as string);
+        setSubmitting(false);
+        return;
+      }
+
+      // --- If Cash on Delivery, finalize immediately ---
+      await finalizeOrderAfterValidation(form.email, orderId);
+
+    } catch (err) {
+      showToast((err as Error).message, "error");
+      setSubmitting(false);
+    }
+  };
+
+  /**
+   * Called either after COD order is created, or after Stripe payment is confirmed
+   */
+  const finalizeOrderAfterValidation = async (email: string, orderId: string) => {
+    try {
+      // Mark cart items as "success" so the global cart becomes empty
       try {
         await fetch(CONFIRM_CART_URL, {
-          method:  "POST",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ userEmail: form.email }),
+          body: JSON.stringify({ userEmail: email }),
         });
       } catch (cartErr) {
         console.warn("[Checkout] Could not clear cart:", (cartErr as Error).message);
       }
 
-      // Step 3 — Clean sessionStorage
+      // Clean session storage
       sessionStorage.removeItem("checkout_data");
 
-      // Step 4 — Show success
-      const order = json.order as { _id?: string } | undefined;
-      setDoneOrderId(order?._id ?? (json.orderId as string) ?? "");
+      // Show the success screen component
       setSuccess(true);
+    } catch (err) {
+      showToast("Order placed, but there were issues updating the cart.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
+  /**
+   * Callback from the StripePaymentForm component after the card is successfully charged
+   */
+  const handleStripeSuccess = async (paymentIntentId: string) => {
+    setSubmitting(true);
+    try {
+      // Notify backend that Stripe payment succeeded for this specific order
+      const response = await fetch(CONFIRM_PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: doneOrderId,
+          paymentIntentId
+        }),
+      });
+      
+      const json = await response.json();
+      if (!json.success) {
+        throw new Error(json.message || "Failed to confirm payment on server.");
+      }
+
+      // Everything passed! Finalize UI
+      await finalizeOrderAfterValidation(form.email, doneOrderId);
+      showToast("Payment confirmed successfully!", "success");
     } catch (err) {
       showToast((err as Error).message, "error");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -741,10 +803,10 @@ function CheckoutPageContent() {
                 />
                 <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
                   <Field label="First Name" id="firstName" required error={errors.firstName}>
-                    <Input id="firstName" placeholder="John"  value={form.firstName} onChange={handleChange} error={errors.firstName} disabled={submitting} />
+                    <Input id="firstName" placeholder="John" value={form.firstName} onChange={handleChange} error={errors.firstName} disabled={submitting} />
                   </Field>
                   <Field label="Last Name" id="lastName" required error={errors.lastName}>
-                    <Input id="lastName"  placeholder="Doe"   value={form.lastName}  onChange={handleChange} error={errors.lastName}  disabled={submitting} />
+                    <Input id="lastName" placeholder="Doe" value={form.lastName} onChange={handleChange} error={errors.lastName} disabled={submitting} />
                   </Field>
                   <Field label="Email Address" id="email" required error={errors.email}>
                     <Input id="email" type="email" placeholder="john@example.com" value={form.email} onChange={handleChange} error={errors.email} disabled={submitting} />
@@ -805,9 +867,9 @@ function CheckoutPageContent() {
                 <div className="space-y-3 p-6">
                   {(
                     [
-                      { id: "standard",  label: "Standard Shipping",  desc: "5–7 business days", price: "Free"   },
-                      { id: "express",   label: "Express Shipping",   desc: "2–3 business days", price: `${currencySymbol}12.99` },
-                      { id: "overnight", label: "Overnight Delivery", desc: "Next business day",  price: `${currencySymbol}24.99` },
+                      { id: "standard", label: "Standard Shipping", desc: "5–7 business days", price: "Free" },
+                      { id: "express", label: "Express Shipping", desc: "2–3 business days", price: `${currencySymbol}12.99` },
+                      { id: "overnight", label: "Overnight Delivery", desc: "Next business day", price: `${currencySymbol}24.99` },
                     ] as const
                   ).map((opt) => (
                     <label
@@ -1009,21 +1071,34 @@ function CheckoutPageContent() {
                   </div>
                 </div>
 
-                {/* Submit button */}
+                {/* Interactive Submit Area */}
                 <div className="px-6 pb-6">
-                  <button
-                    type="submit"
-                    disabled={submitting || cartItems.length === 0}
-                    className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-neutral-900 py-4 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
-                  >
-                    {submitting ? (
-                      <><IcoSpin c="h-4 w-4" /> Processing…</>
-                    ) : paymentMethod === "cash_on_delivery" ? (
-                      <><IcoCash c="h-4 w-4" /> Place Order (COD · {currencySymbol})</>
-                    ) : (
-                      <><IcoCard c="h-4 w-4" /> Place Order · {fmt(subtotal, locale, currency)}</>
-                    )}
-                  </button>
+                  {paymentMethod === "online" && clientSecret ? (
+                    /* The Real Stripe Payment Form */
+                    <Elements stripe={stripePromise} options={{ clientSecret }}>
+                      <StripePaymentForm 
+                        totalAmount={subtotal} 
+                        currencySymbol={currencySymbol} 
+                        onSuccess={handleStripeSuccess}
+                        onError={(msg) => showToast(msg, "error")}
+                      />
+                    </Elements>
+                  ) : (
+                    /* Normal Submit Button (shows "Proceed" for online, "Place" for COD) */
+                    <button
+                      type="submit"
+                      disabled={submitting || cartItems.length === 0}
+                      className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-neutral-900 py-4 text-sm font-semibold uppercase tracking-widest text-white transition-all hover:bg-neutral-700 hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+                    >
+                      {submitting ? (
+                        <><IcoSpin c="h-4 w-4" /> Processing…</>
+                      ) : paymentMethod === "cash_on_delivery" ? (
+                        <><IcoCash c="h-4 w-4" /> Place Order (COD · {currencySymbol})</>
+                      ) : (
+                        <><IcoCard c="h-4 w-4" /> Proceed to Payment · {fmt(subtotal, locale, currency)}</>
+                      )}
+                    </button>
+                  )}
 
                   <div className="mt-4 flex items-start gap-1.5 rounded-xl bg-neutral-50 px-3 py-3 dark:bg-neutral-800/60">
                     <IcoInfo c="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
