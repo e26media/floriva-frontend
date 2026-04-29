@@ -39,7 +39,8 @@ const EmblaCarousel = ({ images, option }: { images: string[]; option: EmblaOpti
 
   useEffect(() => {
     if (!emblaMainApi) return
-    onSelect()
+    // Delay slightly to avoid cascading renders during initialization
+    Promise.resolve().then(() => onSelect())
 
     emblaMainApi.on('select', onSelect).on('reInit', onSelect)
   }, [emblaMainApi, onSelect])

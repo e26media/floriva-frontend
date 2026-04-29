@@ -141,13 +141,19 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
   }
 
   useEffect(() => {
-    if (isOpen) fetchCountries()
+    if (isOpen) {
+      setTimeout(() => {
+        fetchCountries()
+      }, 0)
+    }
   }, [isOpen])
 
   // ── Auto-focus search on dropdown open ────────────────────────────────────
   useEffect(() => {
     if (dropdownOpen) {
-      setSearch('')
+      setTimeout(() => {
+        setSearch('')
+      }, 0)
       setTimeout(() => searchRef.current?.focus(), 50)
     }
   }, [dropdownOpen])
@@ -466,10 +472,27 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
 export default function LocationSelector() {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
-  const [selected, setSelected]   = useState<{ country: Country; city: string } | null>(null)
+  const [selected, setSelected] = useState<{ country: Country; city: string } | null>(null)
+
+  // ── Load from localStorage on mount ─────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem('floriva_selected_country')
+    if (saved) {
+      try {
+        const data = JSON.parse(saved)
+        setTimeout(() => {
+          setSelected(data)
+        }, 0)
+      } catch (e) {
+        console.error('Failed to parse saved country', e)
+      }
+    }
+  }, [])
 
   const handleConfirm = (country: Country, city: string) => {
-    setSelected({ country, city })
+    const data = { country, city }
+    setSelected(data)
+    localStorage.setItem('floriva_selected_country', JSON.stringify(data))
     setModalOpen(false)
     router.push(`/country/${country.name.toLowerCase()}`)
   }

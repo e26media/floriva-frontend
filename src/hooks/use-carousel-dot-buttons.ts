@@ -30,8 +30,10 @@ export const useCarouselDotButton = (emblaApi: EmblaCarouselType | undefined): U
   useEffect(() => {
     if (!emblaApi) return
 
-    onInit(emblaApi)
-    onSelect(emblaApi)
+    setTimeout(() => {
+      onInit(emblaApi)
+      onSelect(emblaApi)
+    }, 0)
     emblaApi.on('reInit', onInit).on('reInit', onSelect).on('select', onSelect)
   }, [emblaApi, onInit, onSelect])
 

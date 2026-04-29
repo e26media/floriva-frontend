@@ -66,10 +66,8 @@ function formatPrice(amount: number): string {
 // New Arrivals filter helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getFeaturedProductRaw(product: TApiProduct): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (product as any).FeaturedProduct ?? (product as any).featuredProduct ?? (product as any).featured_product ?? null
+    return (product as any).FeaturedProduct ?? (product as any).featuredProduct ?? (product as any).featured_product ?? null
 }
 
 function isNewArrival(product: TApiProduct): boolean {
@@ -79,8 +77,7 @@ function isNewArrival(product: TApiProduct): boolean {
   return arr.some((item) => {
     if (!item || typeof item === 'string') return false
     if (typeof item === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const obj = item as Record<string, any>
+            const obj = item as Record<string, any>
       return obj.name?.trim().toLowerCase() === NEW_ARRIVALS_LABEL.toLowerCase()
     }
     return false

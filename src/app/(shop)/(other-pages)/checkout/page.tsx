@@ -528,7 +528,25 @@ function CheckoutPageContent() {
 
   // ── Read ?country= param ──────────────────────────────────────────────────
   const countryParam = searchParams.get("country");
-  const currencyInfo = getCurrencyInfo(countryParam);
+  
+  // ── Dynamic Country Resolution ─────────────────────────────────────────────
+  const [resolvedCountry, setResolvedCountry] = useState<string | null>(countryParam);
+
+  useEffect(() => {
+    if (!countryParam && typeof window !== 'undefined') {
+      const saved = localStorage.getItem('floriva_selected_country');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.country?.name) {
+            setResolvedCountry(parsed.country.name.toLowerCase());
+          }
+        } catch (e) {}
+      }
+    }
+  }, [countryParam]);
+
+  const currencyInfo = getCurrencyInfo(resolvedCountry);
   const { currency, symbol: currencySymbol, locale } = currencyInfo;
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);

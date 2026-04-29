@@ -64,10 +64,8 @@ function formatPrice(amount: number): string {
 // Best Sellers filter helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getFeaturedProductRaw(product: TApiProduct): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (product as any).FeaturedProduct ?? (product as any).featuredProduct ?? (product as any).featured_product ?? null
+    return (product as any).FeaturedProduct ?? (product as any).featuredProduct ?? (product as any).featured_product ?? null
 }
 
 function isBestSeller(product: TApiProduct): boolean {
@@ -77,8 +75,7 @@ function isBestSeller(product: TApiProduct): boolean {
   return arr.some((item) => {
     if (!item || typeof item === 'string') return false
     if (typeof item === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const obj = item as Record<string, any>
+            const obj = item as Record<string, any>
       return obj.name?.trim().toLowerCase() === BEST_SELLERS_LABEL.toLowerCase()
     }
     return false

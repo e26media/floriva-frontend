@@ -32,7 +32,6 @@ const API_URL = `${BASE_URL}/api/categoryview`
 
 // ─── Resolve image ────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveImage(cat: any): string | null {
   const raw =
     cat.categoriesimg ||
@@ -65,7 +64,6 @@ const CARD_PALETTES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractCategories(data: any): Category[] {
   if (!data) return []
   if (Array.isArray(data)) return data
@@ -82,7 +80,6 @@ function extractCategories(data: any): Category[] {
   return []
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveId(cat: any): string {
   return String(cat._id || cat.id || cat.slug || Math.random())
 }
@@ -109,8 +106,7 @@ function CollectionCard({
   href,
   onClick,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  category: any
+    category: any
   index: number
   href: string
   onClick: () => void
@@ -241,8 +237,7 @@ interface Props {
   headingDim?: string
   heading?: string
   autoPlayInterval?: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onSubCategoryClick?: (category: any) => void
+    onSubCategoryClick?: (category: any) => void
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -270,8 +265,7 @@ const SectionCollectionSlider = ({
   //   countrySlug = "india"  → /country/india/category/<id>
   //   countrySlug = null     → /category/<id>
   //
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const buildCategoryHref = useCallback((cat: any): string => {
+    const buildCategoryHref = useCallback((cat: any): string => {
     const id = resolveId(cat)
     if (countrySlug) {
       return `/country/${countrySlug}/category/${id}`
@@ -375,11 +369,9 @@ const SectionCollectionSlider = ({
         setLoading(false)
       }
     })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [pathname, countrySlug])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleCardClick = useCallback((cat: any) => {
+    const handleCardClick = useCallback((cat: any) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('[Slider] card clicked, navigating to →', buildCategoryHref(cat))
     }

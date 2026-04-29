@@ -117,7 +117,7 @@ const Footer: React.FC = () => {
         })),
   }
   const categoriesMenuone: CategoryWidgetMenu = {
-    id: 'categories',
+    id: 'categories-2',
     title: 'Categories',
     menus: loading
       ? [{ href: '#', label: 'Loading...', id: 'loading' }]

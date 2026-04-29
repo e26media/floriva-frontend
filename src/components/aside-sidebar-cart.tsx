@@ -1,12 +1,11 @@
 import { TCardProduct, getCart } from '@/data/data'
-import ButtonPrimary from '@/shared/Button/ButtonPrimary'
-import ButtonSecondary from '@/shared/Button/ButtonSecondary'
-import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import clsx from 'clsx'
 import Image from 'next/image'
 import { Link } from './Link'
 import Prices from './Prices'
+import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { Aside } from './aside/aside'
+import CartButtons from './CartButtons'
 
 interface Props {
   className?: string
@@ -47,8 +46,7 @@ const AsideSidebarCart = async ({ className = '' }: Props) => {
               Shipping and taxes calculated at checkout.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <ButtonSecondary href={'/cart'}>View cart</ButtonSecondary>
-              <ButtonPrimary href={'/checkout'}>Check out</ButtonPrimary>
+              <CartButtons />
             </div>
             <div className="mt-6 flex justify-center text-center text-sm text-neutral-500 dark:text-neutral-400">
               <p className="text-xs">

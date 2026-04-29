@@ -3,14 +3,6 @@ import { useEffect, useState } from 'react'
 export const useThemeMode = () => {
   const [isDarkMode, setIsDarkMode] = useState(false)
 
-  useEffect(() => {
-    if (localStorage.theme === 'is-darkmode') {
-      toDark()
-    } else {
-      toLight()
-    }
-  }, [])
-
   const toDark = () => {
     setIsDarkMode(true)
     const root = document.querySelector('html')
@@ -26,6 +18,17 @@ export const useThemeMode = () => {
     root.classList.remove('dark')
     localStorage.theme = 'is-lightmode'
   }
+
+  useEffect(() => {
+    const theme = localStorage.theme
+    setTimeout(() => {
+      if (theme === 'is-darkmode') {
+        toDark()
+      } else {
+        toLight()
+      }
+    }, 0)
+  }, [])
 
   function _toogleDarkMode() {
     if (localStorage.theme === 'is-lightmode') {

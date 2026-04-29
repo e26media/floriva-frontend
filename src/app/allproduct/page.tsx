@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, useParams, usePathname } from "next/navigation";
+import Link from "next/link";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string; }
@@ -544,15 +545,21 @@ function AllProductsPageInner() {
 
   // Sync color from URL
   useEffect(() => {
-    setFilters(f => ({ ...f, color: urlColor }));
-    setPage(1);
+    // Delay to avoid cascading renders
+    setTimeout(() => {
+      setFilters(f => ({ ...f, color: urlColor }));
+      setPage(1);
+    }, 0);
   }, [urlColor]);
 
   // ── Fetch products with country filtering ──────────────────────────────────────────
   useEffect(() => {
-    setLoading(true);
-    setError("");
-    setAllProducts([]);
+    // Delay to avoid cascading renders
+    setTimeout(() => {
+      setLoading(true);
+      setError("");
+      setAllProducts([]);
+    }, 0);
 
     // Fetch all products first
     fetch(`${BASE}/api/productview`)
@@ -728,13 +735,13 @@ function AllProductsPageInner() {
                 <div className="fade-up mt-10 mb-6">
                   {/* Breadcrumb */}
                   <nav className="flex items-center gap-2 text-[.77rem] text-[#b0a090] mb-3 flex-wrap">
-                    <a href="/" className="hover:text-[#1e1610] transition-colors">Home</a>
+                    <Link href="/" className="hover:text-[#1e1610] transition-colors">Home</Link>
                     <span>/</span>
                     {isMainPage ? (
                       <span className="text-[#7a6b5e]">All Products</span>
                     ) : (
                       <>
-                        <a href="/allproduct" className="hover:text-[#1e1610] transition-colors">All Products</a>
+                        <Link href="/allproduct" className="hover:text-[#1e1610] transition-colors">All Products</Link>
                         <span>/</span>
                         <span className="capitalize">{country}</span>
                       </>

@@ -31,13 +31,17 @@ function CallbackContent() {
     const success = searchParams.get('success')
     const popup   = !!window.opener
 
-    setIsPopup(popup)
+    setTimeout(() => {
+      setIsPopup(popup)
+    }, 0)
 
     // ── Error ────────────────────────────────────────────────────────────────
     if (error) {
       const msg = decodeURIComponent(error)
-      setErrorMsg(msg)
-      setPhase('error')
+      setTimeout(() => {
+        setErrorMsg(msg)
+        setPhase('error')
+      }, 0)
       if (popup) {
         window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, window.location.origin)
         setTimeout(() => window.close(), 2500)
@@ -47,8 +51,10 @@ function CallbackContent() {
 
     // ── Success ───────────────────────────────────────────────────────────────
     if (success === 'true' && token) {
-      setUserName(name || email)
-      setPhase('success')
+      setTimeout(() => {
+        setUserName(name || email)
+        setPhase('success')
+      }, 0)
 
       // Always save session
       localStorage.setItem('floriva_token', token)
@@ -69,8 +75,10 @@ function CallbackContent() {
     }
 
     // ── Fallback ──────────────────────────────────────────────────────────────
-    setErrorMsg('Authentication failed. Please try again.')
-    setPhase('error')
+    setTimeout(() => {
+      setErrorMsg('Authentication failed. Please try again.')
+      setPhase('error')
+    }, 0)
     if (popup) {
       window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, window.location.origin)
       setTimeout(() => window.close(), 2500)

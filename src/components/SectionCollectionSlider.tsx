@@ -31,7 +31,6 @@ const API_URL = `${BASE_URL}/api/categoryview`
 
 // ─── Resolve image — prefix relative paths with BASE_URL ─────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveImage(cat: any): string | null {
   const raw =
     cat.categoriesimg ||   // ← your backend field, first priority
@@ -65,7 +64,6 @@ const CARD_PALETTES = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractCategories(data: any): Category[] {
   if (!data) return []
   if (Array.isArray(data)) return data
@@ -82,7 +80,6 @@ function extractCategories(data: any): Category[] {
   return []
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function resolveId(cat: any): string {
   return String(cat._id || cat.id || cat.slug || Math.random())
 }
@@ -94,8 +91,7 @@ function CollectionCard({
   index,
   onClick,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  category: any
+    category: any
   index: number
   onClick: () => void
 }) {
@@ -229,7 +225,6 @@ interface Props {
   headingDim?: string
   heading?: string
   autoPlayInterval?: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSubCategoryClick?: (category: any) => void
 }
 
@@ -331,7 +326,6 @@ const SectionCollectionSlider = ({
   }, [])
 
   const handleCardClick = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (cat: any) => { console.log('[SectionCollectionSlider] clicked:', cat); onSubCategoryClick?.(cat) },
     [onSubCategoryClick]
   )

@@ -79,13 +79,10 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
 
   useEffect(() => {
     if (isSlided || !indexActive) return
-    setIsSlided(true)
+    setTimeout(() => {
+      setIsSlided(true)
+    }, 0)
   }, [indexActive, isSlided])
-
-  useInterval(
-    () => handleAutoNext(),
-    isRunning ? 5000 : 999999
-  )
 
   const handleAutoNext = () => {
     setIndexActive((state) => (state >= slides.length - 1 ? 0 : state + 1))
@@ -106,6 +103,11 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     if (TIME_OUT) clearTimeout(TIME_OUT)
     TIME_OUT = setTimeout(() => toggleIsRunning(true), 1000)
   }
+
+  useInterval(
+    () => handleAutoNext(),
+    isRunning ? 5000 : 999999
+  )
 
   // ─── Render a single slide ────────────────────────────────────────────────
   const renderItem = (index: number) => {

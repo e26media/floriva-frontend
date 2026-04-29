@@ -421,8 +421,10 @@ export default function ProductDetailPage() {
       ? params.id[0]
       : (params?.id as string | undefined);
 
-    setCountry(parsedCountry ?? paramCountry ?? "india");
-    setId(parsedId ?? paramId ?? "");
+    setTimeout(() => {
+      setCountry(parsedCountry ?? paramCountry ?? "india");
+      setId(parsedId ?? paramId ?? "");
+    }, 0);
   }, [params]);
 
   // Derive currencyInfo from country parsed from the real URL
@@ -492,10 +494,13 @@ export default function ProductDetailPage() {
       // id not yet parsed from pathname — stay in loading state
       return;
     }
-    setLoading(true);
-    setError("");
-    setProduct(null);
-    setRelated([]);
+    // Delay slightly to avoid cascading renders
+    setTimeout(() => {
+      setLoading(true);
+      setError("");
+      setProduct(null);
+      setRelated([]);
+    }, 0);
 
     fetch(`${BASE}/api/productview/${id}`)
       .then(async r => {

@@ -109,7 +109,7 @@ export default function PoliciesPage() {
             </h1>
             
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed opacity-0 translate-y-5 animate-[slideUp_0.8s_ease-out_0.2s_forwards]">
-              Learn about our shipping policies and how we protect your privacy. We're committed to transparency and your satisfaction.
+              Learn about our shipping policies and how we protect your privacy. We&apos;re committed to transparency and your satisfaction.
             </p>
           </div>
 

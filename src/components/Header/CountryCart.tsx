@@ -459,10 +459,10 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
                 ✓
               </div>
               <div>
-                <h3 className="font-syne text-xl font-extrabold text-gray-800">You're registered!</h3>
+                <h3 className="font-syne text-xl font-extrabold text-gray-800">You&apos;re registered!</h3>
                 <p className="text-sm text-gray-400 mt-2 leading-relaxed">
                   Your vendor profile has been submitted.<br />
-                  We'll review and activate your account within 24 hours.
+                  We&apos;ll review and activate your account within 24 hours.
                 </p>
               </div>
               <button onClick={onClose}

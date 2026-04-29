@@ -386,8 +386,11 @@ export default function CountryCategoryPage() {
 
   useEffect(() => {
     if (!countryName || !urlId) return
-    setLoading(true)
-    setError('')
+    // Delay to avoid cascading renders
+    setTimeout(() => {
+      setLoading(true)
+      setError('')
+    }, 0)
 
     fetch(`${BASE}/api/countrywise?country=${encodeURIComponent(countryName)}`)
       .then(r => {

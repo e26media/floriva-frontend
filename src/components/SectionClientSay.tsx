@@ -190,9 +190,11 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
 
   useEffect(() => {
     if (!emblaApi) return
-    setScrollSnaps(emblaApi.scrollSnapList())
+    setTimeout(() => {
+      setScrollSnaps(emblaApi.scrollSnapList())
+      onSelect()
+    }, 0)
     emblaApi.on('select', onSelect)
-    onSelect()
     return () => { emblaApi.off('select', onSelect) }
   }, [emblaApi, onSelect])
 
@@ -261,13 +263,13 @@ const SectionClientSay: FC<SectionClientSayProps> = ({
             aria-hidden
             className="absolute -top-8 -left-3 text-7xl leading-none font-serif select-none pointer-events-none text-rose-200 dark:text-rose-900"
           >
-            "
+            &quot;
           </span>
           <span
             aria-hidden
             className="absolute -bottom-10 -right-3 text-7xl leading-none font-serif select-none pointer-events-none text-rose-200 dark:text-rose-900 rotate-180"
           >
-            "
+            &quot;
           </span>
 
           <div className="overflow-hidden" ref={emblaRef}>

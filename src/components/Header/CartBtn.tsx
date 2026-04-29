@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ShoppingCart02Icon, Store02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 
@@ -64,13 +64,6 @@ function useImagePreview() {
 }
 
 /* ─── Upload Box ─────────────────────────────────────────────── */
-/*
-  FIX: Replaced div+ref.click() approach with a proper <label> wrapping
-  the <input type="file">. On iOS and Android, programmatic .click() on
-  a file input triggered from a div's onClick is blocked by the browser's
-  security model. A <label htmlFor=...> natively activates its input on
-  any tap/click without JS, which mobile browsers fully support.
-*/
 function UploadBox({
   id,
   label,
@@ -94,14 +87,12 @@ function UploadBox({
       className="relative cursor-pointer rounded-2xl border-2 border-dashed border-[#EA5A7B]/20 bg-[#EA5A7B]/[0.02] overflow-hidden aspect-[4/3] transition-all duration-200 hover:border-[#EA5A7B]/50 hover:bg-[#EA5A7B]/[0.05] group block"
       style={{ WebkitTapHighlightColor: 'transparent' }}
     >
-      {/* Hidden file input — id links it to the label above */}
       <input
         id={id}
         type="file"
         accept={accept}
         className="sr-only"
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-        // Allow re-selecting the same file on mobile
         onClick={(e) => { (e.target as HTMLInputElement).value = '' }}
       />
 
@@ -256,7 +247,6 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
     }
   }
 
-  /* ── Step-1 client validation ── */
   const validateStep1 = (): boolean => {
     const errs: FieldErrors = {}
     if (!form.vendorName.trim())    errs.vendorName    = 'Vendor name is required'
@@ -269,7 +259,6 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
     return true
   }
 
-  /* ── Step-2 client validation ── */
   const validateStep2 = (): boolean => {
     const errs: FieldErrors = {}
     if (!form.email.trim()) errs.email = 'Email is required'
@@ -284,14 +273,11 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
     return true
   }
 
-  /* ── Submit ── */
   const handleSubmit = async () => {
     if (!validateStep2()) return
-
     setIsLoading(true)
     setFieldErrors({})
     setShowBanner(false)
-
     try {
       const formData = new FormData()
       formData.append('name',        form.vendorName)
@@ -315,21 +301,16 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
         } catch {
           errMessage = (await res.text()) || errMessage
         }
-
         const parsed = parseValidationErrors(errMessage)
         setFieldErrors(parsed)
         setShowBanner(true)
         if (parsed.vendorName || parsed.vendorAddress) setStep(1)
         return
       }
-
       setSubmitted(true)
     } catch (err: unknown) {
       setFieldErrors({
-        general:
-          err instanceof Error
-            ? err.message
-            : 'Something went wrong. Please try again.',
+        general: err instanceof Error ? err.message : 'Something went wrong. Please try again.',
       })
       setShowBanner(true)
     } finally {
@@ -353,12 +334,10 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
         .spinner       { animation: spin .7s linear infinite; }
       `}</style>
 
-      {/* Backdrop */}
       <div
         className="vp-animate-in fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm mt-80"
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
-        {/* Modal */}
         <div className="vp-shell relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl shadow-black/15 border border-gray-100/80">
           <div
             className="h-1 w-full rounded-t-3xl"
@@ -367,287 +346,97 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
 
           {!submitted ? (
             <>
-              {/* Header */}
               <div className="flex items-start justify-between px-7 pt-6">
                 <div>
-                  <h2 className="font-syne text-xl font-extrabold text-gray-800 tracking-tight">
-                    Vendor Registration
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {step === 1 ? 'Basic info & photos' : 'Contact details & licence'}
-                  </p>
+                  <h2 className="font-syne text-xl font-extrabold text-gray-800 tracking-tight">Vendor Registration</h2>
+                  <p className="text-xs text-gray-400 mt-1">{step === 1 ? 'Basic info & photos' : 'Contact details & licence'}</p>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-base text-gray-300 hover:text-[#EA5A7B] hover:bg-[#EA5A7B]/10 transition-all duration-150 flex-shrink-0 mt-0.5"
-                >
-                  ✕
-                </button>
+                <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-base text-gray-300 hover:text-[#EA5A7B] hover:bg-[#EA5A7B]/10 transition-all duration-150 flex-shrink-0 mt-0.5">✕</button>
               </div>
 
-              {/* Step pills */}
               <div className="flex items-center gap-2 px-7 mt-4">
                 {[1, 2].map((s) => (
-                  <div
-                    key={s}
-                    className="h-1 rounded-full transition-all duration-300"
-                    style={{
-                      width: 36,
-                      background:
-                        step >= s
-                          ? 'linear-gradient(90deg,#7C4CA3,#EA5A7B)'
-                          : '#e5e7eb',
-                    }}
-                  />
+                  <div key={s} className="h-1 rounded-full transition-all duration-300" style={{ width: 36, background: step >= s ? 'linear-gradient(90deg,#7C4CA3,#EA5A7B)' : '#e5e7eb' }} />
                 ))}
-                <span className="ml-auto text-[10px] font-bold tracking-widest uppercase text-gray-300">
-                  Step {step} / 2
-                </span>
+                <span className="ml-auto text-[10px] font-bold tracking-widest uppercase text-gray-300">Step {step} / 2</span>
               </div>
 
               <div className="mx-7 mt-4 h-px bg-gray-100" />
 
-              {/* Body */}
               <div className="px-7 py-5 flex flex-col gap-4">
                 {step === 1 ? (
                   <>
-                    {showBanner &&
-                      (fieldErrors.vendorName || fieldErrors.vendorAddress) && (
-                        <ValidationBanner
-                          errors={{
-                            vendorName: fieldErrors.vendorName,
-                            vendorAddress: fieldErrors.vendorAddress,
-                          }}
-                          onClose={() => {
-                            setFieldErrors((p) => {
-                              const n = { ...p }
-                              delete n.vendorName
-                              delete n.vendorAddress
-                              return n
-                            })
-                            setShowBanner(false)
-                          }}
-                        />
-                      )}
-
+                    {showBanner && (fieldErrors.vendorName || fieldErrors.vendorAddress) && (
+                      <ValidationBanner errors={{ vendorName: fieldErrors.vendorName, vendorAddress: fieldErrors.vendorAddress }} onClose={() => { setFieldErrors((p) => { const n = { ...p }; delete n.vendorName; delete n.vendorAddress; return n }); setShowBanner(false) }} />
+                    )}
                     <Field label="Vendor / Shop Name" error={fieldErrors.vendorName}>
-                      <input
-                        className={fieldErrors.vendorName ? inputErrCls : inputCls}
-                        placeholder="e.g. Sunrise Traders"
-                        value={form.vendorName}
-                        onChange={(e) => set('vendorName', e.target.value)}
-                      />
+                      <input className={fieldErrors.vendorName ? inputErrCls : inputCls} placeholder="e.g. Sunrise Traders" value={form.vendorName} onChange={(e) => set('vendorName', e.target.value)} />
                     </Field>
-
                     <Field label="Vendor Address" error={fieldErrors.vendorAddress}>
-                      <textarea
-                        className={
-                          (fieldErrors.vendorAddress ? inputErrCls : inputCls) +
-                          ' resize-none min-h-[72px]'
-                        }
-                        placeholder="Street, City, State, PIN code..."
-                        value={form.vendorAddress}
-                        onChange={(e) => set('vendorAddress', e.target.value)}
-                      />
+                      <textarea className={(fieldErrors.vendorAddress ? inputErrCls : inputCls) + ' resize-none min-h-[72px]'} placeholder="Street, City, State, PIN code..." value={form.vendorAddress} onChange={(e) => set('vendorAddress', e.target.value)} />
                     </Field>
-
                     <div className="h-px bg-gray-100" />
-
                     <div>
-                      <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-2">
-                        Photos
-                      </p>
+                      <p className="text-[10px] font-bold tracking-widest uppercase text-gray-400 mb-2">Photos</p>
                       <div className="grid grid-cols-2 gap-3">
-                        {/*
-                          KEY FIX: Each UploadBox now receives a unique `id` prop.
-                          The <label htmlFor={id}> inside UploadBox links directly
-                          to the <input id={id}>, making the entire box a native
-                          file-picker trigger — no JS .click() needed, works on
-                          iOS Safari, Chrome Android, and all mobile browsers.
-                        */}
-                        <UploadBox
-                          id="vendor-photo-input"
-                          label="Vendor Photo"
-                          sublabel="Your profile picture"
-                          preview={vendorImg.preview}
-                          icon="🧑‍💼"
-                          onFile={(f) => {
-                            set('vendorPhoto', f)
-                            vendorImg.handleFile(f)
-                          }}
-                        />
-                        <UploadBox
-                          id="shop-photo-input"
-                          label="Shop Photo"
-                          sublabel="Storefront / interior"
-                          preview={shopImg.preview}
-                          icon="🏪"
-                          onFile={(f) => {
-                            set('shopPhoto', f)
-                            shopImg.handleFile(f)
-                          }}
-                        />
+                        <UploadBox id="vendor-photo-input" label="Vendor Photo" sublabel="Your profile picture" preview={vendorImg.preview} icon="🧑‍💼" onFile={(f) => { set('vendorPhoto', f); vendorImg.handleFile(f) }} />
+                        <UploadBox id="shop-photo-input" label="Shop Photo" sublabel="Storefront / interior" preview={shopImg.preview} icon="🏪" onFile={(f) => { set('shopPhoto', f); shopImg.handleFile(f) }} />
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
-                    {showBanner &&
-                      (fieldErrors.email || fieldErrors.phone || fieldErrors.general) && (
-                        <ValidationBanner
-                          errors={{
-                            email: fieldErrors.email,
-                            phone: fieldErrors.phone,
-                            general: fieldErrors.general,
-                          }}
-                          onClose={() => {
-                            setFieldErrors((p) => {
-                              const n = { ...p }
-                              delete n.email
-                              delete n.phone
-                              delete n.general
-                              return n
-                            })
-                            setShowBanner(false)
-                          }}
-                        />
-                      )}
-
+                    {showBanner && (fieldErrors.email || fieldErrors.phone || fieldErrors.general) && (
+                      <ValidationBanner errors={{ email: fieldErrors.email, phone: fieldErrors.phone, general: fieldErrors.general }} onClose={() => { setFieldErrors((p) => { const n = { ...p }; delete n.email; delete n.phone; delete n.general; return n }); setShowBanner(false) }} />
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Email" error={fieldErrors.email}>
-                        <input
-                          className={fieldErrors.email ? inputErrCls : inputCls}
-                          type="email"
-                          placeholder="you@example.com"
-                          value={form.email}
-                          onChange={(e) => set('email', e.target.value)}
-                        />
+                        <input className={fieldErrors.email ? inputErrCls : inputCls} type="email" placeholder="you@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} />
                       </Field>
                       <Field label="Phone" error={fieldErrors.phone}>
-                        <input
-                          className={fieldErrors.phone ? inputErrCls : inputCls}
-                          type="tel"
-                          placeholder="+91 98765 43210"
-                          value={form.phone}
-                          onChange={(e) => set('phone', e.target.value)}
-                        />
+                        <input className={fieldErrors.phone ? inputErrCls : inputCls} type="tel" placeholder="+91 98765 43210" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
                       </Field>
                     </div>
-
                     <div className="h-px bg-gray-100" />
-
                     <Field label="Shop Licence Number" optional>
-                      <input
-                        className={inputCls}
-                        placeholder="e.g. KA/MNG/2024/00123"
-                        value={form.shopLicence}
-                        onChange={(e) => set('shopLicence', e.target.value)}
-                      />
+                      <input className={inputCls} placeholder="e.g. KA/MNG/2024/00123" value={form.shopLicence} onChange={(e) => set('shopLicence', e.target.value)} />
                     </Field>
                   </>
                 )}
               </div>
 
-              {/* Footer */}
               <div className="px-7 pb-7 flex gap-3">
                 {step === 1 ? (
                   <>
-                    <button
-                      onClick={onClose}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (validateStep1()) {
-                          setShowBanner(false)
-                          setStep(2)
-                        }
-                      }}
-                      className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99]"
-                      style={{
-                        background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
-                        boxShadow: '0 4px 18px rgba(234,90,123,.32)',
-                      }}
-                    >
-                      Continue →
-                    </button>
+                    <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150">Cancel</button>
+                    <button onClick={() => { if (validateStep1()) { setShowBanner(false); setStep(2) } }} className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99]" style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.32)' }}>Continue →</button>
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={() => {
-                        setStep(1)
-                        setShowBanner(false)
-                      }}
-                      disabled={isLoading}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150 disabled:opacity-40"
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isLoading}
-                      className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      style={{
-                        background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
-                        boxShadow: '0 4px 18px rgba(234,90,123,.32)',
-                      }}
-                    >
+                    <button onClick={() => { setStep(1); setShowBanner(false) }} disabled={isLoading} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-all duration-150 disabled:opacity-40">← Back</button>
+                    <button onClick={handleSubmit} disabled={isLoading} className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[.99] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.32)' }}>
                       {isLoading ? (
                         <>
                           <svg className="spinner w-4 h-4" viewBox="0 0 24 24" fill="none">
-                            <circle
-                              cx="12" cy="12" r="10"
-                              stroke="white" strokeWidth="3" strokeOpacity=".3"
-                            />
-                            <path
-                              d="M12 2a10 10 0 0 1 10 10"
-                              stroke="white" strokeWidth="3" strokeLinecap="round"
-                            />
+                            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeOpacity=".3" />
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
                           </svg>
                           Submitting…
                         </>
-                      ) : (
-                        'Submit Registration'
-                      )}
+                      ) : 'Submit Registration'}
                     </button>
                   </>
                 )}
               </div>
             </>
           ) : (
-            /* Success */
             <div className="flex flex-col items-center gap-5 px-8 py-14 text-center">
-              <div
-                className="vp-pop-in w-20 h-20 rounded-full flex items-center justify-center text-white text-4xl font-bold"
-                style={{
-                  background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
-                  boxShadow: '0 0 40px rgba(234,90,123,.35)',
-                }}
-              >
-                ✓
-              </div>
+              <div className="vp-pop-in w-20 h-20 rounded-full flex items-center justify-center text-white text-4xl font-bold" style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 0 40px rgba(234,90,123,.35)' }}>✓</div>
               <div>
-                <h3 className="font-syne text-xl font-extrabold text-gray-800">
-                  You're registered!
-                </h3>
-                <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-                  Your vendor profile has been submitted.<br />
-                  We'll review and activate your account within 24 hours.
-                </p>
+                <h3 className="font-syne text-xl font-extrabold text-gray-800">You&apos;re registered!</h3>
+                <p className="text-sm text-gray-400 mt-2 leading-relaxed">Your vendor profile has been submitted.<br />We&apos;ll review and activate your account within 24 hours.</p>
               </div>
-              <button
-                onClick={onClose}
-                className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5"
-                style={{
-                  background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)',
-                  boxShadow: '0 4px 18px rgba(234,90,123,.3)',
-                }}
-              >
-                Done
-              </button>
+              <button onClick={onClose} className="w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5" style={{ background: 'linear-gradient(135deg,#7C4CA3,#EA5A7B)', boxShadow: '0 4px 18px rgba(234,90,123,.3)' }}>Done</button>
             </div>
           )}
         </div>
@@ -659,12 +448,36 @@ function VendorPopup({ onClose }: { onClose: () => void }) {
 /* ─── CartBtn (default export) ───────────────────────────────── */
 export default function CartBtn() {
   const router = useRouter()
+  const params = useParams()
   const [showVendorPopup, setShowVendorPopup] = useState(false)
+
+  const handleCartClick = () => {
+    // 1. Check URL params first
+    let countryName = params?.name as string | undefined
+    if (params?.country) countryName = params.country as string
+
+    // 2. Fallback to localStorage
+    if (!countryName && typeof window !== 'undefined') {
+      const saved = localStorage.getItem('floriva_selected_country')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          countryName = parsed.country?.name?.toLowerCase()
+        } catch (e) {}
+      }
+    }
+
+    if (countryName) {
+      router.push(`/country/${countryName.toLowerCase()}/cart`)
+    } else {
+      router.push('/cart')
+    }
+  }
 
   return (
     <>
       <button
-        onClick={() => router.push('/cart')}
+        onClick={handleCartClick}
         title="Cart"
         className="relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800"
       >

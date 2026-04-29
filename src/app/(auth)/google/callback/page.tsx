@@ -29,52 +29,49 @@ function CallbackContent() {
     const name    = searchParams.get('name')  || ''
     const email   = searchParams.get('email') || ''
     const success = searchParams.get('success')
-    const popup   = !!window.opener
+    const popup   = typeof window !== 'undefined' && !!window.opener
 
-    setIsPopup(popup)
+    const timer = setTimeout(() => {
+      setIsPopup(popup)
 
-    // ── Error ────────────────────────────────────────────────────────────────
-    if (error) {
-      const msg = decodeURIComponent(error)
-      setErrorMsg(msg)
+      if (error) {
+        const msg = decodeURIComponent(error)
+        setErrorMsg(msg)
+        setPhase('error')
+        if (popup) {
+          window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, window.location.origin)
+          setTimeout(() => window.close(), 2500)
+        }
+        return
+      }
+
+      if (success === 'true' && token) {
+        setUserName(name || email)
+        setPhase('success')
+        localStorage.setItem('floriva_token', token)
+        localStorage.setItem('floriva_user', JSON.stringify({ username: name, email }))
+
+        if (popup) {
+          window.opener.postMessage(
+            { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email } },
+            window.location.origin
+          )
+          setTimeout(() => window.close(), 1800)
+        } else {
+          setTimeout(() => router.replace('/'), 1800)
+        }
+        return
+      }
+
+      setErrorMsg('Authentication failed. Please try again.')
       setPhase('error')
       if (popup) {
-        window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, window.location.origin)
+        window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, window.location.origin)
         setTimeout(() => window.close(), 2500)
       }
-      return
-    }
+    }, 0)
 
-    // ── Success ───────────────────────────────────────────────────────────────
-    if (success === 'true' && token) {
-      setUserName(name || email)
-      setPhase('success')
-
-      // Always save session
-      localStorage.setItem('floriva_token', token)
-      localStorage.setItem('floriva_user', JSON.stringify({ username: name, email }))
-
-      if (popup) {
-        // Popup mode: notify opener then close
-        window.opener.postMessage(
-          { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email } },
-          window.location.origin
-        )
-        setTimeout(() => window.close(), 1800)
-      } else {
-        // Direct mode: redirect to home
-        setTimeout(() => router.replace('/'), 1800)
-      }
-      return
-    }
-
-    // ── Fallback ──────────────────────────────────────────────────────────────
-    setErrorMsg('Authentication failed. Please try again.')
-    setPhase('error')
-    if (popup) {
-      window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, window.location.origin)
-      setTimeout(() => window.close(), 2500)
-    }
+    return () => clearTimeout(timer)
   }, [searchParams, router])
 
   return (

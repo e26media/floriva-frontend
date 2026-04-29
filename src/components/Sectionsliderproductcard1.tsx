@@ -513,15 +513,15 @@ interface ColourPickerSectionProps {
   colors: Array<{ name: string; hex: string; count: number }>
 }
 
+const Sparkle = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="inline-block opacity-70">
+    <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" fill="#4a5c2a" />
+  </svg>
+)
+
 function ColourPickerSection({ colors }: ColourPickerSectionProps) {
   const router = useRouter()
   if (colors.length === 0) return null
-
-  const Sparkle = () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="inline-block opacity-70">
-      <path d="M8 0L9.5 6.5L16 8L9.5 9.5L8 16L6.5 9.5L0 8L6.5 6.5L8 0Z" fill="#4a5c2a" />
-    </svg>
-  )
 
   return (
     <div className="relative w-full rounded-3xl overflow-hidden py-10 px-6 mb-10"

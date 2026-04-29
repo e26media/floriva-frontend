@@ -30,7 +30,9 @@ export const useCarouselArrowButtons = (emblaApi: EmblaCarouselType | undefined)
   useEffect(() => {
     if (!emblaApi) return
 
-    onSelect(emblaApi)
+    setTimeout(() => {
+      onSelect(emblaApi)
+    }, 0)
     emblaApi.on('reInit', onSelect).on('select', onSelect)
   }, [emblaApi, onSelect])
 

@@ -448,8 +448,19 @@ export default function ProductDetailPage() {
 
   /* ── Fetch product and filter to only Indian products ── */
   useEffect(() => {
-    if (!id) { setError("No product ID in URL"); setLoading(false); return; }
-    setLoading(true); setError(""); setProduct(null); setRelated([]);
+    if (!id) {
+      setTimeout(() => {
+        setError("No product ID in URL");
+        setLoading(false);
+      }, 0);
+      return;
+    }
+    setTimeout(() => {
+      setLoading(true);
+      setError("");
+      setProduct(null);
+      setRelated([]);
+    }, 0);
 
     fetch(`${BASE}/api/productview/${id}`)
       .then(async r => {

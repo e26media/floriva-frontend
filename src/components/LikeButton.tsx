@@ -12,7 +12,9 @@ const LikeButton: React.FC<Props> = ({ className = '', liked = false }) => {
 
   // make random for demo
   useEffect(() => {
-    setIsLiked(Math.random() > 0.5)
+    setTimeout(() => {
+      setIsLiked(Math.random() > 0.5)
+    }, 0)
   }, [])
 
   return (

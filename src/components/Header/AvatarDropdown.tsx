@@ -223,19 +223,19 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     }
   }, [])
 
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
-    document.addEventListener('keydown', handle)
-    return () => document.removeEventListener('keydown', handle)
-  }, [])
-
-  const closeModal = () => { 
+  const closeModal = useCallback(() => { 
     setVisible(false); 
     setTimeout(() => {
       document.body.style.overflow = 'unset'
       onClose()
     }, 260) 
-  }
+  }, [onClose]);
+
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
+    document.addEventListener('keydown', handle)
+    return () => document.removeEventListener('keydown', handle)
+  }, [closeModal])
 
   const startTimer = () => {
     setTimer(30)
@@ -550,13 +550,13 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
                 </button>
 
                 <p style={{ marginTop: '10px', textAlign: 'center', fontSize: '11px', color: '#9ca3af', marginBottom: 0 }}>
-                  Google's account picker will open in a popup window
+                  Google&apos;s account picker will open in a popup window
                 </p>
                 <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '11px', color: '#d1d5db', marginBottom: 0 }}>
                   By continuing you agree to our{' '}
-                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Terms</a>
-                  {' '}& {' '}
-                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Privacy</a>
+                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Terms &amp; Conditions</a>
+                  {' '}&amp;{' '}
+                  <a href="#" style={{ color: '#EA5A7B', textDecoration: 'none' }}>Privacy Policy</a>
                 </p>
               </>
             )}
@@ -877,7 +877,9 @@ export default function AvatarDropdown({ className }: Props) {
     const token = localStorage.getItem('floriva_token')
     if (saved && token) { 
       try { 
-        setUser(JSON.parse(saved)) 
+        setTimeout(() => {
+          setUser(JSON.parse(saved)) 
+        }, 0)
       } catch (_) {}
     }
   }, [])

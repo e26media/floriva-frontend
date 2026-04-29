@@ -29,14 +29,20 @@ const CountryNotification: FC<Props> = ({ countryName: propCountryName }) => {
       // Format country name: capitalize first letter, rest lowercase
       const formattedCountry = extractedCountry.charAt(0).toUpperCase() + 
                                extractedCountry.slice(1).toLowerCase();
-      setCountryName(formattedCountry);
+      setTimeout(() => {
+        setCountryName(formattedCountry);
+      }, 0);
     } else if (propCountryName) {
       // Fallback to prop if provided
       const formattedCountry = propCountryName.charAt(0).toUpperCase() + 
                                propCountryName.slice(1).toLowerCase();
-      setCountryName(formattedCountry);
+      setTimeout(() => {
+        setCountryName(formattedCountry);
+      }, 0);
     } else {
-      setCountryName('');
+      setTimeout(() => {
+        setCountryName('');
+      }, 0);
     }
   }, [pathname, propCountryName]);
 

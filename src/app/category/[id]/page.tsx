@@ -359,8 +359,10 @@ export default function CategoryPage() {
 
   useEffect(() => {
     if (!urlId) return
-    setLoading(true)
-    setError('')
+    setTimeout(() => {
+      setLoading(true)
+      setError('')
+    }, 0)
 
     Promise.all([
       // Fetch ALL categories

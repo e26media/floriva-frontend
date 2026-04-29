@@ -84,16 +84,20 @@ export default function ProductDetailPage() {
   /* ── Fetch product ── */
   useEffect(() => {
     if (!id) {
-      setError("No product ID in URL");
-      setLoading(false);
+      setTimeout(() => {
+        setError("No product ID in URL");
+        setLoading(false);
+      }, 0);
       return;
     }
 
     console.log("Fetching product id:", id);
 
-    setLoading(true);
-    setError("");
-    setProduct(null);
+    setTimeout(() => {
+      setLoading(true);
+      setError("");
+      setProduct(null);
+    }, 0);
 
     const url = `${BASE}/api/productview/${id}`;
     console.log("Fetch URL:", url);

@@ -275,17 +275,9 @@ function TopBar({ name, cat, onShare, shared }: {
 ═══════════════════════════════════════════════════════════════ */
 export default function ProductDetailPage() {
 
-  /* ── Step 1: get pathname (App Router hook, safe fallback) ── */
-  let pathname = "";
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    pathname = usePathname() ?? "";
-  } catch {
-    if (typeof window !== "undefined") pathname = window.location.pathname;
-  }
+  const pathname = usePathname() ?? "";
 
   /* ── Step 2: get raw Next.js params (App Router) ── */
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const rawParams = useParams();
 
   /* ── Step 3: parse params from URL path as fallback ── */
@@ -352,8 +344,13 @@ export default function ProductDetailPage() {
 
   /* ── Fetch product ── */
   useEffect(() => {
-    if (!id) { setError("No product ID found in URL"); setLoading(false); return; }
-    setLoading(true); setError(""); setProduct(null); setRelated([]); setImgIdx(0);
+    if (!id) {
+      setTimeout(() => { setError("No product ID found in URL"); setLoading(false); }, 0);
+      return;
+    }
+    setTimeout(() => {
+      setLoading(true); setError(""); setProduct(null); setRelated([]); setImgIdx(0);
+    }, 0);
 
     fetch(`${BASE}/api/productview/${id}`)
       .then(async r => {

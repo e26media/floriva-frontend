@@ -122,15 +122,11 @@ function formatPrice(amount: number, currency: CurrencyInfo): string {
 // Best Seller filter helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getFeaturedProductRaw(product: TApiProduct): unknown {
   return (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (product as any).FeaturedProduct ??
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (product as any).featuredProduct ??
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (product as any).featured_product ??
+        (product as any).FeaturedProduct ??
+        (product as any).featuredProduct ??
+        (product as any).featured_product ??
     null
   )
 }
@@ -147,8 +143,7 @@ function isBestSeller(product: TApiProduct): boolean {
     if (!item) return false
     if (typeof item === 'string') return false // bare ID string — no name to compare
     if (typeof item === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const obj = item as Record<string, any>
+            const obj = item as Record<string, any>
       return obj.name?.trim().toLowerCase() === BEST_SELLER_LABEL.toLowerCase()
     }
     return false
