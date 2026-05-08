@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
 
 // =============================================================================
 //  TYPES
@@ -81,78 +82,9 @@ interface CountryConfig {
 }
 
 // Currency symbols mapping
-const getCurrencySymbol = (countryCode: string): string => {
-  const currencyMap: Record<string, string> = {
-    'usd': '$',
-    'eur': '€',
-    'gbp': '£',
-    'jpy': '¥',
-    'aud': 'A$',
-    'cad': 'C$',
-    'chf': 'Fr',
-    'cny': '¥',
-    'inr': '₹',
-    'aed': 'د.إ',
-    'qar': '﷼',
-    'sar': '﷼',
-    'sgd': 'S$',
-    'nzd': 'NZ$',
-    'hkd': 'HK$',
-    'mxn': '$',
-    'brl': 'R$',
-    'rub': '₽',
-    'krw': '₩',
-    'try': '₺',
-  };
-  return currencyMap[countryCode.toLowerCase()] || '$';
-};
-
-// Country to currency mapping
-const getCountryCurrency = (countryName: string): string => {
-  const countryCurrencyMap: Record<string, string> = {
-    'united states': 'USD',
-    'usa': 'USD',
-    'us': 'USD',
-    'canada': 'CAD',
-    'uk': 'GBP',
-    'united kingdom': 'GBP',
-    'australia': 'AUD',
-    'india': 'INR',
-    'qatar': 'QAR',
-    'uae': 'AED',
-    'united arab emirates': 'AED',
-    'saudi arabia': 'SAR',
-    'singapore': 'SGD',
-    'new zealand': 'NZD',
-    'japan': 'JPY',
-    'south korea': 'KRW',
-    'brazil': 'BRL',
-    'mexico': 'MXN',
-    'russia': 'RUB',
-    'turkey': 'TRY',
-    'switzerland': 'CHF',
-    'europe': 'EUR',
-    'germany': 'EUR',
-    'france': 'EUR',
-    'italy': 'EUR',
-    'spain': 'EUR',
-  };
-  
-  const normalized = countryName.toLowerCase().trim();
-  return countryCurrencyMap[normalized] || 'USD';
-};
-
-// Format amount with country-specific currency
+// Using shared currency utility
 const formatCurrency = (amount: number, countryName?: string): string => {
-  const currencyCode = countryName ? getCountryCurrency(countryName) : 'USD';
-  const symbol = getCurrencySymbol(currencyCode);
-  
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currencyCode,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  return sharedFormatPrice(amount, countryName || null);
 };
 
 // Format country name for display
@@ -690,7 +622,7 @@ function NotLoggedIn({ country }: { country?: string }) {
 interface CountryFilterProps {
   currentCountry?: string;
   onCountryChange: (country: string | undefined) => void;
-  availableCountries: Array<{ name: string; count: number; currency: string }>;
+  availableCountries: Array<{ name: string; count: number; currencyCode: string }>;
 }
 
 function CountryFilter({ currentCountry, onCountryChange, availableCountries }: CountryFilterProps) {
@@ -717,7 +649,7 @@ function CountryFilter({ currentCountry, onCountryChange, availableCountries }: 
         className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
       >
         <IcoLocation c="h-4 w-4" />
-        {selectedCountry ? `${selectedCountry.name} (${selectedCountry.currency})` : 'All Countries'}
+        {selectedCountry ? `${selectedCountry.name} (${selectedCountry.currencyCode})` : 'All Countries'}
         <IcoChevD c="h-3 w-3" />
       </button>
 
@@ -749,7 +681,7 @@ function CountryFilter({ currentCountry, onCountryChange, availableCountries }: 
             >
               <span>{country.name}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">{country.currency}</span>
+                <span className="text-xs text-neutral-400 dark:text-neutral-500">{country.currencyCode}</span>
                 <span className="text-xs bg-neutral-100 dark:bg-neutral-700 px-2 py-0.5 rounded-full">
                   {country.count}
                 </span>
@@ -786,14 +718,13 @@ export default function OrdersPage() {
 
   // Extract unique countries with counts and currency from orders
   const availableCountries = useMemo(() => {
-    const countryMap = new Map<string, { name: string; count: number; currency: string }>();
+    const countryMap = new Map<string, { name: string; count: number; currencyCode: string }>();
     
     orders.forEach(order => {
       const countryName = order.shippingAddress?.country;
       if (countryName) {
         const normalizedName = formatCountryName(countryName);
-        const currencyCode = getCountryCurrency(countryName);
-        const currencySymbol = getCurrencySymbol(currencyCode);
+        const cInfo = getCurrencyForCountry(countryName);
         
         if (countryMap.has(normalizedName)) {
           const existing = countryMap.get(normalizedName)!;
@@ -805,7 +736,7 @@ export default function OrdersPage() {
           countryMap.set(normalizedName, { 
             name: normalizedName, 
             count: 1, 
-            currency: currencySymbol 
+            currencyCode: cInfo.code 
           });
         }
       }

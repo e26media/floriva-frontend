@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
 import Link from "next/link";
 
 /* ─────────────────────────────────────────────────────────────────
@@ -30,15 +31,6 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
 const img = (p: string) => !p ? "" : p.startsWith("http") ? p : `${BASE}${p}`;
 const pct = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0;
 
-// Currency configuration for different countries
-const CURRENCY_CONFIG: Record<string, CurrencyInfo> = {
-  australia: { symbol: "A$", code: "AUD", rate: 0.018 },
-  usa:       { symbol: "$",  code: "USD", rate: 0.012 },
-  uk:        { symbol: "£",  code: "GBP", rate: 0.0095 },
-  canada:    { symbol: "C$", code: "CAD", rate: 0.016 },
-  india:     { symbol: "₹",  code: "INR", rate: 1 },
-  default:   { symbol: "₹",  code: "INR", rate: 1 },
-};
 
 const COLOR_HEX: Record<string, string> = {
   pink: "#f9a8d4", red: "#f87171", white: "#e8e0d8", blue: "#93c5fd",
@@ -239,17 +231,14 @@ function Skeleton() {
 function RelCard({
   p,
   country,
-  currencyInfo,
 }: {
   p: Product;
   country: string;      // e.g. "australia" — comes directly from useParams()
-  currencyInfo: CurrencyInfo;
 }) {
   const d = pct(p.exactPrice, p.discountPrice);
 
-  // Convert prices from INR to the current country's currency
-  const convertedPrice      = Math.round(p.discountPrice * currencyInfo.rate);
-  const convertedExactPrice = Math.round(p.exactPrice    * currencyInfo.rate);
+  const convertedPrice      = p.discountPrice;
+  const convertedExactPrice = p.exactPrice;
 
   return (
     <Link
@@ -295,16 +284,13 @@ function RelCard({
         <div className="flex items-baseline gap-2 flex-wrap">
           {/* ✅ currency symbol from URL country param */}
           <span className="text-[0.9rem] font-bold text-stone-900">
-            {currencyInfo.symbol}{convertedPrice.toLocaleString()}
+            {sharedFormatPrice(convertedPrice, country)}
           </span>
           {d > 0 && (
             <span className="text-[0.7rem] text-stone-400 line-through">
-              {currencyInfo.symbol}{convertedExactPrice.toLocaleString()}
+              {sharedFormatPrice(convertedExactPrice, country)}
             </span>
           )}
-          <span className="text-[0.58rem] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-100 ml-auto">
-            {currencyInfo.code}
-          </span>
         </div>
       </div>
     </Link>
@@ -427,10 +413,8 @@ export default function ProductDetailPage() {
     }, 0);
   }, [params]);
 
-  // Derive currencyInfo from country parsed from the real URL
-  // e.g. "australia" → { symbol: "A$", code: "AUD", rate: 0.018 }
-  const currencyInfo: CurrencyInfo =
-    CURRENCY_CONFIG[country] ?? CURRENCY_CONFIG.default;
+  // Derive flag from country
+  const currencyInfo = getCurrencyForCountry(country);
 
   const [product,  setProduct]  = useState<Product | null>(null);
   const [related,  setRelated]  = useState<Product[]>([]);
@@ -482,11 +466,6 @@ export default function ProductDetailPage() {
     return () => el.removeEventListener("scroll", updateArrows);
   }, [related, updateArrows]);
 
-  // ✅ formatPrice: converts from INR base price using country's rate & symbol
-  const formatPrice = useCallback((priceInINR: number) => {
-    const converted = Math.round(priceInINR * currencyInfo.rate);
-    return `${currencyInfo.symbol}${converted.toLocaleString()}`;
-  }, [currencyInfo]);
 
   // Fetch product — runs once id is populated from pathname
   useEffect(() => {
@@ -597,7 +576,7 @@ export default function ProductDetailPage() {
       <TopBar id={id} name="Not found" country={country} />
       <div className="max-w-2xl mx-auto px-6 mt-20">
         <div className="bg-white rounded-3xl p-10 border border-red-100 text-center shadow-xl">
-          <div className="text-6xl mb-5">🌸</div>
+          <div className="text-6xl mb-5">{currencyInfo.flag}</div>
           <h2 className="font-serif text-3xl font-bold mb-3 text-stone-900">Product not found</h2>
           <p className="text-stone-500 text-sm mb-5">{error}</p>
           {rawDebug && (
@@ -783,15 +762,15 @@ export default function ProductDetailPage() {
             {/* Price block with country currency */}
             <div className="flex items-end gap-3.5 mb-2 flex-wrap">
               <span className="font-serif text-5xl font-black text-stone-900 leading-none">
-                {formatPrice(product.discountPrice)}
+                {sharedFormatPrice(product.discountPrice, country)}
               </span>
               {disc > 0 && (
                 <>
                   <span className="text-lg text-stone-400 line-through leading-none pb-1">
-                    {formatPrice(product.exactPrice)}
+                    {sharedFormatPrice(product.exactPrice, country)}
                   </span>
                   <span className="text-[0.73rem] bg-green-100 text-green-800 px-3.5 py-1.5 rounded-full font-black leading-none">
-                    Save {formatPrice(product.exactPrice - product.discountPrice)}
+                    Save {sharedFormatPrice(product.exactPrice - product.discountPrice, country)}
                   </span>
                 </>
               )}
@@ -861,7 +840,7 @@ export default function ProductDetailPage() {
                   ) : cartAdded ? (
                     <><CheckIcon /> Added to Cart!</>
                   ) : (
-                    <><CartIcon n={20} /> Add to Cart · {formatPrice(product.discountPrice)}</>
+                    <><CartIcon n={20} /> Add to Cart · {sharedFormatPrice(product.discountPrice, country)}</>
                   )}
                 </button>
               </div>
@@ -912,8 +891,8 @@ export default function ProductDetailPage() {
                       { label: "Category",   value: product.category?.name },
                       { label: "Color",      value: product.color?.name, swatch: true },
                       { label: "Stock",      value: `${product.stock} units` },
-                      { label: "MRP",        value: formatPrice(product.exactPrice) },
-                      { label: "Sale Price", value: formatPrice(product.discountPrice) },
+                      { label: "MRP",        value: sharedFormatPrice(product.exactPrice, country) },
+                      { label: "Sale Price", value: sharedFormatPrice(product.discountPrice, country) },
                       { label: "Discount",   value: disc > 0 ? `${disc}%` : "No discount" },
                       { label: "Currency",   value: `${currencyInfo.code} (${currencyInfo.symbol})` },
                     ].filter(r => r.value).map((row, i, arr) => (
@@ -1062,7 +1041,6 @@ export default function ProductDetailPage() {
                   <RelCard
                     p={p}
                     country={country}
-                    currencyInfo={currencyInfo}
                   />
                 </div>
               ))}

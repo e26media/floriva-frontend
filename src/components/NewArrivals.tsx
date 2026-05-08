@@ -34,33 +34,15 @@ export interface TApiProduct {
   createdAt: string; updatedAt: string
 }
 
+import { formatPrice } from '@/utils/currency'
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Constants — hardcoded to India / INR
+// Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL           = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL      = 30_000
 const NEW_ARRIVALS_LABEL = 'New Arrivals'
-
-// India is always the country for this component
-const INDIA_SLUG     = 'india'
-const INDIA_CURRENCY = { symbol: '₹', code: 'INR', locale: 'en-IN', position: 'before' as const }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Format price — always INR
-// ─────────────────────────────────────────────────────────────────────────────
-
-function formatPrice(amount: number): string {
-  try {
-    const formatted = new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-    return `₹${formatted}`
-  } catch {
-    return `₹${amount.toLocaleString()}`
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // New Arrivals filter helpers
@@ -88,13 +70,12 @@ function isNewArrival(product: TApiProduct): boolean {
 // Filter products belonging to India
 // ─────────────────────────────────────────────────────────────────────────────
 
-function isIndiaProduct(product: TApiProduct): boolean {
+function isCountryProduct(product: TApiProduct, countrySlug: string): boolean {
   const c = product.country
   if (!c) return false
-  if (typeof c === 'string') return c.toLowerCase() === INDIA_SLUG
+  if (typeof c === 'string') return c.toLowerCase() === countrySlug.toLowerCase()
   if (typeof c === 'object') {
-    const nameMatch = c.name?.toLowerCase() === INDIA_SLUG
-    return nameMatch
+    return c.name?.toLowerCase() === countrySlug.toLowerCase()
   }
   return false
 }
@@ -155,6 +136,7 @@ interface TCartToast {
   qty: number
   type: TToastType
   message?: string
+  countrySlug: string | null
 }
 
 let _toastItems: TCartToast[] = []
@@ -162,9 +144,9 @@ let _toastCounter = 0
 const _toastListeners = new Set<() => void>()
 const _notifyToast = () => _toastListeners.forEach((fn) => fn())
 
-function pushToast(product: TApiProduct, qty: number, type: TToastType, message?: string) {
+function pushToast(product: TApiProduct, qty: number, type: TToastType, countrySlug: string | null, message?: string) {
   const id = ++_toastCounter
-  _toastItems = [..._toastItems, { id, product, qty, type, message }]
+  _toastItems = [..._toastItems, { id, product, qty, type, message, countrySlug }]
   _notifyToast()
   setTimeout(() => {
     _toastItems = _toastItems.filter((t) => t.id !== id)
@@ -211,8 +193,7 @@ function CartToastContainer() {
               ) : (
                 <>
                   <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
-                  {/* Always INR ₹ */}
-                  <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice)}</p>
+                  <p className="text-xs text-gray-400">Qty {toast.qty} · {formatPrice(toast.product.discountPrice, toast.countrySlug)}</p>
                 </>
               )}
             </div>
@@ -275,7 +256,7 @@ function isNewIn(createdAt: string): boolean {
 // useAddToCart
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useAddToCart(product: TApiProduct) {
+function useAddToCart(product: TApiProduct, countrySlug: string | null) {
   const [loading, setLoading] = useState(false)
   const [added, setAdded]     = useState(false)
 
@@ -286,12 +267,12 @@ function useAddToCart(product: TApiProduct) {
     setLoading(false)
     if (result.ok) {
       setAdded(true)
-      pushToast(product, qty, 'success')
+      pushToast(product, qty, 'success', countrySlug)
       setTimeout(() => setAdded(false), 2000)
     } else {
-      pushToast(product, qty, 'error', result.message)
+      pushToast(product, qty, 'error', countrySlug, result.message)
     }
-  }, [loading, product])
+  }, [loading, product, countrySlug])
 
   return { addToCart, loading, added }
 }
@@ -363,11 +344,11 @@ function AccordionRow({ title, children }: { title: string; children: React.Reac
 // QuickViewModal — always INR, always India product link
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: () => void }) {
+function QuickViewModal({ product, countrySlug, onClose }: { product: TApiProduct; countrySlug: string | null; onClose: () => void }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty]             = useState(1)
   const thumbsRef = useRef<HTMLDivElement>(null)
-  const { addToCart, loading: adding, added } = useAddToCart(product)
+  const { addToCart, loading: adding, added } = useAddToCart(product, countrySlug)
 
   const { rating, reviews } = fakeRating(product._id)
   const discount    = calcDiscount(product.exactPrice, product.discountPrice)
@@ -509,11 +490,11 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
             {/* Always INR prices */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
-                {formatPrice(product.discountPrice)}
+                {formatPrice(product.discountPrice, countrySlug)}
               </span>
               {product.exactPrice > product.discountPrice && (
                 <>
-                  <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice)}</span>
+                  <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice, countrySlug)}</span>
                   <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">-{discount}%</span>
                 </>
               )}
@@ -579,7 +560,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 
             <div className="flex items-center justify-end pt-4 mt-auto border-t border-gray-100">
               {/* Link to country/india product page */}
-              <a href={`/country/${INDIA_SLUG}/product/${product._id}`}
+              <a href={`/country/${countrySlug || 'india'}/product/${product._id}`}
                 className="text-xs font-semibold text-gray-700 underline-offset-2 hover:underline">
                 View full page →
               </a>
@@ -596,7 +577,7 @@ function QuickViewModal({ product, onClose }: { product: TApiProduct; onClose: (
 // ProductCard — always INR
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p: TApiProduct) => void }) {
+function ProductCard({ data, countrySlug, onQuickView }: { data: TApiProduct; countrySlug: string | null; onQuickView: (p: TApiProduct) => void }) {
   const imageUrl   = data.images?.[0] ? imgSrc(data.images[0]) : null
   const colorName  = data.color?.name ?? null
   const discount   = calcDiscount(data.exactPrice, data.discountPrice)
@@ -605,7 +586,7 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
   const swatches   = getSwatches(data)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const touchedRef = useRef(false)
-  const { addToCart, loading, added } = useAddToCart(data)
+  const { addToCart, loading, added } = useAddToCart(data, countrySlug)
 
   const handleTouchStart = useCallback(() => {
     if (!touchedRef.current) {
@@ -705,10 +686,10 @@ function ProductCard({ data, onQuickView }: { data: TApiProduct; onQuickView: (p
         {/* Always INR prices */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
-            {formatPrice(data.discountPrice)}
+            {formatPrice(data.discountPrice, countrySlug)}
           </span>
           {data.exactPrice > data.discountPrice && (
-            <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
+            <span className="text-xs text-gray-400 line-through">{formatPrice(data.exactPrice, countrySlug)}</span>
           )}
         </div>
         <div className="mt-1">
@@ -770,9 +751,31 @@ const NewArrivals: FC<BestSellersProps> = ({
   pollInterval = POLL_INTERVAL,
 }) => {
 
-  // Always fetch India products — no pathname/country detection needed
-  // Uses the countrywise API with country=india
-  const apiUrl = `${BASE_URL}/api/countrywise?country=${INDIA_SLUG}`
+  // Detect country from localStorage
+  const [countrySlug, setCountrySlug] = useState<string>('australia')
+
+  useEffect(() => {
+    const sync = () => {
+      const saved = localStorage.getItem('floriva_selected_country')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed?.country?.name) {
+            const name = parsed.country.name.toLowerCase()
+            Promise.resolve().then(() => setCountrySlug(name))
+          }
+        } catch (e) {
+          console.error('Failed to parse country from localStorage', e)
+        }
+      }
+    }
+
+    sync() // Initial sync
+    window.addEventListener('floriva_country_changed', sync)
+    return () => window.removeEventListener('floriva_country_changed', sync)
+  }, [])
+
+
 
   const [products,  setProducts]  = useState<TApiProduct[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -784,13 +787,14 @@ const NewArrivals: FC<BestSellersProps> = ({
   const { prevBtnDisabled, nextBtnDisabled, onPrevButtonClick, onNextButtonClick } =
     useCarouselArrowButtons(emblaApi)
 
-  // ── Fetch + filter India New Arrivals ──────────────────────────────────────
+  // ── Fetch + filter New Arrivals ──────────────────────────────────────
   const fetchProducts = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true)
       setError(null)
 
-      const res = await fetch(apiUrl, { cache: 'no-store' })
+      const currentApiUrl = `${BASE_URL}/api/countrywise?country=${countrySlug}`
+      const res = await fetch(currentApiUrl, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const json = await res.json()
 
@@ -802,24 +806,20 @@ const NewArrivals: FC<BestSellersProps> = ({
 
       // Step 1: keep only India products (by country name)
       // (The API may already filter by country, but we double-filter to be safe)
-      const indiaProducts = all.filter(isIndiaProduct)
+      const countryProducts = all.filter(p => isCountryProduct(p, countrySlug))
 
       // Step 2: keep only New Arrivals
-      const newArrivals = indiaProducts.filter(isNewArrival)
+      const newArrivals = countryProducts.filter(isNewArrival)
 
-      // If countrywise API already filters by country, indiaProducts === all
-      // Fall back: if indiaProducts is empty, use all (API already filtered)
-      const finalProducts = indiaProducts.length > 0 ? newArrivals : all.filter(isNewArrival)
+      // If countrywise API already filters by country, countryProducts === all
+      // Fall back: if countryProducts is empty, use all (API already filtered)
+      const finalProducts = countryProducts.length > 0 ? newArrivals : all.filter(isNewArrival)
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[CountryNewarrivals] apiUrl          →', apiUrl)
+        console.log('[CountryNewarrivals] apiUrl          →', currentApiUrl)
         console.log('[CountryNewarrivals] total fetched   :', all.length)
-        console.log('[CountryNewarrivals] india products  :', indiaProducts.length)
+        console.log('[CountryNewarrivals] country products :', countryProducts.length)
         console.log('[CountryNewarrivals] new arrivals    :', finalProducts.length)
-        if (all.length > 0) {
-          console.log('[CountryNewarrivals] sample product  :', all[0])
-          console.log('[CountryNewarrivals] sample featured :', getFeaturedProductRaw(all[0]))
-        }
       }
 
       if (isMounted.current) setProducts(finalProducts)
@@ -829,7 +829,7 @@ const NewArrivals: FC<BestSellersProps> = ({
     } finally {
       if (isMounted.current && !isBackground) setLoading(false)
     }
-  }, [apiUrl])
+  }, [countrySlug])
 
   useEffect(() => {
     isMounted.current = true
@@ -895,7 +895,7 @@ const NewArrivals: FC<BestSellersProps> = ({
               {products.map((product) => (
                 <div key={product._id}
                   className="embla__slide flex-[0_0_calc(100%-6px)] sm:flex-[0_0_calc(50%-10px)] md:flex-[0_0_calc(33.333%-14px)] xl:flex-[0_0_calc(25%-15px)] pl-3 sm:pl-5 min-w-0">
-                  <ProductCard data={product} onQuickView={handleQuickView} />
+                  <ProductCard data={product} countrySlug={countrySlug} onQuickView={handleQuickView} />
                 </div>
               ))}
             </div>
@@ -911,7 +911,7 @@ const NewArrivals: FC<BestSellersProps> = ({
       </div>
 
       {quickViewProduct && (
-        <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} />
+        <QuickViewModal product={quickViewProduct} countrySlug={countrySlug} onClose={() => setQuickViewProduct(null)} />
       )}
     </>
   )

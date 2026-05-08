@@ -474,25 +474,50 @@ export default function LocationSelector() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState<{ country: Country; city: string } | null>(null)
 
-  // ── Load from localStorage on mount ─────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem('floriva_selected_country')
     if (saved) {
       try {
         const data = JSON.parse(saved)
-        setTimeout(() => {
-          setSelected(data)
-        }, 0)
+        Promise.resolve().then(() => setSelected(data))
+
+        // If on home page, redirect to country-specific home
+        if (window.location.pathname === '/' && data?.country?.name) {
+          router.push(`/country/${data.country.name.toLowerCase()}`)
+        }
       } catch (e) {
         console.error('Failed to parse saved country', e)
       }
+    } else {
+      // No country selected yet -> Fetch countries and default to Australia
+      fetch(`${BASE_URL}/api/allCountries`)
+        .then((res) => res.json())
+        .then((json) => {
+          const data = Array.isArray(json) ? json : (json.data ?? [])
+          const australia = data.find((c: any) => c.name.toLowerCase() === 'australia')
+          if (australia) {
+            const defaultData = { country: australia, city: '' }
+            setSelected(defaultData)
+            localStorage.setItem('floriva_selected_country', JSON.stringify(defaultData))
+            // Emit event to sync other components
+            window.dispatchEvent(new Event('floriva_country_changed'))
+            
+            // If on home page, consider redirecting to country-specific home
+            if (window.location.pathname === '/') {
+              router.push(`/country/australia`)
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to fetch default country', err))
     }
-  }, [])
+  }, [router])
 
   const handleConfirm = (country: Country, city: string) => {
     const data = { country, city }
     setSelected(data)
     localStorage.setItem('floriva_selected_country', JSON.stringify(data))
+    // Emit event to sync other components
+    window.dispatchEvent(new Event('floriva_country_changed'))
     setModalOpen(false)
     router.push(`/country/${country.name.toLowerCase()}`)
   }

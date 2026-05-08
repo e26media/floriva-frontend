@@ -191,7 +191,7 @@ function isNewIn(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 30 * 24 * 60 * 60 * 1000
 }
 
-function formatPrice(n: number) { return '₹' + n.toLocaleString('en-IN') }
+import { formatPrice } from '@/utils/currency'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cart API
@@ -230,7 +230,7 @@ function pushToast(product: TApiProduct, qty: number, type: TToastType, message?
   setTimeout(() => { _toasts = _toasts.filter(t => t.id !== id); _notifyToasts() }, 3500)
 }
 
-function CartToastContainer() {
+function CartToastContainer({ countrySlug }: { countrySlug: string | null }) {
   const [, re] = useState(0)
   useEffect(() => {
     const fn = () => re(n => n + 1)
@@ -253,7 +253,7 @@ function CartToastContainer() {
               {err
                 ? <p className="text-xs text-gray-600 line-clamp-2">{t.message}</p>
                 : <><p className="text-sm font-semibold text-gray-900 truncate">{t.product.name}</p>
-                    <p className="text-[11px] text-gray-400">Qty {t.qty} · {formatPrice(t.product.discountPrice)}</p></>}
+                    <p className="text-[11px] text-gray-400">Qty {t.qty} · {formatPrice(t.product.discountPrice, countrySlug)}</p></>}
             </div>
           </div>
         )
@@ -377,8 +377,8 @@ function AddToBagBtn({ outOfStock, adding, added, onAdd, fullWidth = false }: {
 // Quick View Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QuickViewModal({ product, onClose, soldCount = 0 }: {
-  product: TApiProduct; onClose: () => void; soldCount?: number
+function QuickViewModal({ product, onClose, countrySlug, soldCount = 0 }: {
+  product: TApiProduct; onClose: () => void; countrySlug: string | null; soldCount?: number
 }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
@@ -589,11 +589,11 @@ function QuickViewModal({ product, onClose, soldCount = 0 }: {
               {/* Price block */}
               <div className="flex items-center gap-2.5 flex-wrap mb-4">
                 <span className="text-2xl font-black text-gray-900 tracking-tight">
-                  {formatPrice(product.discountPrice)}
+                  {formatPrice(product.discountPrice, countrySlug)}
                 </span>
                 {product.exactPrice > product.discountPrice && (
                   <>
-                    <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice)}</span>
+                    <span className="text-sm text-gray-400 line-through">{formatPrice(product.exactPrice, countrySlug)}</span>
                     <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-500">−{discount}%</span>
                   </>
                 )}
@@ -648,7 +648,7 @@ function QuickViewModal({ product, onClose, soldCount = 0 }: {
 
               {/* Footer */}
               <div className="flex items-center justify-end pt-4 mt-1">
-                <a href={`/product/${product._id}`}
+                <a href={`/country/${countrySlug || 'india'}/product/${product._id}`}
                   className="text-xs font-bold text-gray-700 underline underline-offset-4 decoration-gray-300 hover:text-gray-900 hover:decoration-gray-600 transition-colors">
                   View full details →
                 </a>
@@ -666,8 +666,8 @@ function QuickViewModal({ product, onClose, soldCount = 0 }: {
 // Product Card
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProductCard({ data, onQuickView, soldCount, rank }: {
-  data: TApiProduct; onQuickView: (p: TApiProduct) => void; soldCount: number; rank: number
+function ProductCard({ data, onQuickView, soldCount, rank, countrySlug }: {
+  data: TApiProduct; onQuickView: (p: TApiProduct) => void; soldCount: number; rank: number; countrySlug: string | null
 }) {
   const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
   const discount = calcDiscount(data.exactPrice, data.discountPrice)
@@ -677,7 +677,12 @@ function ProductCard({ data, onQuickView, soldCount, rank }: {
   const { addToCart, loading, added } = useAddToCart(data)
 
   return (
-    <div className="card-wrap flex flex-col">
+    <div
+      className="card-wrap flex flex-col cursor-pointer"
+      onClick={() => {
+        window.location.href = `/country/${countrySlug || 'india'}/product/${data._id}`
+      }}
+    >
 
       {/* Image */}
       <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gray-100">
@@ -768,10 +773,10 @@ function ProductCard({ data, onQuickView, soldCount, rank }: {
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
-            {formatPrice(data.discountPrice)}
+            {formatPrice(data.discountPrice, countrySlug)}
           </span>
           {data.exactPrice > data.discountPrice && (
-            <span className="text-[11px] text-gray-400 line-through">{formatPrice(data.exactPrice)}</span>
+            <span className="text-[11px] text-gray-400 line-through">{formatPrice(data.exactPrice, countrySlug)}</span>
           )}
         </div>
       </div>
@@ -819,6 +824,26 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
   emblaOptions = { slidesToScroll: 'auto', dragFree: true },
   pollInterval = POLL_INTERVAL,
 }) => {
+  const [countrySlug, setCountrySlug] = useState<string>('australia')
+
+  useEffect(() => {
+    const sync = () => {
+      const saved = localStorage.getItem('floriva_selected_country')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed?.country?.name) {
+            const name = parsed.country.name.toLowerCase()
+            Promise.resolve().then(() => setCountrySlug(name))
+          }
+        } catch (e) {}
+      }
+    }
+    sync()
+    window.addEventListener('floriva_country_changed', sync)
+    return () => window.removeEventListener('floriva_country_changed', sync)
+  }, [])
+
   const [products, setProducts] = useState<TApiProduct[]>([])
   const [salesTally, setSalesTally] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -870,7 +895,7 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
   return (
     <>
       <style>{GLOBAL_STYLES}</style>
-      <CartToastContainer/>
+      <CartToastContainer countrySlug={countrySlug}/>
 
       <div className={`nc-SectionSliderProductCard ${className}`}>
         <Heading
@@ -918,6 +943,7 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
                     onQuickView={setQuickViewProduct}
                     soldCount={salesTally.get(product._id) ?? 0}
                     rank={index + 1}
+                    countrySlug={countrySlug}
                   />
                 </div>
               ))}
@@ -938,6 +964,7 @@ const BestSellerProduct: FC<SectionSliderProductCardProps> = ({
         <QuickViewModal
           product={quickViewProduct}
           onClose={() => setQuickViewProduct(null)}
+          countrySlug={countrySlug}
           soldCount={salesTally.get(quickViewProduct._id) ?? 0}
         />
       )}

@@ -12,63 +12,9 @@ import StripePaymentForm from "@/components/StripePaymentForm";
 // Initialize Stripe outside of the component to prevent multiple initializations
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
 
-// =============================================================================
-//  CURRENCY CONFIG
-// =============================================================================
-const COUNTRY_CURRENCY_MAP: Record<string, { currency: string; symbol: string; locale: string }> = {
-  australia: { currency: "AUD", symbol: "A$", locale: "en-AU" },
-  au: { currency: "AUD", symbol: "A$", locale: "en-AU" },
-  "united states": { currency: "USD", symbol: "$", locale: "en-US" },
-  us: { currency: "USD", symbol: "$", locale: "en-US" },
-  usa: { currency: "USD", symbol: "$", locale: "en-US" },
-  "united kingdom": { currency: "GBP", symbol: "£", locale: "en-GB" },
-  uk: { currency: "GBP", symbol: "£", locale: "en-GB" },
-  gb: { currency: "GBP", symbol: "£", locale: "en-GB" },
-  canada: { currency: "CAD", symbol: "C$", locale: "en-CA" },
-  ca: { currency: "CAD", symbol: "C$", locale: "en-CA" },
-  india: { currency: "INR", symbol: "₹", locale: "en-IN" },
-  in: { currency: "INR", symbol: "₹", locale: "en-IN" },
-  europe: { currency: "EUR", symbol: "€", locale: "en-DE" },
-  germany: { currency: "EUR", symbol: "€", locale: "de-DE" },
-  de: { currency: "EUR", symbol: "€", locale: "de-DE" },
-  france: { currency: "EUR", symbol: "€", locale: "fr-FR" },
-  fr: { currency: "EUR", symbol: "€", locale: "fr-FR" },
-  japan: { currency: "JPY", symbol: "¥", locale: "ja-JP" },
-  jp: { currency: "JPY", symbol: "¥", locale: "ja-JP" },
-  china: { currency: "CNY", symbol: "¥", locale: "zh-CN" },
-  cn: { currency: "CNY", symbol: "¥", locale: "zh-CN" },
-  singapore: { currency: "SGD", symbol: "S$", locale: "en-SG" },
-  sg: { currency: "SGD", symbol: "S$", locale: "en-SG" },
-  "new zealand": { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
-  nz: { currency: "NZD", symbol: "NZ$", locale: "en-NZ" },
-  "united arab emirates": { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  uae: { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  ae: { currency: "AED", symbol: "د.إ", locale: "ar-AE" },
-  switzerland: { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  ch: { currency: "CHF", symbol: "CHF", locale: "de-CH" },
-  "south korea": { currency: "KRW", symbol: "₩", locale: "ko-KR" },
-  kr: { currency: "KRW", symbol: "₩", locale: "ko-KR" },
-  brazil: { currency: "BRL", symbol: "R$", locale: "pt-BR" },
-  br: { currency: "BRL", symbol: "R$", locale: "pt-BR" },
-  mexico: { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  mx: { currency: "MXN", symbol: "MX$", locale: "es-MX" },
-  "south africa": { currency: "ZAR", symbol: "R", locale: "en-ZA" },
-  za: { currency: "ZAR", symbol: "R", locale: "en-ZA" },
-  sweden: { currency: "SEK", symbol: "kr", locale: "sv-SE" },
-  se: { currency: "SEK", symbol: "kr", locale: "sv-SE" },
-  norway: { currency: "NOK", symbol: "kr", locale: "nb-NO" },
-  no: { currency: "NOK", symbol: "kr", locale: "nb-NO" },
-  denmark: { currency: "DKK", symbol: "kr", locale: "da-DK" },
-  dk: { currency: "DKK", symbol: "kr", locale: "da-DK" },
-};
+import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
 
-const DEFAULT_CURRENCY = { currency: "USD", symbol: "$", locale: "en-US" };
-
-function getCurrencyInfo(countryParam: string | null) {
-  if (!countryParam) return DEFAULT_CURRENCY;
-  const key = countryParam.toLowerCase().trim();
-  return COUNTRY_CURRENCY_MAP[key] ?? DEFAULT_CURRENCY;
-}
+// Removed local getCurrencyInfo - using shared formatPrice with country slug
 
 // =============================================================================
 //  TYPES
@@ -130,8 +76,8 @@ function getUserData(): Partial<{ email: string; firstName: string; lastName: st
   catch { return {}; }
 }
 
-function fmt(n: number, locale: string, currency: string): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(n ?? 0);
+function fmt(n: number, countrySlug: string | null): string {
+  return formatPrice(n, countrySlug);
 }
 
 function getImgSrc(images?: (string | ProductImage)[]): string | null {
@@ -404,12 +350,10 @@ function SectionHeader({ icon, title, step }: SectionHeaderProps) {
 // =============================================================================
 function OrderItemRow({
   item,
-  locale,
-  currency,
+  countrySlug,
 }: {
   item: CartItem;
-  locale: string;
-  currency: string;
+  countrySlug: string | null;
 }) {
   const [imgErr, setImgErr] = useState(false);
   const p = item.productId;
@@ -444,7 +388,7 @@ function OrderItemRow({
           {p?.name ?? p?.title ?? "Product"}
         </p>
         <p className="shrink-0 text-sm font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
-          {fmt(price * qty, locale, currency)}
+          {fmt(price * qty, countrySlug)}
         </p>
       </div>
     </div>
@@ -458,13 +402,11 @@ interface SuccessScreenProps {
   orderId: string;
   email: string;
   paymentMethod: string;
-  currencySymbol: string;
-  currency: string;
-  locale: string;
+  countrySlug: string | null;
   subtotal: number;
 }
 
-function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency, locale, subtotal }: SuccessScreenProps) {
+function SuccessScreen({ orderId, email, paymentMethod, countrySlug, subtotal }: SuccessScreenProps) {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -483,12 +425,12 @@ function SuccessScreen({ orderId, email, paymentMethod, currencySymbol, currency
       {/* Currency info badge on success */}
       <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
         <IcoGlobe c="h-4 w-4" />
-        {fmt(subtotal, locale, currency)} {currency}
+        {fmt(subtotal, countrySlug)}
       </div>
 
       {paymentMethod === "cash_on_delivery" && (
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400">
-          <IcoCash c="h-4 w-4" /> Pay on Delivery · {currencySymbol}
+          <IcoCash c="h-4 w-4" /> Pay on Delivery
         </div>
       )}
       {paymentMethod === "online" && (
@@ -546,8 +488,8 @@ function CheckoutPageContent() {
     }
   }, [countryParam]);
 
-  const currencyInfo = getCurrencyInfo(resolvedCountry);
-  const { currency, symbol: currencySymbol, locale } = currencyInfo;
+  const countrySlug = resolvedCountry;
+  const { symbol: currencySymbol, code: currency } = getCurrencyForCountry(countrySlug);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -663,7 +605,7 @@ function CheckoutPageContent() {
         city: form.city.trim(),
         stateProvinceRegionId: form.stateProvinceRegionId.trim(),
         postalCode: form.postalCode.trim(),
-        country: form.country.trim(),
+        country: form.country.trim() || countrySlug || "",
       },
     };
 
@@ -766,9 +708,7 @@ function CheckoutPageContent() {
             orderId={doneOrderId}
             email={form.email}
             paymentMethod={paymentMethod}
-            currencySymbol={currencySymbol}
-            currency={currency}
-            locale={locale}
+            countrySlug={countrySlug}
             subtotal={subtotal}
           />
         </main>
@@ -984,7 +924,7 @@ function CheckoutPageContent() {
                       <IcoInfo c="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                       <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
                         You will pay{" "}
-                        <strong>{fmt(subtotal, locale, currency)}</strong>{" "}
+                        <strong>{fmt(subtotal, countrySlug)}</strong>{" "}
                         <span className="opacity-70">({currency})</span> cash upon delivery.
                       </p>
                     </div>
@@ -1036,8 +976,7 @@ function CheckoutPageContent() {
                       <OrderItemRow
                         key={item._id}
                         item={item}
-                        locale={locale}
-                        currency={currency}
+                        countrySlug={countrySlug}
                       />
                     ))}
                   </div>
@@ -1055,7 +994,7 @@ function CheckoutPageContent() {
                   <div className="flex justify-between text-sm">
                     <span className="text-neutral-500 dark:text-neutral-400">Subtotal</span>
                     <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
-                      {fmt(subtotal, locale, currency)}
+                      {fmt(subtotal, countrySlug)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -1066,7 +1005,7 @@ function CheckoutPageContent() {
                     <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">Total</span>
                     <div className="text-right">
                       <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-                        {fmt(subtotal, locale, currency)}
+                        {fmt(subtotal, countrySlug)}
                       </span>
                       <p className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500">{currency}</p>
                     </div>
@@ -1113,7 +1052,7 @@ function CheckoutPageContent() {
                       ) : paymentMethod === "cash_on_delivery" ? (
                         <><IcoCash c="h-4 w-4" /> Place Order (COD · {currencySymbol})</>
                       ) : (
-                        <><IcoCard c="h-4 w-4" /> Proceed to Payment · {fmt(subtotal, locale, currency)}</>
+                        <><IcoCard c="h-4 w-4" /> Proceed to Payment · {fmt(subtotal, countrySlug)}</>
                       )}
                     </button>
                   )}

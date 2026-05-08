@@ -1,24 +1,44 @@
+'use client'
+
 import { Divider } from '@/components/Divider'
 import Heading from '@/components/Heading/Heading'
 import Prices from '@/components/Prices'
 import { getOrders } from '@/data/data'
-import { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { formatPrice } from '@/utils/currency'
 
-export const metadata: Metadata = {
-  title: 'Order Successful',
-  description: 'Your order has been successfully placed.',
-}
 
-export default async function Page() {
-  // for demo purposes, you need to use the getOrder(number) function to get the order by number, example: getOrder(123456789)
-  const order = (await getOrders())[0]
+export default function Page() {
+  const [order, setOrder] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [countrySlug, setCountrySlug] = useState<string | null>(null)
 
-  if (!order) {
-    return notFound()
-  }
+  useEffect(() => {
+    async function load() {
+      const orders = await getOrders()
+      setOrder(orders[0])
+      setLoading(false)
+    }
+    load()
+
+    const saved = localStorage.getItem('floriva_selected_country')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed?.country?.name) {
+          const name = parsed.country.name.toLowerCase()
+          Promise.resolve().then(() => setCountrySlug(name))
+        }
+      } catch (e) {}
+    }
+  }, [])
+
+  if (loading) return null
+  if (!order) return notFound()
+
   const products = order.products
 
   return (
@@ -48,7 +68,7 @@ export default async function Page() {
               role="list"
               className="mt-6 divide-y divide-neutral-200 border-t border-neutral-200 text-sm text-neutral-500 dark:divide-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
             >
-              {products.map((product) => (
+              {products.map((product: any) => (
                 <li key={product.id} className="flex gap-x-2.5 py-6 sm:gap-x-6">
                   <div className="relative aspect-3/4 w-24 flex-none">
                     {product.featuredImage && (
@@ -85,22 +105,22 @@ export default async function Page() {
             <dl className="space-y-6 border-t border-neutral-200 pt-6 text-sm font-medium text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
               <div className="flex justify-between">
                 <dt className="uppercase">Subtotal</dt>
-                <dd className="text-neutral-900 dark:text-neutral-100">${order.cost.subtotal.toFixed(2)}</dd>
+                <dd className="text-neutral-900 dark:text-neutral-100">{formatPrice(order.cost.subtotal, countrySlug)}</dd>
               </div>
 
               <div className="flex justify-between">
                 <dt className="uppercase">Shipping</dt>
-                <dd className="text-neutral-900 dark:text-neutral-100">${order.cost.shipping.toFixed(2)}</dd>
+                <dd className="text-neutral-900 dark:text-neutral-100">{formatPrice(order.cost.shipping, countrySlug)}</dd>
               </div>
 
               <div className="flex justify-between">
                 <dt className="uppercase">Taxes</dt>
-                <dd className="text-neutral-900 dark:text-neutral-100">${order.cost.tax.toFixed(2)}</dd>
+                <dd className="text-neutral-900 dark:text-neutral-100">{formatPrice(order.cost.tax, countrySlug)}</dd>
               </div>
 
               <div className="flex items-center justify-between border-t border-neutral-200 pt-6 text-neutral-900 dark:border-neutral-700 dark:text-neutral-100">
                 <dt className="text-base uppercase">Total</dt>
-                <dd className="text-base">${order.cost.total.toFixed(2)}</dd>
+                <dd className="text-base">{formatPrice(order.cost.total, countrySlug)}</dd>
               </div>
             </dl>
 

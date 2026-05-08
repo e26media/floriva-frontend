@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
+import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
 
 // =============================================================================
 //  TYPES
@@ -68,65 +69,7 @@ const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7
 
 const REFRESH_INTERVAL = 5000;
 
-// =============================================================================
-//  COUNTRY → CURRENCY MAP
-// =============================================================================
-const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
-  india:                    { symbol: "₹",   code: "INR" },
-  australia:                { symbol: "A$",  code: "AUD" },
-  "united states":          { symbol: "$",   code: "USD" },
-  usa:                      { symbol: "$",   code: "USD" },
-  "united kingdom":         { symbol: "£",   code: "GBP" },
-  uk:                       { symbol: "£",   code: "GBP" },
-  europe:                   { symbol: "€",   code: "EUR" },
-  germany:                  { symbol: "€",   code: "EUR" },
-  france:                   { symbol: "€",   code: "EUR" },
-  italy:                    { symbol: "€",   code: "EUR" },
-  spain:                    { symbol: "€",   code: "EUR" },
-  japan:                    { symbol: "¥",   code: "JPY" },
-  china:                    { symbol: "¥",   code: "CNY" },
-  canada:                   { symbol: "CA$", code: "CAD" },
-  switzerland:              { symbol: "Fr",  code: "CHF" },
-  brazil:                   { symbol: "R$",  code: "BRL" },
-  russia:                   { symbol: "₽",   code: "RUB" },
-  "south korea":            { symbol: "₩",   code: "KRW" },
-  mexico:                   { symbol: "MX$", code: "MXN" },
-  indonesia:                { symbol: "Rp",  code: "IDR" },
-  turkey:                   { symbol: "₺",   code: "TRY" },
-  "saudi arabia":           { symbol: "﷼",   code: "SAR" },
-  uae:                      { symbol: "د.إ", code: "AED" },
-  "united arab emirates":   { symbol: "د.إ", code: "AED" },
-  singapore:                { symbol: "S$",  code: "SGD" },
-  pakistan:                 { symbol: "₨",   code: "PKR" },
-  bangladesh:               { symbol: "৳",   code: "BDT" },
-  "sri lanka":              { symbol: "₨",   code: "LKR" },
-  nepal:                    { symbol: "₨",   code: "NPR" },
-  thailand:                 { symbol: "฿",   code: "THB" },
-  vietnam:                  { symbol: "₫",   code: "VND" },
-  philippines:              { symbol: "₱",   code: "PHP" },
-  malaysia:                 { symbol: "RM",  code: "MYR" },
-  nigeria:                  { symbol: "₦",   code: "NGN" },
-  "south africa":           { symbol: "R",   code: "ZAR" },
-  ghana:                    { symbol: "₵",   code: "GHS" },
-  kenya:                    { symbol: "KSh", code: "KES" },
-  egypt:                    { symbol: "E£",  code: "EGP" },
-  argentina:                { symbol: "$",   code: "ARS" },
-  colombia:                 { symbol: "$",   code: "COP" },
-  chile:                    { symbol: "$",   code: "CLP" },
-  peru:                     { symbol: "S/",  code: "PEN" },
-  poland:                   { symbol: "zł",  code: "PLN" },
-  sweden:                   { symbol: "kr",  code: "SEK" },
-  norway:                   { symbol: "kr",  code: "NOK" },
-  denmark:                  { symbol: "kr",  code: "DKK" },
-  "new zealand":            { symbol: "NZ$", code: "NZD" },
-  israel:                   { symbol: "₪",   code: "ILS" },
-  ukraine:                  { symbol: "₴",   code: "UAH" },
-};
-
-function currencyFor(countryName: string): { symbol: string; code: string } {
-  const key = countryName.trim().toLowerCase();
-  return CURRENCY_MAP[key] ?? { symbol: "$", code: "USD" };
-}
+// Using shared currency utility
 
 // =============================================================================
 //  GENERIC HELPERS
@@ -151,12 +94,8 @@ function getImgSrc(images?: (string | ProductImage)[]): string | null {
   return null;
 }
 
-function fmtPrice(n: number, symbol = "$"): string {
-  const formatted = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n ?? 0);
-  return `${symbol}${formatted}`;
+function fmtPrice(n: number, country: string): string {
+  return sharedFormatPrice(n, country);
 }
 
 function extractId(val?: string | { _id?: string; name?: string }): string | null {
@@ -436,7 +375,7 @@ function CartItemCard({
   const [metaLoading, setMetaLoading] = useState(true);
   const [meta, setMeta] = useState<ResolvedMeta>({
     colorName: "", categoryName: "", countryName: "", countryId: "",
-    currencySymbol: "$", currencyCode: "USD",
+    currencySymbol: "", currencyCode: "",
   });
 
   const colorKey    = typeof p?.color    === "string" ? p.color    : (p?.color    as { _id?: string })?._id ?? "";
@@ -455,7 +394,7 @@ function CartItemCard({
       if (cancelled) return;
       const countryName = countryResult.name;
       const countryId = countryResult.id;
-      const { symbol: currencySymbol, code: currencyCode } = currencyFor(currentCountry);
+      const { symbol: currencySymbol, code: currencyCode } = getCurrencyForCountry(currentCountry);
       const resolved: ResolvedMeta = { 
         colorName, 
         categoryName, 
@@ -477,7 +416,6 @@ function CartItemCard({
   const price     = getPrice(p);
   const sale      = isSale(p);
   const qty       = Number(item.quantity) || 1;
-  const sym       = meta.currencySymbol;
   const lineTotal = price * qty;
   const origTotal = Number(p?.exactPrice ?? 0) * qty;
   const savings   = sale ? origTotal - lineTotal : 0;
@@ -529,11 +467,11 @@ function CartItemCard({
           </h3>
           <div className="hidden shrink-0 text-right sm:block">
             <p className="text-base font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-              {fmtPrice(lineTotal, sym)}
+              {fmtPrice(lineTotal, currentCountry)}
             </p>
             {sale && (
               <p className="text-xs tabular-nums text-neutral-400 line-through">
-                {fmtPrice(origTotal, sym)}
+                {fmtPrice(origTotal, currentCountry)}
               </p>
             )}
           </div>
@@ -586,7 +524,7 @@ function CartItemCard({
           {/* Savings */}
           {!metaLoading && sale && savings > 0 && (
             <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400">
-              Save {fmtPrice(savings, sym)}
+              Save {fmtPrice(savings, currentCountry)}
             </span>
           )}
         </div>
@@ -618,11 +556,11 @@ function CartItemCard({
           {/* Mobile price */}
           <div className="block text-right sm:hidden">
             <p className="text-sm font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-              {fmtPrice(lineTotal, sym)}
+              {fmtPrice(lineTotal, currentCountry)}
             </p>
             {sale && (
               <p className="text-xs tabular-nums text-neutral-400 line-through">
-                {fmtPrice(origTotal, sym)}
+                {fmtPrice(origTotal, currentCountry)}
               </p>
             )}
           </div>
@@ -646,7 +584,6 @@ function OrderSummary({
   onCheckout: () => void;
   countryName: string;
 }) {
-  const { symbol: displaySymbol } = currencyFor(countryName);
   const allResolved = items.length > 0 && items.every((item) => !!resolvedMetas[item._id]);
 
   const subtotal = items.reduce(
@@ -680,7 +617,7 @@ function OrderSummary({
             </span>
             {allResolved ? (
               <span className="font-semibold tabular-nums text-neutral-800 dark:text-neutral-200">
-                {fmtPrice(subtotal, displaySymbol)}
+                {fmtPrice(subtotal, countryName)}
               </span>
             ) : (
               <span className="inline-block h-4 w-20 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
@@ -692,7 +629,7 @@ function OrderSummary({
               <span className="text-red-500 dark:text-red-400">Discount savings</span>
               {allResolved ? (
                 <span className="font-semibold tabular-nums text-red-500 dark:text-red-400">
-                  -{fmtPrice(totalSavings, displaySymbol)}
+                  -{fmtPrice(totalSavings, countryName)}
                 </span>
               ) : (
                 <span className="inline-block h-4 w-16 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
@@ -704,7 +641,7 @@ function OrderSummary({
             <span className="text-base font-bold text-neutral-900 dark:text-neutral-100">Total</span>
             {allResolved ? (
               <span className="text-xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
-                {fmtPrice(subtotal, displaySymbol)}
+                {fmtPrice(subtotal, countryName)}
               </span>
             ) : (
               <span className="inline-block h-6 w-24 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />

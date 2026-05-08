@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
 
 /* ─────────────────────────────────────────────────────────────────
    TYPES
@@ -268,7 +269,7 @@ function Skeleton() {
 /* ─────────────────────────────────────────────────────────────────
    RELATED PRODUCT CARD (Only Indian Products)
 ───────────────────────────────────────────────────────────────── */
-function RelCard({ p }: { p: Product }) {
+function RelCard({ p, countrySlug }: { p: Product; countrySlug: string | null }) {
   const d = pct(p.exactPrice, p.discountPrice);
   return (
     <article
@@ -295,7 +296,6 @@ function RelCard({ p }: { p: Product }) {
             −{d}%
           </span>
         )}
-        {/* India Badge */}
         
         <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <span className="bg-white/95 text-stone-900 text-xs font-bold px-4 py-2 rounded-lg tracking-wide">
@@ -312,11 +312,11 @@ function RelCard({ p }: { p: Product }) {
         </h4>
         <div className="flex items-baseline gap-2">
           <span className="text-[0.9rem] font-bold text-stone-900">
-            ₹{p.discountPrice?.toLocaleString()}
+            {formatPrice(p.discountPrice, countrySlug)}
           </span>
           {d > 0 && (
             <span className="text-[0.7rem] text-stone-400 line-through">
-              ₹{p.exactPrice?.toLocaleString()}
+              {formatPrice(p.exactPrice, countrySlug)}
             </span>
           )}
         </div>
@@ -328,8 +328,8 @@ function RelCard({ p }: { p: Product }) {
 /* ─────────────────────────────────────────────────────────────────
    TOP NAV BAR
 ───────────────────────────────────────────────────────────────── */
-function TopBar({ id, name, cat, onShare, shared, isIndian }: {
-  id: string; name: string; cat?: string; onShare?: () => void; shared?: boolean; isIndian?: boolean;
+function TopBar({ id, name, cat, onShare, shared, countrySlug }: {
+  id: string; name: string; cat?: string; onShare?: () => void; shared?: boolean; countrySlug: string | null;
 }) {
   return (
     <nav className="sticky top-0 bg-amber-50/95 backdrop-blur-md border-b border-amber-100 shadow-sm z-10">
@@ -397,7 +397,7 @@ export default function ProductDetailPage() {
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
   const [rawDebug, setRawDebug] = useState("");
-  const [isIndian, setIsIndian] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   const [imgIdx,   setImgIdx]   = useState(0);
   const [qty,      setQty]      = useState(1);
@@ -446,8 +446,38 @@ export default function ProductDetailPage() {
     return () => el.removeEventListener("scroll", updateArrows);
   }, [related, updateArrows]);
 
-  /* ── Fetch product and filter to only Indian products ── */
+  const router = useRouter()
+
   useEffect(() => {
+    const sync = () => {
+      const saved = localStorage.getItem('floriva_selected_country')
+      let activeCountry = 'australia'
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed?.country?.name) {
+            activeCountry = parsed.country.name.toLowerCase()
+          }
+        } catch (e) {}
+      }
+      setSelectedCountry(activeCountry)
+
+      // ── REDIRECT TO REGIONAL PATH ──
+      // If we have a country, redirect to /country/[country]/product/[id]
+      if (activeCountry && id && window.location.pathname.startsWith('/product/')) {
+        router.replace(`/country/${activeCountry}/product/${id}`)
+      }
+    }
+
+    sync() // Initial sync
+    window.addEventListener('floriva_country_changed', sync)
+    return () => window.removeEventListener('floriva_country_changed', sync)
+  }, [id, router])
+
+  useEffect(() => {
+    if (!selectedCountry) return
+    const activeCountry = selectedCountry
+
     if (!id) {
       setTimeout(() => {
         setError("No product ID in URL");
@@ -480,15 +510,14 @@ export default function ProductDetailPage() {
 
         if (!p) throw new Error("Product not found in API response");
         
-        // Check if product is from India
+        // Check if product is from the selected country
         const productCountry = getProductCountry(p);
-        const isIndianProduct = productCountry === "india";
+        const isMatch = productCountry === activeCountry;
         
-        if (!isIndianProduct) {
-          throw new Error("This product is not available in India");
+        if (!isMatch) {
+          throw new Error(`This product is not available in the ${activeCountry} collection`);
         }
         
-        setIsIndian(true);
         return p;
       })
       .then(p => {
@@ -502,14 +531,14 @@ export default function ProductDetailPage() {
               Array.isArray(d?.data)     ? d.data     :
               Array.isArray(d?.result)   ? d.result   : [];
 
-            // Filter to ONLY Indian products for related items
-            const indianProducts = all.filter(product => {
+            // Filter to ONLY products for selected country for related items
+            const matchedProducts = all.filter(product => {
               const productCountry = getProductCountry(product);
-              return productCountry === "india";
+              return productCountry === activeCountry;
             });
 
             // Then filter by same category
-            const rel = indianProducts
+            const rel = matchedProducts
               .filter(x => x._id !== p._id && x.category?.name === p.category?.name)
               .slice(0, 16);
             
@@ -519,10 +548,9 @@ export default function ProductDetailPage() {
       })
       .catch(e => {
         setError(e.message);
-        setIsIndian(false);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, selectedCountry]);
 
   /* ─────────────────────────────────────────────────────────────
      ADD TO CART HANDLER
@@ -576,7 +604,7 @@ export default function ProductDetailPage() {
   if (loading) return (
     <div className="min-h-screen bg-amber-50 font-sans">
       <style>{globalStyles}</style>
-      <TopBar id={id} name="Loading…" isIndian={false} />
+      <TopBar id={id} name="Loading…" countrySlug={selectedCountry} />
       <Skeleton />
     </div>
   );
@@ -585,22 +613,19 @@ export default function ProductDetailPage() {
   if (error || !product) return (
     <div className="min-h-screen bg-amber-50 font-sans">
       <style>{globalStyles}</style>
-      <TopBar id={id} name="Not found" isIndian={false} />
+      <TopBar id={id} name="Not found" countrySlug={selectedCountry} />
       <div className="max-w-2xl mx-auto px-6 mt-20">
         <div className="bg-white rounded-3xl p-10 border border-red-100 text-center shadow-xl">
-          <div className="text-6xl mb-5">🇮🇳</div>
-          {/* <h2 className="font-serif text-3xl font-bold mb-3 text-stone-900">Indian Products Only</h2> */}
+          <div className="text-6xl mb-5">
+            {getCurrencyForCountry(selectedCountry).flag}
+          </div>
           <p className="text-stone-500 text-sm mb-5">
-            {error === "This product is not available in India" 
-              ? "This product is not available in the Indian collection." 
-              : error}
+            {error}
           </p>
-          {error === "This product is not available in India" && (
-            <p className="text-[0.8rem] text-orange-600 mb-6 bg-orange-50 p-4 rounded-xl">
-              Floriva India only showcases products from our Indian collection. 
-              Please browse our Indian products for a delightful shopping experience.
-            </p>
-          )}
+          <p className="text-[0.8rem] text-orange-600 mb-6 bg-orange-50 p-4 rounded-xl">
+            Floriva {selectedCountry} only showcases products from our {selectedCountry} collection. 
+            Please browse our products for a delightful shopping experience.
+          </p>
           {rawDebug && (
             <details className="text-left mb-5">
               <summary className="cursor-pointer text-xs text-orange-600 font-semibold">🔍 Debug: Raw API Response</summary>
@@ -609,12 +634,6 @@ export default function ProductDetailPage() {
               </pre>
             </details>
           )}
-          {/* <button
-            onClick={() => window.location.href = "/allproduct"}
-            className="inline-flex items-center gap-2.5 px-7 py-3 bg-stone-900 text-amber-50 rounded-xl text-sm font-semibold cursor-pointer border-none hover:bg-stone-700 transition-colors"
-          >
-            Browse Indian Products
-          </button> */}
         </div>
       </div>
     </div>
@@ -642,7 +661,7 @@ export default function ProductDetailPage() {
         cat={product.category?.name} 
         onShare={doShare} 
         shared={shared}
-        isIndian={isIndian}
+        countrySlug={selectedCountry}
       />
 
       {/* ══════════════════════════════════════════════
@@ -801,15 +820,15 @@ export default function ProductDetailPage() {
             {/* Price */}
             <div className="flex items-end gap-3.5 mb-6 flex-wrap">
               <span className="font-serif text-5xl font-black text-stone-900 leading-none">
-                ₹{product.discountPrice?.toLocaleString()}
+                {formatPrice(product.discountPrice, selectedCountry)}
               </span>
               {disc > 0 && (
                 <>
                   <span className="text-lg text-stone-400 line-through leading-none pb-1">
-                    ₹{product.exactPrice?.toLocaleString()}
+                    {formatPrice(product.exactPrice, selectedCountry)}
                   </span>
                   <span className="text-[0.73rem] bg-green-100 text-green-800 px-3.5 py-1.5 rounded-full font-black leading-none">
-                    Save ₹{((product.exactPrice ?? 0) - (product.discountPrice ?? 0)).toLocaleString()}
+                    Save {formatPrice((product.exactPrice ?? 0) - (product.discountPrice ?? 0), selectedCountry)}
                   </span>
                 </>
               )}
@@ -1051,7 +1070,7 @@ export default function ProductDetailPage() {
             >
               {related.map((p, i) => (
                 <div key={p._id} style={{ scrollSnapAlign: "start", animationDelay: `${Math.min(i, 8) * 0.05}s` }} className="animate-fade-up">
-                  <RelCard p={p} />
+                  <RelCard p={p} countrySlug={selectedCountry} />
                 </div>
               ))}
             </div>

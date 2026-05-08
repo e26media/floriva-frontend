@@ -3,9 +3,11 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, usePathname } from "next/navigation";
 
+import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
+
 /* ─────────────────────────────────────────────────────────────────
    TYPES
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 interface SubCategory { _id: string; name: string }
 interface Category    { _id: string; name: string; subCategories: SubCategory[] }
 interface Color       { _id: string; name: string }
@@ -16,9 +18,6 @@ interface Product {
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   CONSTANTS
-───────────────────────────────────────────────────────────────── */
 const BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 const imgUrl = (p: string) => !p ? "" : p.startsWith("http") ? p : `${BASE}${p}`;
 const pct    = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0;
@@ -31,58 +30,11 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 /* ─────────────────────────────────────────────────────────────────
-   CURRENCY
-───────────────────────────────────────────────────────────────── */
-interface CurrencyInfo { symbol: string; code: string; locale: string }
-
-const CURRENCY_MAP: Record<string, CurrencyInfo> = {
-  india:             { symbol: "₹",   code: "INR", locale: "en-IN" },
-  in:                { symbol: "₹",   code: "INR", locale: "en-IN" },
-  usa:               { symbol: "$",   code: "USD", locale: "en-US" },
-  us:                { symbol: "$",   code: "USD", locale: "en-US" },
-  "united-states":   { symbol: "$",   code: "USD", locale: "en-US" },
-  uk:                { symbol: "£",   code: "GBP", locale: "en-GB" },
-  "united-kingdom":  { symbol: "£",   code: "GBP", locale: "en-GB" },
-  gb:                { symbol: "£",   code: "GBP", locale: "en-GB" },
-  europe:            { symbol: "€",   code: "EUR", locale: "de-DE" },
-  eu:                { symbol: "€",   code: "EUR", locale: "de-DE" },
-  germany:           { symbol: "€",   code: "EUR", locale: "de-DE" },
-  france:            { symbol: "€",   code: "EUR", locale: "fr-FR" },
-  japan:             { symbol: "¥",   code: "JPY", locale: "ja-JP" },
-  jp:                { symbol: "¥",   code: "JPY", locale: "ja-JP" },
-  canada:            { symbol: "CA$", code: "CAD", locale: "en-CA" },
-  ca:                { symbol: "CA$", code: "CAD", locale: "en-CA" },
-  australia:         { symbol: "A$",  code: "AUD", locale: "en-AU" },
-  au:                { symbol: "A$",  code: "AUD", locale: "en-AU" },
-  uae:               { symbol: "AED", code: "AED", locale: "ar-AE" },
-  singapore:         { symbol: "S$",  code: "SGD", locale: "en-SG" },
-  sg:                { symbol: "S$",  code: "SGD", locale: "en-SG" },
-};
-
-const DEFAULT_CURRENCY: CurrencyInfo = { symbol: "₹", code: "INR", locale: "en-IN" };
-
-function getCurrency(slug: string): CurrencyInfo {
-  if (!slug) return DEFAULT_CURRENCY;
-  return CURRENCY_MAP[slug.toLowerCase().trim()] ?? DEFAULT_CURRENCY;
-}
-
-function fmt(amount: number | undefined, c: CurrencyInfo): string {
-  if (amount == null || isNaN(Number(amount))) return `${c.symbol}0`;
-  try {
-    return Number(amount).toLocaleString(c.locale, {
-      style: "currency", currency: c.code, maximumFractionDigits: 0,
-    });
-  } catch {
-    return `${c.symbol}${Number(amount).toLocaleString()}`;
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────────
    PARSE COUNTRY + ID FROM PATHNAME  (bulletproof fallback)
    Handles:
      /country/australia/product/abc123
      /product/abc123
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 function parsePathParams(path: string): { country: string; id: string } {
   const m1 = path.match(/\/country\/([^/?#]+)\/product\/([^/?#]+)/);
   if (m1) return { country: m1[1], id: m1[2] };
@@ -93,7 +45,7 @@ function parsePathParams(path: string): { country: string; id: string } {
 
 /* ─────────────────────────────────────────────────────────────────
    AUTH
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 function getUserEmail(): string | null {
   try {
     const raw = localStorage.getItem("floriva_user");
@@ -112,7 +64,7 @@ function getUserEmail(): string | null {
 
 /* ─────────────────────────────────────────────────────────────────
    ADD TO CART
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 async function addToCartAPI(productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
   const userEmail = getUserEmail();
   if (!userEmail) return { ok: false, message: "Please log in to add items to cart." };
@@ -132,7 +84,7 @@ async function addToCartAPI(productId: string, quantity: number): Promise<{ ok: 
 
 /* ─────────────────────────────────────────────────────────────────
    TOAST
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 type TType = "success" | "error" | "info";
 interface IToast { id: number; msg: string; type: TType }
 
@@ -163,7 +115,7 @@ function ToastBox({ toasts, remove }: { toasts: IToast[]; remove: (n: number) =>
 
 /* ─────────────────────────────────────────────────────────────────
    SKELETON
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 function Skeleton() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -187,8 +139,8 @@ function Skeleton() {
 /* ─────────────────────────────────────────────────────────────────
    RELATED CARD
    Navigates to /country/[country]/product/[id] — keeps country in URL
-───────────────────────────────────────────────────────────────── */
-function RelCard({ p, country, currency }: { p: Product; country: string; currency: CurrencyInfo }) {
+   ───────────────────────────────────────────────────────────────── */
+function RelCard({ p, country }: { p: Product; country: string }) {
   const d    = pct(p.exactPrice, p.discountPrice);
   const href = country ? `/country/${country}/product/${p._id}` : `/product/${p._id}`;
 
@@ -223,8 +175,8 @@ function RelCard({ p, country, currency }: { p: Product; country: string; curren
         <p className="text-[0.6rem] text-stone-400 uppercase tracking-widest font-semibold mb-1">{p.category?.name}</p>
         <h4 className="font-serif text-[0.95rem] font-semibold leading-tight mb-2 line-clamp-2 text-stone-900">{p.name}</h4>
         <div className="flex items-baseline gap-2">
-          <span className="text-[0.9rem] font-bold text-stone-900">{fmt(p.discountPrice, currency)}</span>
-          {d > 0 && <span className="text-[0.7rem] text-stone-400 line-through">{fmt(p.exactPrice, currency)}</span>}
+          <span className="text-[0.9rem] font-bold text-stone-900">{formatPrice(p.discountPrice, country)}</span>
+          {d > 0 && <span className="text-[0.7rem] text-stone-400 line-through">{formatPrice(p.exactPrice, country)}</span>}
         </div>
       </div>
     </article>
@@ -233,7 +185,7 @@ function RelCard({ p, country, currency }: { p: Product; country: string; curren
 
 /* ─────────────────────────────────────────────────────────────────
    TOP NAV
-───────────────────────────────────────────────────────────────── */
+   ───────────────────────────────────────────────────────────────── */
 function TopBar({ name, cat, onShare, shared }: {
   name: string; cat?: string; onShare?: ()=>void; shared?: boolean
 }) {
@@ -272,7 +224,7 @@ function TopBar({ name, cat, onShare, shared }: {
 /* ═══════════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
    Route file: app/country/[country]/product/[id]/page.tsx
-═══════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════ */
 export default function ProductDetailPage() {
 
   const pathname = usePathname() ?? "";
@@ -292,12 +244,12 @@ export default function ProductDetailPage() {
   })();
 
   const country: string = (() => {
-    if (rawParams?.country) return Array.isArray(rawParams.country) ? rawParams.country[0] : String(rawParams.country);
+    if (rawParams?.name) return Array.isArray(rawParams.name) ? rawParams.name[0] : String(rawParams.name);
     return parsed.country;
   })();
 
   /* ── Step 5: currency from country ── */
-  const currency = getCurrency(country);
+  const currency = getCurrencyForCountry(country);
 
   /* ── State ── */
   const [product,     setProduct]     = useState<Product | null>(null);
@@ -631,15 +583,15 @@ ${rawDebug}`}
             {/* ── PRICE — dynamic currency ── */}
             <div className="flex items-end gap-3.5 mb-6 flex-wrap">
               <span className="font-serif text-5xl font-black text-stone-900 leading-none">
-                {fmt(product.discountPrice, currency)}
+                {formatPrice(product.discountPrice, country)}
               </span>
               {disc > 0 && (
                 <>
                   <span className="text-lg text-stone-400 line-through leading-none pb-1">
-                    {fmt(product.exactPrice, currency)}
+                    {formatPrice(product.exactPrice, country)}
                   </span>
                   <span className="text-[0.73rem] bg-green-100 text-green-800 px-3.5 py-1.5 rounded-full font-black leading-none">
-                    Save {fmt(saved, currency)}
+                    Save {formatPrice(saved, country)}
                   </span>
                 </>
               )}
@@ -749,8 +701,8 @@ ${rawDebug}`}
                       { label:"Category",   value: product.category?.name },
                       { label:"Color",      value: product.color?.name, swatch: true },
                       { label:"Stock",      value: `${product.stock} units` },
-                      { label:"MRP",        value: fmt(product.exactPrice, currency) },
-                      { label:"Sale Price", value: fmt(product.discountPrice, currency) },
+                      { label:"MRP",        value: formatPrice(product.exactPrice, country) },
+                      { label:"Sale Price", value: formatPrice(product.discountPrice, country) },
                       { label:"Discount",   value: disc>0?`${disc}%`:"No discount" },
                       { label:"Currency",   value: `${currency.code} (${currency.symbol})` },
                     ].filter(r=>r.value).map((row,i,arr) => (
@@ -844,7 +796,7 @@ ${rawDebug}`}
                 <div key={p._id} className="fade-up shrink-0"
                   style={{ scrollSnapAlign:"start", animationDelay:`${Math.min(i,8)*0.05}s` }}>
                   {/* ✅ country passed → URL = /country/australia/product/[id] */}
-                  <RelCard p={p} country={country} currency={currency}/>
+                  <RelCard p={p} country={country}/>
                 </div>
               ))}
             </div>

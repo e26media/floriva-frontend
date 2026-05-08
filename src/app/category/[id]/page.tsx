@@ -357,6 +357,20 @@ export default function CategoryPage() {
   const [page, setPage]               = useState(1)
   const [quickView, setQuickView]     = useState<Product | null>(null)
 
+  // ── REDIRECT TO REGIONAL PATH ──
+  useEffect(() => {
+    const saved = localStorage.getItem('floriva_selected_country')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        const activeCountry = parsed?.country?.name?.toLowerCase()
+        if (activeCountry && urlId && window.location.pathname.startsWith('/category/')) {
+          router.replace(`/country/${activeCountry}/category/${urlId}`)
+        }
+      } catch (e) {}
+    }
+  }, [urlId, router])
+
   useEffect(() => {
     if (!urlId) return
     setTimeout(() => {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { formatPrice, getCurrencyForCountry } from '@/utils/currency'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string }
@@ -27,26 +28,6 @@ const pct = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 
 const PER_PAGE = 12
 
 // ─── Currency map by country name ─────────────────────────────────────────────
-const CURRENCY_MAP: Record<string, { symbol: string; code: string }> = {
-  india:            { symbol: '₹',   code: 'INR' },
-  'united states':  { symbol: '$',   code: 'USD' },
-  usa:              { symbol: '$',   code: 'USD' },
-  uk:               { symbol: '£',   code: 'GBP' },
-  'united kingdom': { symbol: '£',   code: 'GBP' },
-  europe:           { symbol: '€',   code: 'EUR' },
-  germany:          { symbol: '€',   code: 'EUR' },
-  france:           { symbol: '€',   code: 'EUR' },
-  japan:            { symbol: '¥',   code: 'JPY' },
-  china:            { symbol: '¥',   code: 'CNY' },
-  australia:        { symbol: 'A$',  code: 'AUD' },
-  canada:           { symbol: 'C$',  code: 'CAD' },
-  uae:              { symbol: 'AED', code: 'AED' },
-  singapore:        { symbol: 'S$',  code: 'SGD' },
-}
-
-function getCurrency(countryName: string) {
-  return CURRENCY_MAP[countryName?.toLowerCase()] ?? { symbol: '₹', code: 'INR' }
-}
 
 const COLOR_MAP: Record<string, string> = {
   pink: '#f9a8d4', red: '#f87171', white: '#f0ece6', blue: '#93c5fd',
@@ -93,15 +74,11 @@ const IconGlobe = () => (
   </svg>
 )
 
-// ─── Price display helper ─────────────────────────────────────────────────────
-function Price({ amount, symbol }: { amount: number; symbol: string }) {
-  return <>{symbol}{amount.toLocaleString()}</>
-}
 
 // ─── Quick View Modal ─────────────────────────────────────────────────────────
 function QuickViewModal({
-  product, onClose, currencySymbol,
-}: { product: Product; onClose: () => void; currencySymbol: string }) {
+  product, onClose, countryName,
+}: { product: Product; onClose: () => void; countryName: string }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
@@ -208,12 +185,12 @@ function QuickViewModal({
             )}
             <div className="flex items-baseline gap-2.5 flex-wrap mb-3.5">
               <span className="text-[1.65rem] font-bold text-[#1e1610] leading-none">
-                <Price amount={product.discountPrice} symbol={currencySymbol} />
+                {formatPrice(product.discountPrice, countryName)}
               </span>
               {discount > 0 && (
                 <>
                   <span className="text-[0.95rem] text-[#b0a090] line-through">
-                    <Price amount={product.exactPrice} symbol={currencySymbol} />
+                    {formatPrice(product.exactPrice, countryName)}
                   </span>
                   <span className="text-[0.72rem] bg-[#dcfce7] text-[#3d8b5e] px-2.5 py-[3px] rounded-full font-bold">
                     Save {discount}%
@@ -265,13 +242,11 @@ function QuickViewModal({
 function ProductCard({
   product,
   onQuickView,
-  currencySymbol,
   countryName,
 }: {
   product: Product
   onQuickView: () => void
-  currencySymbol: string
-  countryName: string   // ✅ FIXED — was undefined "countrySlug", now prop from parent
+  countryName: string
 }) {
   const router = useRouter()
   const [imgIdx, setImgIdx] = useState(0)
@@ -318,11 +293,11 @@ function ProductCard({
         <p className="text-[0.77rem] text-[#7a6b5e] mb-2.5 overflow-hidden text-ellipsis whitespace-nowrap">{product.title}</p>
         <div className="flex items-baseline gap-1.5">
           <span className="text-[0.98rem] font-semibold text-[#1e1610]">
-            <Price amount={product.discountPrice} symbol={currencySymbol} />
+            {formatPrice(product.discountPrice, countryName)}
           </span>
           {discount > 0 && (
             <span className="text-[0.76rem] text-[#b0a090] line-through">
-              <Price amount={product.exactPrice} symbol={currencySymbol} />
+              {formatPrice(product.exactPrice, countryName)}
             </span>
           )}
         </div>
@@ -373,7 +348,7 @@ export default function CountryCategoryPage() {
   const countryName = (params?.name as string) ?? ''
   const urlId       = (params?.id   as string) ?? ''
 
-  const currency = getCurrency(countryName)
+  const currency = getCurrencyForCountry(countryName)
 
   const [allProducts, setAllProducts]         = useState<Product[]>([])
   const [matchedCategory, setMatchedCategory] = useState<Category | null>(null)
@@ -659,7 +634,6 @@ export default function CountryCategoryPage() {
                   <ProductCard
                     key={p._id}
                     product={p}
-                    currencySymbol={currency.symbol}
                     countryName={countryName}
                     onQuickView={() => setQuickView(p)}
                   />
@@ -675,7 +649,7 @@ export default function CountryCategoryPage() {
         {quickView && (
           <QuickViewModal
             product={quickView}
-            currencySymbol={currency.symbol}
+            countryName={countryName}
             onClose={() => setQuickView(null)}
           />
         )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, useParams, usePathname } from "next/navigation";
+import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
 import Link from "next/link";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -33,27 +34,10 @@ interface Filters {
 }
 
 // ─── Country → Currency map ────────────────────────────────────────────────────
-const COUNTRY_CURRENCY: Record<string, { symbol: string; code: string; name: string; flag: string }> = {
-  australia:        { symbol: "A$",  code: "AUD", name: "Australian Dollar",  flag: "🇦🇺" },
-  india:            { symbol: "₹",   code: "INR", name: "Indian Rupee",        flag: "🇮🇳" },
-  usa:              { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  "united states":  { symbol: "$",   code: "USD", name: "US Dollar",           flag: "🇺🇸" },
-  uk:               { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  "united kingdom": { symbol: "£",   code: "GBP", name: "British Pound",       flag: "🇬🇧" },
-  canada:           { symbol: "C$",  code: "CAD", name: "Canadian Dollar",     flag: "🇨🇦" },
-  newzealand:       { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  "new zealand":    { symbol: "NZ$", code: "NZD", name: "New Zealand Dollar",  flag: "🇳🇿" },
-  singapore:        { symbol: "S$",  code: "SGD", name: "Singapore Dollar",    flag: "🇸🇬" },
-  uae:              { symbol: "د.إ", code: "AED", name: "UAE Dirham",          flag: "🇦🇪" },
-  germany:          { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇩🇪" },
-  france:           { symbol: "€",   code: "EUR", name: "Euro",                flag: "🇫🇷" },
-  japan:            { symbol: "¥",   code: "JPY", name: "Japanese Yen",        flag: "🇯🇵" },
-  iran:             { symbol: "﷼",   code: "IRR", name: "Iranian Rial",        flag: "🇮🇷" },
-};
+// Using shared currency utility
 
 const getCurrency = (country: string) => {
-  const normalizedCountry = country?.toLowerCase().trim() || "";
-  return COUNTRY_CURRENCY[normalizedCountry] ?? { symbol: "₹", code: "INR", name: "Indian Rupee", flag: "🌐" };
+  return getCurrencyForCountry(country);
 };
 
 // ─── Helper to get country name from product ───────────────────────────────────
@@ -88,7 +72,7 @@ const getSubId = (p: Product): string => {
 
 const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
 
-const fmtPrice = (amount: number, symbol: string) => `${symbol}${amount.toLocaleString()}`;
+const fmtPrice = (amount: number, countrySlug: string) => sharedFormatPrice(amount, countrySlug);
 
 // ─── Icons (keep your existing icons) ─────────────────────────────────────────
 const IcoCart = ({ s = 16 }: { s?: number }) => (
@@ -148,8 +132,8 @@ function CheckboxRow({ checked, onChange, label, count, indent = false }: {
 }
 
 // ─── QuickViewModal ────────────────────────────────────────────────────────────
-function QuickViewModal({ product, onClose, currencySymbol }: {
-  product: Product; onClose: () => void; currencySymbol: string;
+function QuickViewModal({ product, onClose, countrySlug }: {
+  product: Product; onClose: () => void; countrySlug: string;
 }) {
   const [imgIdx, setImgIdx] = useState(0);
   const [qty,    setQty]    = useState(1);
@@ -219,9 +203,9 @@ function QuickViewModal({ product, onClose, currencySymbol }: {
             <h2 className="font-serif text-[clamp(1.3rem,2.4vw,1.75rem)] font-bold leading-tight mb-1">{product.name}</h2>
             {product.title !== product.name && <p className="text-[.84rem] text-[#7a6b5e] mb-4 leading-relaxed">{product.title}</p>}
             <div className="flex items-baseline gap-2.5 flex-wrap mb-3">
-              <span className="text-[1.6rem] font-bold leading-none">{fmtPrice(product.discountPrice, currencySymbol)}</span>
+              <span className="text-[1.6rem] font-bold leading-none">{fmtPrice(product.discountPrice, countrySlug)}</span>
               {disc > 0 && (<>
-                <span className="text-[.94rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, currencySymbol)}</span>
+                <span className="text-[.94rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, countrySlug)}</span>
                 <span className="text-[.7rem] bg-[#dcfce7] text-[#3d8b5e] px-2.5 py-[3px] rounded-full font-bold">Save {disc}%</span>
               </>)}
             </div>
@@ -257,8 +241,8 @@ function QuickViewModal({ product, onClose, currencySymbol }: {
 }
 
 // ─── ProductCard ───────────────────────────────────────────────────────────────
-function ProductCard({ product, onQuickView, currencySymbol }: {
-  product: Product; onQuickView: () => void; currencySymbol: string;
+function ProductCard({ product, onQuickView, countrySlug }: {
+  product: Product; onQuickView: () => void; countrySlug: string;
 }) {
   const router = useRouter();
   const [idx, setIdx] = useState(0);
@@ -289,8 +273,8 @@ function ProductCard({ product, onQuickView, currencySymbol }: {
         <h3 className="font-serif text-[1rem] font-semibold leading-snug mb-0.5">{product.name}</h3>
         <p className="text-[.76rem] text-[#7a6b5e] mb-2 truncate">{product.title}</p>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[.97rem] font-semibold">{fmtPrice(product.discountPrice, currencySymbol)}</span>
-          {disc > 0 && <span className="text-[.75rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, currencySymbol)}</span>}
+          <span className="text-[.97rem] font-semibold">{fmtPrice(product.discountPrice, countrySlug)}</span>
+          {disc > 0 && <span className="text-[.75rem] text-[#b0a090] line-through">{fmtPrice(product.exactPrice, countrySlug)}</span>}
         </div>
       </div>
     </article>
@@ -298,9 +282,9 @@ function ProductCard({ product, onQuickView, currencySymbol }: {
 }
 
 // ─── FiltersSidebar ────────────────────────────────────────────────────────────
-function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen, onClose, currencySymbol }: {
+function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen, onClose, countrySlug }: {
   products: Product[]; allCatData: Category[]; filters: Filters;
-  setFilters: (f: Filters) => void; mobileOpen: boolean; onClose: () => void; currencySymbol: string;
+  setFilters: (f: Filters) => void; mobileOpen: boolean; onClose: () => void; countrySlug: string;
 }) {
   const catNames   = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
   const colorNames = Array.from(new Set(products.map(p => p.color?.name).filter(Boolean))) as string[];
@@ -460,15 +444,15 @@ function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen,
             <p className="sidebar-label flex justify-between">
               Max Price
               <span className="text-[.76rem] text-[#1e1610] font-semibold normal-case tracking-normal">
-                {fmtPrice(filters.maxPrice ?? gMax, currencySymbol)}
+                {fmtPrice(filters.maxPrice ?? gMax, countrySlug)}
               </span>
             </p>
             <input type="range" min={gMin} max={gMax} value={filters.maxPrice ?? gMax}
               onChange={e => setFilters({ ...filters, maxPrice: +e.target.value })}
               className="w-full cursor-pointer h-1 mb-2 block accent-[#b5623b]"/>
             <div className="flex justify-between text-[.68rem] text-[#b0a090]">
-              <span>{fmtPrice(gMin, currencySymbol)}</span>
-              <span>{fmtPrice(gMax, currencySymbol)}</span>
+              <span>{fmtPrice(gMin, countrySlug)}</span>
+              <span>{fmtPrice(gMax, countrySlug)}</span>
             </div>
           </div>
         </div>
@@ -718,7 +702,7 @@ function AllProductsPageInner() {
               setFilters={handleFilters}
               mobileOpen={mobSb}
               onClose={() => setMobSb(false)}
-              currencySymbol={currency.symbol}
+              countrySlug={country}
             />
           )}
 
@@ -832,7 +816,7 @@ function AllProductsPageInner() {
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                       {paginated.map(p => (
-                        <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} currencySymbol={currency.symbol} />
+                        <ProductCard key={p._id} product={p} onQuickView={() => setQuickView(p)} countrySlug={country} />
                       ))}
                     </div>
                     <Pagination page={page} total={filtered.length} perPage={PER_PAGE} onChange={setPage} />
@@ -844,7 +828,7 @@ function AllProductsPageInner() {
         </div>
 
         {quickView && (
-          <QuickViewModal product={quickView} onClose={() => setQuickView(null)} currencySymbol={currency.symbol} />
+          <QuickViewModal product={quickView} onClose={() => setQuickView(null)} countrySlug={country} />
         )}
       </div>
     </>

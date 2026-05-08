@@ -43,48 +43,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
 const NEW_ARRIVALS_LABEL = 'New Arrivals' // Changed from 'Best Seller' to 'New Arrivals'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Country → Currency mapping
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface CurrencyInfo {
-  symbol: string       // e.g. "₹"
-  code: string         // e.g. "INR"
-  locale: string       // e.g. "en-IN"
-  position: 'before' | 'after'
-}
-
-const COUNTRY_CURRENCY_MAP: Record<string, CurrencyInfo> = {
-  india:          { symbol: '₹',  code: 'INR', locale: 'en-IN', position: 'before' },
-  in:             { symbol: '₹',  code: 'INR', locale: 'en-IN', position: 'before' },
-  usa:            { symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
-  us:             { symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
-  'united-states':{ symbol: '$',  code: 'USD', locale: 'en-US', position: 'before' },
-  uk:             { symbol: '£',  code: 'GBP', locale: 'en-GB', position: 'before' },
-  'united-kingdom':{ symbol: '£', code: 'GBP', locale: 'en-GB', position: 'before' },
-  gb:             { symbol: '£',  code: 'GBP', locale: 'en-GB', position: 'before' },
-  europe:         { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
-  eu:             { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
-  germany:        { symbol: '€',  code: 'EUR', locale: 'de-DE', position: 'before' },
-  france:         { symbol: '€',  code: 'EUR', locale: 'fr-FR', position: 'before' },
-  japan:          { symbol: '¥',  code: 'JPY', locale: 'ja-JP', position: 'before' },
-  jp:             { symbol: '¥',  code: 'JPY', locale: 'ja-JP', position: 'before' },
-  canada:         { symbol: 'CA$',code: 'CAD', locale: 'en-CA', position: 'before' },
-  ca:             { symbol: 'CA$',code: 'CAD', locale: 'en-CA', position: 'before' },
-  australia:      { symbol: 'A$', code: 'AUD', locale: 'en-AU', position: 'before' },
-  au:             { symbol: 'A$', code: 'AUD', locale: 'en-AU', position: 'before' },
-  uae:            { symbol: 'AED',code: 'AED', locale: 'ar-AE', position: 'before' },
-  singapore:      { symbol: 'S$', code: 'SGD', locale: 'en-SG', position: 'before' },
-  sg:             { symbol: 'S$', code: 'SGD', locale: 'en-SG', position: 'before' },
-}
-
-const DEFAULT_CURRENCY: CurrencyInfo = { symbol: '₹', code: 'INR', locale: 'en-IN', position: 'before' }
-
-function getCurrencyForCountry(countrySlug: string | null): CurrencyInfo {
-  if (!countrySlug) return DEFAULT_CURRENCY
-  const key = countrySlug.toLowerCase().trim()
-  return COUNTRY_CURRENCY_MAP[key] ?? DEFAULT_CURRENCY
-}
+import { formatPrice } from '@/utils/currency'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // URL helpers
@@ -99,23 +58,6 @@ function getCurrencyForCountry(countrySlug: string | null): CurrencyInfo {
 function getCountryFromPathname(pathname: string): string | null {
   const match = pathname.match(/^\/country\/([^/]+)/i)
   return match ? match[1] : null
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Format price using country currency
-// ─────────────────────────────────────────────────────────────────────────────
-
-function formatPrice(amount: number, currency: CurrencyInfo): string {
-  try {
-    // Use Intl for proper locale number formatting
-    const formatted = new Intl.NumberFormat(currency.locale, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-    return `${currency.symbol}${formatted}`
-  } catch {
-    return `${currency.symbol}${amount.toLocaleString()}`
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,7 +151,7 @@ interface TCartToast {
   qty: number
   type: TToastType
   message?: string
-  currency: CurrencyInfo   // ← carry currency into toast
+  countrySlug: string | null
 }
 
 let _toastItems: TCartToast[] = []
@@ -221,11 +163,11 @@ function pushToast(
   product: TApiProduct,
   qty: number,
   type: TToastType,
-  currency: CurrencyInfo,
+  countrySlug: string | null,
   message?: string
 ) {
   const id = ++_toastCounter
-  _toastItems = [..._toastItems, { id, product, qty, type, currency, message }]
+  _toastItems = [..._toastItems, { id, product, qty, type, countrySlug, message }]
   _notifyToast()
   setTimeout(() => {
     _toastItems = _toastItems.filter((t) => t.id !== id)
@@ -281,7 +223,7 @@ function CartToastContainer() {
                   <p className="text-xs font-semibold text-gray-900 truncate">{toast.product.name}</p>
                   {/* ✅ Uses the country-correct currency symbol */}
                   <p className="text-xs text-gray-400">
-                    Qty {toast.qty} · {formatPrice(toast.product.discountPrice, toast.currency)}
+                    Qty {toast.qty} · {formatPrice(toast.product.discountPrice, toast.countrySlug)}
                   </p>
                 </>
               )}
@@ -345,7 +287,7 @@ function isNewIn(createdAt: string): boolean {
 // useAddToCart — now currency-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
-function useAddToCart(product: TApiProduct, currency: CurrencyInfo) {
+function useAddToCart(product: TApiProduct, countrySlug: string | null) {
   const [loading, setLoading] = useState(false)
   const [added, setAdded] = useState(false)
 
@@ -357,14 +299,14 @@ function useAddToCart(product: TApiProduct, currency: CurrencyInfo) {
       setLoading(false)
       if (result.ok) {
         setAdded(true)
-        // ✅ Pass currency so toast shows correct symbol
-        pushToast(product, qty, 'success', currency)
+        // ✅ Pass countrySlug so toast shows correct symbol
+        pushToast(product, qty, 'success', countrySlug)
         setTimeout(() => setAdded(false), 2000)
       } else {
-        pushToast(product, qty, 'error', currency, result.message)
+        pushToast(product, qty, 'error', countrySlug, result.message)
       }
     },
-    [loading, product, currency]
+    [loading, product, countrySlug]
   )
 
   return { addToCart, loading, added }
@@ -467,19 +409,17 @@ function AccordionRow({
 
 function QuickViewModal({
   product,
-  currency,
   countrySlug,
   onClose,
 }: {
   product: TApiProduct
-  currency: CurrencyInfo
   countrySlug: string | null
   onClose: () => void
 }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const thumbsRef = useRef<HTMLDivElement>(null)
-  const { addToCart, loading: adding, added } = useAddToCart(product, currency)
+  const { addToCart, loading: adding, added } = useAddToCart(product, countrySlug)
 
   const { rating, reviews } = fakeRating(product._id)
   const discount = calcDiscount(product.exactPrice, product.discountPrice)
@@ -656,12 +596,12 @@ function QuickViewModal({
             {/* ✅ Prices use country currency */}
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-base font-bold text-emerald-700">
-                {formatPrice(product.discountPrice, currency)}
+                {formatPrice(product.discountPrice, countrySlug)}
               </span>
               {product.exactPrice > product.discountPrice && (
                 <>
                   <span className="text-sm text-gray-400 line-through">
-                    {formatPrice(product.exactPrice, currency)}
+                    {formatPrice(product.exactPrice, countrySlug)}
                   </span>
                   <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">
                     -{discount}%
@@ -782,11 +722,11 @@ function QuickViewModal({
 
 function ProductCard({
   data,
-  currency,
+  countrySlug,
   onQuickView,
 }: {
   data: TApiProduct
-  currency: CurrencyInfo
+  countrySlug: string | null
   onQuickView: (p: TApiProduct) => void
 }) {
   const imageUrl = data.images?.[0] ? imgSrc(data.images[0]) : null
@@ -797,7 +737,7 @@ function ProductCard({
   const swatches = getSwatches(data)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const touchedRef = useRef(false)
-  const { addToCart, loading, added } = useAddToCart(data, currency)
+  const { addToCart, loading, added } = useAddToCart(data, countrySlug)
 
   const handleTouchStart = useCallback(() => {
     if (!touchedRef.current) {
@@ -936,11 +876,11 @@ function ProductCard({
         {/* ✅ Prices use country currency */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs sm:text-sm font-bold text-emerald-700">
-            {formatPrice(data.discountPrice, currency)}
+            {formatPrice(data.discountPrice, countrySlug)}
           </span>
           {data.exactPrice > data.discountPrice && (
             <span className="text-xs text-gray-400 line-through">
-              {formatPrice(data.exactPrice, currency)}
+              {formatPrice(data.exactPrice, countrySlug)}
             </span>
           )}
         </div>
@@ -1009,8 +949,6 @@ const CountryNewarrivals: FC<BestSellersProps> = ({
   const pathname    = usePathname()
   const countrySlug = getCountryFromPathname(pathname)
 
-  // ── 2. Derive currency from country ───────────────────────────────────────
-  const currency = getCurrencyForCountry(countrySlug)
 
   // ── 3. Build country-aware API URL ────────────────────────────────────────
   const apiUrl = countrySlug
@@ -1058,7 +996,6 @@ const CountryNewarrivals: FC<BestSellersProps> = ({
           console.log('[CountryBestSellers] pathname     →', pathname)
           console.log('[CountryBestSellers] countrySlug  →', countrySlug)
           console.log('[CountryBestSellers] apiUrl       →', apiUrl)
-          console.log('[CountryBestSellers] currency     →', currency)
           console.log('[CountryBestSellers] total fetched:', all.length)
           console.log('[CountryBestSellers] new arrivals :', newArrivals.length)
           if (all.length > 0) {
@@ -1154,7 +1091,7 @@ const CountryNewarrivals: FC<BestSellersProps> = ({
                 >
                   <ProductCard
                     data={product}
-                    currency={currency}
+                    countrySlug={countrySlug}
                     onQuickView={handleQuickView}
                   />
                 </div>
@@ -1175,7 +1112,6 @@ const CountryNewarrivals: FC<BestSellersProps> = ({
       {quickViewProduct && (
         <QuickViewModal
           product={quickViewProduct}
-          currency={currency}
           countrySlug={countrySlug}
           onClose={() => setQuickViewProduct(null)}
         />
