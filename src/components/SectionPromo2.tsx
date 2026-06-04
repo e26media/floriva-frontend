@@ -3,20 +3,17 @@
 import Logo from '@/components/Logo'
 import backgroundLineSvg from '@/images/Moon.svg'
 import rightImgDemo from '@/images/floriva/banner/4.png'
+import { fetchSiteContent, getSiteImageByKey, resolveMediaUrl } from '@/lib/siteContent'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
 import clsx from 'clsx'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { FC } from 'react'
+import { FC, useEffect, useState } from 'react'
 
 export interface SectionPromo2Props {
   className?: string
 }
 
-// ─── Helper: build the correct /allproduct href ───────────────────────────────
-// /                        → /allproduct
-// /country/australia       → /country/australia/allproduct
-// /country/australia/xyz   → /country/australia/allproduct
 function buildAllProductHref(pathname: string): string {
   const countryMatch = pathname.match(/^(\/country\/[^/]+)/)
   if (countryMatch) {
@@ -28,6 +25,18 @@ function buildAllProductHref(pathname: string): string {
 const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
   const pathname = usePathname()
   const allProductHref = buildAllProductHref(pathname ?? '/')
+  const [promoSrc, setPromoSrc] = useState<string | typeof rightImgDemo>(rightImgDemo)
+
+  useEffect(() => {
+    fetchSiteContent().then(({ siteImages }) => {
+      const promo = getSiteImageByKey(siteImages, 'promo_2')
+      if (promo?.imageUrl) {
+        setPromoSrc(resolveMediaUrl(promo.imageUrl))
+      }
+    })
+  }, [])
+
+  const promoIsRemote = typeof promoSrc === 'string'
 
   return (
     <div className={clsx(className, 'xl:pt-10 2xl:pt-12')}>
@@ -46,13 +55,18 @@ const SectionPromo2: FC<SectionPromo2Props> = ({ className }) => {
             Fashion is a form of self-expression and autonomy at a particular period and place.
           </span>
           <div className="mt-6 flex space-x-2 sm:mt-12 sm:space-x-5">
-            {/* ✅ Dynamic country-aware href */}
             <ButtonPrimary href={allProductHref}>Discover more</ButtonPrimary>
           </div>
         </div>
 
         <div className="relative mt-10 block max-w-xl lg:absolute lg:bottom-0 lg:left-0 lg:mt-0 lg:max-w-[calc(55%-40px)]">
-          <Image alt="section promo 2" src={rightImgDemo} sizes="(max-width: 768px) 100vw, 50vw" className="" />
+          <Image
+            alt="section promo 2"
+            src={promoSrc}
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className=""
+            unoptimized={promoIsRemote}
+          />
         </div>
       </div>
     </div>
