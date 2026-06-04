@@ -1,4 +1,20 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
+function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:7000'
+    }
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://api.florivagifts.com'
+  }
+  return 'http://localhost:7000'
+}
+
+const API_BASE = getApiBase()
 
 export type HeroSlide = {
   _id: string
