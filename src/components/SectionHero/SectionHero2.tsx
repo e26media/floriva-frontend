@@ -1,15 +1,15 @@
 'use client'
 
 import backgroundLineSvg from '@/images/Moon.svg'
-import heroImage1 from '@/images/floriva/aboutbanneer.png'
+import heroBanner from '@/images/floriva/hero-banner.png'
 import heroImage2 from '@/images/floriva/banner/2.png'
-import heroImage3 from '@/images/floriva/banner/5.png'
 import { fetchSiteContent, resolveMediaUrl, type HeroSlide } from '@/lib/siteContent'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import clsx from 'clsx'
 import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { FC, useEffect, useMemo, useState } from 'react'
 import { useSwipeable } from 'react-swipeable'
@@ -29,29 +29,17 @@ type SlideView = {
   heading: string
   subHeading: string
   btnText: string
+  fullBanner?: boolean
 }
 
 const DEFAULT_SLIDES: SlideView[] = [
   {
-    id: 'default-1',
-    imageUrl: heroImage1.src,
-    heading: 'Exclusive collection <br /> for everyone',
-    subHeading: 'In this season, find the best 🔥',
+    id: 'default-hero',
+    imageUrl: heroBanner.src,
+    heading: 'Exclusive collection for everyone',
+    subHeading: 'In this season, find the best',
     btnText: 'Explore shop now',
-  },
-  {
-    id: 'default-2',
-    imageUrl: heroImage2.src,
-    heading: 'Exclusive collection <br /> for everyone',
-    subHeading: 'In this season, find the best 🔥',
-    btnText: 'Explore shop now',
-  },
-  {
-    id: 'default-3',
-    imageUrl: heroImage3.src,
-    heading: 'Exclusive collection <br /> for everyone',
-    subHeading: 'In this season, find the best 🔥',
-    btnText: 'Explore shop now',
+    fullBanner: true,
   },
 ]
 
@@ -62,6 +50,7 @@ function mapApiSlides(apiSlides: HeroSlide[]): SlideView[] {
     heading: slide.heading,
     subHeading: slide.subHeading,
     btnText: slide.btnText,
+    fullBanner: false,
   }))
 }
 
@@ -127,36 +116,55 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     TIME_OUT = setTimeout(() => toggleIsRunning(true), 1000)
   }
 
-  useInterval(() => handleAutoNext(), isRunning ? 5000 : 999999)
+  useInterval(() => handleAutoNext(), isRunning && slideCount > 1 ? 5000 : 999999)
 
   const isRemoteImage = useMemo(
     () => (url: string) => url.startsWith('http://') || url.startsWith('https://'),
     []
   )
 
-  const renderItem = (index: number) => {
-    const isActive = indexActive === index
-    const item = slides[index]
-    if (!item) return null
+  const renderFullBanner = (item: SlideView, isActive: boolean) => (
+    <div
+      key={item.id}
+      className={clsx(
+        'fade--animation relative w-full overflow-hidden bg-[#f5f0e8]',
+        isActive ? 'block' : 'hidden'
+      )}
+    >
+      <Link href={allProductHref} className="block w-full" aria-label={item.btnText}>
+        <Image
+          src={item.imageUrl}
+          alt={item.heading}
+          width={1920}
+          height={800}
+          priority
+          className="h-auto w-full object-cover object-center"
+          sizes="100vw"
+          unoptimized={isRemoteImage(item.imageUrl)}
+        />
+      </Link>
+    </div>
+  )
 
-    return (
-      <div
-        key={item.id}
-        className={clsx(
-          'fade--animation relative flex flex-col gap-10 overflow-hidden py-14 pl-container sm:py-20 lg:flex-row lg:items-center',
-          isActive ? 'flex' : 'hidden'
-        )}
-      >
-        <div className="absolute inset-0 -z-10 bg-[#E3FFE6]">
-          <Image
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
-            className="absolute h-full w-full object-contain"
-            src={backgroundLineSvg}
-            alt="hero background"
-          />
-        </div>
+  const renderSplitSlide = (item: SlideView, index: number, isActive: boolean) => (
+    <div
+      key={item.id}
+      className={clsx(
+        'fade--animation relative flex flex-col gap-10 overflow-hidden py-14 pl-container sm:py-20 lg:flex-row lg:items-center',
+        isActive ? 'flex' : 'hidden'
+      )}
+    >
+      <div className="absolute inset-0 -z-10 bg-[#E3FFE6]">
+        <Image
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
+          className="absolute h-full w-full object-contain"
+          src={backgroundLineSvg}
+          alt="hero background"
+        />
+      </div>
 
+      {slideCount > 1 && (
         <div className="absolute start-1/2 bottom-4 flex -translate-x-1/2 justify-center rtl:translate-x-1/2">
           {slides.map((_, dotIndex) => {
             const isDotActive = indexActive === dotIndex
@@ -178,43 +186,57 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
             )
           })}
         </div>
+      )}
 
-        <div className="relative flex max-w-5xl flex-1/2 flex-col items-start fade--animation__left">
-          <span className="block text-base font-medium text-neutral-700 fade--animation__subheading md:text-xl">
-            {item.subHeading}
-          </span>
-          <h2
-            className="mt-5 text-4xl font-semibold text-neutral-900 fade--animation__heading sm:mt-6 md:text-5xl xl:text-6xl xl:leading-[1.2] 2xl:text-7xl"
-            dangerouslySetInnerHTML={{ __html: item.heading }}
-          />
+      <div className="relative flex max-w-5xl flex-1/2 flex-col items-start fade--animation__left">
+        <span className="block text-base font-medium text-neutral-700 fade--animation__subheading md:text-xl">
+          {item.subHeading}
+        </span>
+        <h2
+          className="mt-5 text-4xl font-semibold text-neutral-900 fade--animation__heading sm:mt-6 md:text-5xl xl:text-6xl xl:leading-[1.2] 2xl:text-7xl"
+          dangerouslySetInnerHTML={{ __html: item.heading }}
+        />
 
-          <ButtonPrimary className="mt-10 fade--animation__button sm:mt-20" href={allProductHref}>
-            <span className="me-2">{item.btnText}</span>
-            <HugeiconsIcon icon={Search01Icon} size={20} />
-          </ButtonPrimary>
-        </div>
-
-        <div className="relative -z-10 flex-1/2 lg:pr-10">
-          <Image
-            sizes="(max-width: 768px) 100vw, 60vw"
-            className="h-auto w-full max-w-[40rem] object-contain fade--animation__image select-none"
-            src={item.imageUrl}
-            alt={item.heading.replace(/<[^>]+>/g, ' ')}
-            width={790}
-            height={790}
-            priority
-            unoptimized={isRemoteImage(item.imageUrl)}
-          />
-        </div>
+        <ButtonPrimary className="mt-10 fade--animation__button sm:mt-20" href={allProductHref}>
+          <span className="me-2">{item.btnText}</span>
+          <HugeiconsIcon icon={Search01Icon} size={20} />
+        </ButtonPrimary>
       </div>
-    )
+
+      <div className="relative -z-10 flex-1/2 lg:pr-10">
+        <Image
+          sizes="(max-width: 768px) 100vw, 60vw"
+          className="h-auto w-full max-w-[40rem] object-contain fade--animation__image select-none"
+          src={item.imageUrl || heroImage2.src}
+          alt={item.heading.replace(/<[^>]+>/g, ' ')}
+          width={790}
+          height={790}
+          priority
+          unoptimized={isRemoteImage(item.imageUrl)}
+        />
+      </div>
+    </div>
+  )
+
+  const renderItem = (index: number) => {
+    const isActive = indexActive === index
+    const item = slides[index]
+    if (!item) return null
+
+    if (item.fullBanner) {
+      return renderFullBanner(item, isActive)
+    }
+
+    return renderSplitSlide(item, index, isActive)
   }
 
+  const hasFullBannerOnly = slides.length === 1 && slides[0]?.fullBanner
+
   return (
-    <div className={clsx('relative z-[1]', className)} {...handlers}>
+    <div className={clsx('relative z-[1]', className)} {...(hasFullBannerOnly ? {} : handlers)}>
       {slides.map((_, index) => renderItem(index))}
 
-      {slideCount > 1 && (
+      {!hasFullBannerOnly && slideCount > 1 && (
         <>
           <button
             type="button"
