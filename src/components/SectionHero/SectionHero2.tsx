@@ -50,7 +50,7 @@ function mapApiSlides(apiSlides: HeroSlide[]): SlideView[] {
     heading: slide.heading,
     subHeading: slide.subHeading,
     btnText: slide.btnText,
-    fullBanner: false,
+    fullBanner: slide.fullBanner !== false,
   }))
 }
 

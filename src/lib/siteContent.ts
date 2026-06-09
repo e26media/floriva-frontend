@@ -24,6 +24,7 @@ export type HeroSlide = {
   imageUrl: string
   sortOrder: number
   isActive: boolean
+  fullBanner?: boolean
 }
 
 export type SiteImage = {
