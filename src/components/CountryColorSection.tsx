@@ -4,6 +4,13 @@ import Heading from '@/components/Heading/Heading'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
 import useEmblaCarousel from 'embla-carousel-react'
+import {
+  buildPickerColorsFromProducts,
+  formatColorLabel,
+  getFlowerImageForColor,
+  getProductColorFilterValues,
+  productMatchesColorFilter,
+} from '@/lib/colorPickerAssets'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import { FC, useCallback, useEffect, useRef, useState, Suspense } from 'react'
 
@@ -33,42 +40,6 @@ export interface TApiProduct {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const POLL_INTERVAL = 30_000
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Colour maps
-// ─────────────────────────────────────────────────────────────────────────────
-
-const COLOR_FLOWER_IMAGES: Record<string, string> = {
-  red:      'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Red-25-9-24.png',
-  purple:   'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Purple-25-9-24.png',
-  pink:     'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Pink-25-9-24.png',
-  peach:    'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Peach-25-9-24.png',
-  orange:   'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Orange-25-9-24.png',
-  yellow:   'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Yellow-25-9-24.png',
-  white:    'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/White-25-9-24.png',
-  blue:     'https://www.fnp.com/assets/images/custom/flowers_24/Choose%20a%20Favourite%20Colour/Blue-25-9-24.png',
-  green:    'https://images.unsplash.com/photo-1520763185298-1b434c919102?w=220&h=220&fit=crop&crop=center',
-  lavender: 'https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=220&h=220&fit=crop&crop=center',
-  mixed:    'https://images.unsplash.com/photo-1487530811015-780c4a0e7de5?w=220&h=220&fit=crop&crop=center',
-  pastel:   'https://images.unsplash.com/photo-1533616688419-b7a585564566?w=220&h=220&fit=crop&crop=center',
-  coral:    'https://images.unsplash.com/photo-1490750967868-88df5691166b?w=220&h=220&fit=crop&crop=center',
-  black:    'https://images.unsplash.com/photo-1566138163-8e432bf4fb4a?w=220&h=220&fit=crop&crop=center',
-}
-
-function colorHex(name: string): string {
-  const map: Record<string, string> = {
-    red: '#dc2626', crimson: '#b91c1c', blue: '#2563eb', navy: '#1e3a5f',
-    green: '#16a34a', olive: '#65a30d', black: '#171717', white: '#d4d4d4',
-    yellow: '#ca8a04', gold: '#b45309', orange: '#ea580c', purple: '#9333ea',
-    pink: '#ec4899', rose: '#e11d48', gray: '#6b7280', grey: '#6b7280',
-    silver: '#9ca3af', brown: '#78350f', tan: '#92400e', beige: '#d6cfc4',
-    cream: '#e8e0d0', camel: '#b08040', indigo: '#4338ca', teal: '#0d9488',
-    cyan: '#0891b2', lime: '#65a30d', maroon: '#881337', coral: '#ef4444',
-    salmon: '#fb923c', khaki: '#a3a35e', ivory: '#e8e0cc', lavender: '#a78bfa',
-    peach: '#fb923c', mint: '#34d399', sky: '#38bdf8',
-  }
-  return map[name.toLowerCase()] ?? '#9ca3af'
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Country extraction — reads from params synchronously (no async useEffect)
@@ -565,8 +536,8 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
 
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-8 max-w-5xl mx-auto">
         {colors.map((color, idx) => {
-          const flowerImg = COLOR_FLOWER_IMAGES[color.name.toLowerCase()]
-          const label = color.name.charAt(0).toUpperCase() + color.name.slice(1)
+          const flowerImg = getFlowerImageForColor(color.name)
+          const label = formatColorLabel(color.name)
 
           return (
             <button
@@ -575,7 +546,8 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
               style={{ animationDelay: `${idx * 0.055}s` }}
               onClick={() => {
                 if (!country) return
-                const targetUrl = `/country/${country}/allproduct?color=${encodeURIComponent(color.name.toLowerCase())}`
+                const filterColor = getProductColorFilterValues(color.name)[0] ?? color.name.toLowerCase()
+                const targetUrl = `/country/${country}/allproduct?color=${encodeURIComponent(filterColor)}`
                 router.push(targetUrl)
               }}
               aria-label={`Browse ${label} flowers`}
@@ -692,28 +664,13 @@ function CountryColorSectionInner({
     }
 
     if (colorFilter) {
-      list = list.filter(p =>
-        p.color?.name?.toLowerCase() === colorFilter.toLowerCase()
-      )
+      list = list.filter(p => productMatchesColorFilter(p.color?.name, colorFilter))
     }
 
     return list
   })()
 
-  // ── Derive available colours from filtered products ──────────────────────
-  const availableColors = (() => {
-    const map = new Map<string, { hex: string; count: number }>()
-    filteredProducts.forEach(p => {
-      if (p.color?.name) {
-        const name = p.color.name.toLowerCase()
-        const ex = map.get(name)
-        map.set(name, { hex: colorHex(name), count: (ex?.count ?? 0) + 1 })
-      }
-    })
-    return Array.from(map.entries())
-      .map(([name, { hex, count }]) => ({ name, hex, count }))
-      .sort((a, b) => b.count - a.count)
-  })()
+  const availableColors = buildPickerColorsFromProducts(filteredProducts)
 
   const handleQuickView = useCallback((product: TApiProduct) => setQuickViewProduct(product), [])
 

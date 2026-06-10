@@ -1,6 +1,7 @@
 import { getCollections } from '@/data/data'
 import { getNavigation } from '@/data/navigation'
 import { FC } from 'react'
+import HeaderSpacer from './HeaderSpacer'
 import StickyHeader from './StickyHeader'
 
 export interface Props {
@@ -13,7 +14,7 @@ const Header2: FC<Props> = async ({ hasBorder = true }) => {
 
   return (
     <>
-      <div className="h-20" aria-hidden="true" />
+      <HeaderSpacer />
 
       <StickyHeader
         hasBorder={hasBorder}

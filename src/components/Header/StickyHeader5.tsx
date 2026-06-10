@@ -11,6 +11,7 @@ import LocationSelector from './Locationselector'
 import CountryCategory from './Navigation/CountryCategory'
 import CountryCart from './CountryCart'
 import CountryNotification from './CountryNotification'
+import { HEADER_ID } from './HeaderSpacer'
 
 interface StickyHeaderProps {
   hasBorder: boolean
@@ -52,6 +53,7 @@ const StickyHeader5: FC<StickyHeaderProps> = ({
 
   return (
     <div
+      id={HEADER_ID}
       className={clsx(
         // ── Sticky positioning ──────────────────────────────────────────────
         'fixed top-0 left-0 right-0 z-50 w-full',
@@ -115,13 +117,11 @@ const StickyHeader5: FC<StickyHeaderProps> = ({
         </div>
 
         {/* ── Category Nav row ── */}
-        <div className="hidden mx-4 flex-2 lg:flex">
+        <div className="hidden w-full border-t border-neutral-100 px-4 lg:block dark:border-neutral-800">
           <CountryCategory />
         </div>
 
-        <div className="mx-4 hidden flex-2 lg:flex">
-          <CountryNotification />
-        </div>
+        <CountryNotification />
       </div>
     </div>
   )

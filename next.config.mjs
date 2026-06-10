@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    qualities: [75, 90, 100],
     minimumCacheTTL: 2678400 * 12, // 6 months
     remotePatterns: [
       {

@@ -1,7 +1,6 @@
 'use client'
 
 import backgroundLineSvg from '@/images/Moon.svg'
-import heroBanner from '@/images/floriva/hero-banner.png'
 import heroImage2 from '@/images/floriva/banner/2.png'
 import { fetchSiteContent, resolveMediaUrl, type HeroSlide } from '@/lib/siteContent'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
@@ -14,6 +13,11 @@ import { usePathname } from 'next/navigation'
 import { FC, useEffect, useMemo, useState } from 'react'
 import { useSwipeable } from 'react-swipeable'
 import { useInterval } from 'react-use'
+
+/** Served from /public — no Next.js image optimization or recompression */
+const HERO_BANNER_SRC = '/images/hero-banner.png'
+const HERO_BANNER_WIDTH = 1024
+const HERO_BANNER_HEIGHT = 384
 
 function buildAllProductHref(pathname: string): string {
   const countryMatch = pathname.match(/^(\/country\/[^/]+)/)
@@ -35,10 +39,10 @@ type SlideView = {
 const DEFAULT_SLIDES: SlideView[] = [
   {
     id: 'default-hero',
-    imageUrl: heroBanner.src,
-    heading: 'Exclusive collection for everyone',
-    subHeading: 'In this season, find the best',
-    btnText: 'Explore shop now',
+    imageUrl: HERO_BANNER_SRC,
+    heading: 'Exclusive Collection for everyone',
+    subHeading: 'In this season find the best',
+    btnText: 'Explore Now',
     fullBanner: true,
   },
 ]
@@ -127,20 +131,21 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     <div
       key={item.id}
       className={clsx(
-        'fade--animation relative w-full overflow-hidden bg-[#f5f0e8]',
+        'fade--animation relative -mt-px w-full overflow-hidden bg-[#FAF0E8] leading-none',
         isActive ? 'block' : 'hidden'
       )}
     >
       <Link href={allProductHref} className="block w-full" aria-label={item.btnText}>
-        <Image
+        {/* Native img avoids Next.js resize/compress; use 1920×720+ source for sharp full-width */}
+        <img
           src={item.imageUrl}
           alt={item.heading}
-          width={1920}
-          height={800}
-          priority
-          className="h-auto w-full object-cover object-center"
-          sizes="100vw"
-          unoptimized={isRemoteImage(item.imageUrl)}
+          width={HERO_BANNER_WIDTH}
+          height={HERO_BANNER_HEIGHT}
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          className="mx-auto block h-auto w-full max-w-[1920px] object-contain object-center"
         />
       </Link>
     </div>

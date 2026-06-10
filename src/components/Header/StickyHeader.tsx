@@ -8,6 +8,7 @@ import { FC, useEffect, useRef, useState } from 'react'
 import AvatarDropdown from './AvatarDropdown'
 import CartBtn from './CartBtn'
 import HamburgerBtnMenu from './HamburgerBtnMenu'
+import { HEADER_ID } from './HeaderSpacer'
 import LocationSelector from './Locationselector'
 import CategoryNav from './Navigation/CategoryNav'
 
@@ -51,6 +52,7 @@ const StickyHeader: FC<StickyHeaderProps> = ({
 
   return (
     <div
+      id={HEADER_ID}
       className={clsx(
         // ── Sticky positioning ──────────────────────────────────────────────
         'fixed top-0 left-0 right-0 z-50 w-full',

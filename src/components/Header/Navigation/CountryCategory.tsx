@@ -276,28 +276,16 @@ const MobileDirectView = ({
             </div>
           )} */}
 
-          {/* All Products Links */}
           {showAllProductsLink && (
-            <>
-              <div className="border-b border-neutral-200 dark:border-neutral-700">
-                <Link
-                  href={countryName ? `/country/${countryName}` : '/allproduct'}
-                  onClick={handleNavigate}
-                  className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  {countryName ? `All in ${countryName}` : 'All Products'}
-                </Link>
-              </div>
-              <div className="border-b border-neutral-200 dark:border-neutral-700">
-                <Link
-                  href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
-                  onClick={handleNavigate}
-                  className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  All Products
-                </Link>
-              </div>
-            </>
+            <div className="border-b border-neutral-200 dark:border-neutral-700">
+              <Link
+                href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
+                onClick={handleNavigate}
+                className="block py-3 px-4 text-base font-medium text-neutral-800 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+              >
+                All Products
+              </Link>
+            </div>
           )}
 
           {/* Categories */}
@@ -459,16 +447,10 @@ const CountryCategory = ({
         <ul className={clsx('flex flex-wrap items-center gap-1', className)}>
           {showHomeLink && <StaticNavLink href="/" label="Home" />}
           {showAllProductsLink && (
-            <>
-              <StaticNavLink
-                href={countryName ? `/country/${countryName}` : '/allproduct'}
-                label={countryName ? `All in ${countryName}` : 'All Products'}
-              />
-              <StaticNavLink
-                href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
-                label="All Products"
-              />
-            </>
+            <StaticNavLink
+              href={countryName ? `/country/${countryName}/allproduct` : '/allproduct'}
+              label="All Products"
+            />
           )}
           {categories.map((category) => (
             <CategoryDropdown

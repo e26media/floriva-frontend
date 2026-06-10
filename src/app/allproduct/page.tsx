@@ -4,6 +4,11 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams, useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
+import {
+  buildPickerColorsFromProducts,
+  colorHex as pickerColorHex,
+  productMatchesColorFilter,
+} from "@/lib/colorPickerAssets";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string; }
@@ -283,7 +288,7 @@ function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen,
   setFilters: (f: Filters) => void; mobileOpen: boolean; onClose: () => void; countrySlug: string;
 }) {
   const catNames   = Array.from(new Set(products.map(p => p.category?.name).filter(Boolean))) as string[];
-  const colorNames = Array.from(new Set(products.map(p => p.color?.name).filter(Boolean))) as string[];
+  const colorNames = buildPickerColorsFromProducts(products).map(c => c.name);
   const prices     = products.map(p => p.discountPrice);
   const gMin       = prices.length ? Math.min(...prices) : 0;
   const gMax       = prices.length ? Math.max(...prices) : 10000;
@@ -419,12 +424,12 @@ function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen,
                 <span className={`text-[.58rem] ${!filters.color ? "font-bold text-[#1e1610]" : "text-[#7a6b5e]"}`}>All</span>
               </button>
               {colorNames.map(c => {
-                const on = filters.color === c;
+                const on = filters.color.toLowerCase() === c.toLowerCase();
                 return (
                   <button key={c} type="button" title={c} onClick={() => handleColor(c)}
                     className="flex flex-col items-center gap-[3px] cursor-pointer bg-transparent border-none p-0 group/sw">
                     <span className={`w-[28px] h-[28px] rounded-full border-2 flex items-center justify-center transition-all ${on ? "border-[#1e1610] scale-110 shadow-[0_0_0_3px_rgba(30,22,16,.15)]" : "border-transparent hover:border-[#b5623b] hover:scale-105"}`}
-                      style={{ background: COLOR_MAP[c.toLowerCase()] ?? "#e5e7eb" }}>
+                      style={{ background: pickerColorHex(c) }}>
                       {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
                         stroke={["white","yellow","cream","ivory","peach"].includes(c.toLowerCase()) ? "#1e1610" : "white"} strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
                     </span>
@@ -647,7 +652,7 @@ function AllProductsPageInner() {
   const filtered = allProducts
     .filter(p => filters.categories.length === 0 || filters.categories.includes(p.category?.name))
     .filter(p => filters.subCategories.length === 0 || filters.subCategories.includes(getSubId(p)))
-    .filter(p => !filters.color || p.color?.name?.toLowerCase() === filters.color.toLowerCase())
+    .filter(p => productMatchesColorFilter(p.color?.name, filters.color))
     .filter(p => p.discountPrice <= (filters.maxPrice ?? 999999))
     .filter(p => !filters.search ||
       p.name.toLowerCase().includes(filters.search.toLowerCase()) ||
