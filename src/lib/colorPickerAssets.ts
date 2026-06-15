@@ -119,6 +119,32 @@ export function getCircleBgForColor(colorName: string, fallbackHex?: string): st
   return COLOR_CIRCLE_BG[key] ?? fallbackHex ?? '#9ca3af'
 }
 
+/** Light flower PNGs need a visible circle bg and normal blend (not multiply). */
+export function isLightColourBubble(colorName: string): boolean {
+  const key = resolvePickerColorKey(colorName)
+  return ['white', 'cream', 'ivory', 'beige', 'silver'].includes(key)
+}
+
+export function getColourBubbleCircleStyle(
+  colorName: string,
+  fallbackHex?: string
+): { backgroundColor: string; border: string } {
+  return {
+    backgroundColor: getCircleBgForColor(colorName, fallbackHex),
+    border: '3px solid rgba(255,255,255,0.85)',
+  }
+}
+
+export function getColourBubbleImageStyle(colorName: string): {
+  opacity: number
+  mixBlendMode: 'normal' | 'multiply'
+} {
+  if (isLightColourBubble(colorName)) {
+    return { opacity: 1, mixBlendMode: 'normal' }
+  }
+  return { opacity: 0.9, mixBlendMode: 'multiply' }
+}
+
 export function colorHex(name: string): string {
   const key = normalizeColorKey(name)
   return COLOR_HEX_MAP[key] ?? COLOR_HEX_MAP[PICKER_COLOR_ALIASES[key] ?? ''] ?? '#9ca3af'

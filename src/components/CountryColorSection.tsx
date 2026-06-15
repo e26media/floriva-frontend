@@ -7,6 +7,8 @@ import useEmblaCarousel from 'embla-carousel-react'
 import {
   buildPickerColorsFromProducts,
   formatColorLabel,
+  getColourBubbleCircleStyle,
+  getColourBubbleImageStyle,
   getFlowerImageForColor,
   getProductColorFilterValues,
   productMatchesColorFilter,
@@ -519,6 +521,13 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
           animation: colourBubbleIn 0.45s ease forwards;
           opacity: 0;
         }
+        .colour-bubble-circle {
+          transition: transform 0.3s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.3s ease;
+        }
+        .colour-bubble-item:hover .colour-bubble-circle {
+          transform: scale(1.1) translateY(-5px);
+          box-shadow: 0 18px 44px rgba(0,0,0,0.2);
+        }
         .colour-bubble-item:hover .colour-bubble-label {
           color: #2d3a1e;
           font-weight: 700;
@@ -537,6 +546,8 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-8 max-w-5xl mx-auto">
         {colors.map((color, idx) => {
           const flowerImg = getFlowerImageForColor(color.name)
+          const circleStyle = getColourBubbleCircleStyle(color.name, color.hex)
+          const imageStyle = getColourBubbleImageStyle(color.name)
           const label = formatColorLabel(color.name)
 
           return (
@@ -552,13 +563,16 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
               }}
               aria-label={`Browse ${label} flowers`}
             >
-              <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden">
+              <div
+                className="colour-bubble-circle relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden"
+                style={circleStyle}
+              >
                 {flowerImg ? (
                   <img
                     src={flowerImg}
                     alt={label}
                     className="h-full w-full object-cover"
-                    style={{ opacity: 0.9, mixBlendMode: 'multiply' }}
+                    style={imageStyle}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 ) : (

@@ -7,7 +7,8 @@ import useEmblaCarousel from 'embla-carousel-react'
 import {
   buildPickerColorsFromProducts,
   formatColorLabel,
-  getCircleBgForColor,
+  getColourBubbleCircleStyle,
+  getColourBubbleImageStyle,
   getFlowerImageForColor,
   getProductColorFilterValues,
 } from '@/lib/colorPickerAssets'
@@ -514,7 +515,8 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-8 max-w-5xl mx-auto">
         {colors.map((color, idx) => {
           const flowerImg = getFlowerImageForColor(color.name)
-          const circleBg = getCircleBgForColor(color.name, color.hex)
+          const circleStyle = getColourBubbleCircleStyle(color.name, color.hex)
+          const imageStyle = getColourBubbleImageStyle(color.name)
           const label = formatColorLabel(color.name)
 
           return (
@@ -528,18 +530,16 @@ function ColourPickerSection({ colors }: ColourPickerSectionProps) {
               }}
               aria-label={`Browse ${label} flowers`}
             >
-              {/* Circle image */}
               <div
-                className=" relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden"
-                // style={{ backgroundColor: circleBg, border: '3px solid rgba(255,255,255,0.85)' }}
-                // style={{ backgroundColor: circleBg, border: '3px solid rgba(255,255,255,0.85)' }}
+                className="colour-bubble-circle relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden"
+                style={circleStyle}
               >
                 {flowerImg ? (
                   <img
                     src={flowerImg}
                     alt={label}
                     className="h-full w-full object-cover"
-                    style={{ opacity: 0.9, mixBlendMode: 'multiply' }}
+                    style={imageStyle}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 ) : (
