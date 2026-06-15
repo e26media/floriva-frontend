@@ -133,13 +133,9 @@ const Footer: React.FC = () => {
   return (
     <div className="relative border-t py-20 lg:pt-28 lg:pb-24 ">
       <div className="container grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-10">
-        <div className="col-span-2 grid grid-cols-4 gap-5 md:col-span-4 lg:flex lg:flex-col lg:md:col-span-1">
-          <div className="col-span-2 md:col-span-1">
-            <Logo />
-          </div>
-          <div className="col-span-2 flex items-center md:col-span-3">
-            <SocialsList1 />
-          </div>
+        <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
+          <Logo />
+          <SocialsList1 />
         </div>
         {allMenus.map(renderWidgetMenuItem)}
       </div>

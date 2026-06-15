@@ -1,39 +1,44 @@
-import facebook from '@/images/socials/facebook.svg'
-import telegram from '@/images/socials/telegram.svg'
-import twitter from '@/images/socials/twitter.svg'
-import youtube from '@/images/socials/youtube.svg'
+import facebook from '@/images/socials/facebook-mono.svg'
+import instagram from '@/images/socials/instagram.svg'
+import pinterest from '@/images/socials/pinterest.svg'
+import tiktok from '@/images/socials/tiktok.svg'
 import clsx from 'clsx'
 import Image from 'next/image'
 import { FC } from 'react'
 import { Link } from '../link'
-import { InstagramFreeIcons, InstagramIcon } from '@hugeicons/core-free-icons'
 
 interface SocialsList1Props {
   className?: string
 }
 
+/** Update href values when social profile URLs are ready */
 const socials = [
-  { name: 'Instagram', icon: InstagramIcon, href: 'https://www.instagram.com/florivagifts?igsh=a2JwYWY5MjhpdG13' },
-  { name: 'Facebook', icon: facebook, href: 'https://www.instagram.com/florivagifts?igsh=a2JwYWY5MjhpdG13' },
-  { name: 'Youtube', icon: youtube, href: 'https://www.instagram.com/florivagifts?igsh=a2JwYWY5MjhpdG13' },
-  { name: 'Twitter', icon: twitter, href: 'https://www.instagram.com/florivagifts?igsh=a2JwYWY5MjhpdG13' },
+  { name: 'Instagram', icon: instagram, href: '#' },
+  { name: 'Facebook', icon: facebook, href: '#' },
+  { name: 'TikTok', icon: tiktok, href: '#' },
+  { name: 'Pinterest', icon: pinterest, href: '#' },
 ]
 
 const SocialsList1: FC<SocialsList1Props> = ({ className }) => {
   return (
-    <div className={clsx('flex flex-col gap-y-3', className)}>
-      {socials.map((item, index) => (
+    <nav
+      className={clsx('flex items-center gap-x-4', className)}
+      aria-label="Social media"
+    >
+      {socials.map((item) => (
         <Link
+          key={item.name}
           target="_blank"
+          rel="noopener noreferrer"
           href={item.href}
-          className="flex items-center gap-x-2 text-neutral-700 hover:text-black dark:text-neutral-300 dark:hover:text-white"
-          key={index}
+          title={item.name}
+          aria-label={item.name}
+          className="relative block h-7 w-7 text-neutral-700 transition-colors hover:text-black dark:text-neutral-300 dark:hover:text-white"
         >
-          {/* <Image sizes="40px" className="h-auto w-5 shrink-0" width={40} height={40} src={item.icon} alt={item.name} /> */}
-          <span className="text-sm/6">{item.name}</span>
+          <Image fill sizes="28px" src={item.icon} alt="" />
         </Link>
       ))}
-    </div>
+    </nav>
   )
 }
 

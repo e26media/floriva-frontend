@@ -10,7 +10,6 @@ import SectionCollectionSlider2 from '@/components/SectionCollectionSlider2'
 import SectionGridFeatureItems from '@/components/SectionGridFeatureItems'
 import SectionGridMoreExplore from '@/components/SectionGridMoreExplore/SectionGridMoreExplore'
 import SectionHero2 from '@/components/SectionHero/SectionHero2'
-import SectionHowItWork from '@/components/SectionHowItWork/SectionHowItWork'
 import SectionPromo1 from '@/components/SectionPromo1'
 import SectionPromo2 from '@/components/SectionPromo2'
 import SectionSliderLargeProduct from '@/components/SectionSliderLargeProduct'
@@ -51,9 +50,6 @@ async function PageHome() {
          /> */}
          <NewArrivals/>
         {/* <Divider /> */}
-         <div className="pb-16">
-          <SectionHowItWork />
-        </div>
        <BestSellers/>
        {/* <BestSellerProduct/> */}
         {/* <SectionPromo1 /> */}
