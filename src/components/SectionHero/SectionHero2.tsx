@@ -2,7 +2,7 @@
 
 import backgroundLineSvg from '@/images/Moon.svg'
 import heroImage2 from '@/images/floriva/banner/2.png'
-import { fetchSiteContent, resolveMediaUrl, type HeroSlide } from '@/lib/siteContent'
+import { fetchSiteContent, resolveMediaUrl, resolveSlideHref, stripHtml, type HeroSlide } from '@/lib/siteContent'
 import ButtonPrimary from '@/shared/Button/ButtonPrimary'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -33,6 +33,10 @@ type SlideView = {
   heading: string
   subHeading: string
   btnText: string
+  btnLink?: string
+  imageAlt?: string
+  imageTitle?: string
+  imageDescription?: string
   fullBanner?: boolean
 }
 
@@ -54,6 +58,10 @@ function mapApiSlides(apiSlides: HeroSlide[]): SlideView[] {
     heading: slide.heading,
     subHeading: slide.subHeading,
     btnText: slide.btnText,
+    btnLink: slide.btnLink,
+    imageAlt: slide.imageAlt,
+    imageTitle: slide.imageTitle,
+    imageDescription: slide.imageDescription,
     fullBanner: slide.fullBanner !== false,
   }))
 }
@@ -127,7 +135,11 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     []
   )
 
-  const renderFullBanner = (item: SlideView, isActive: boolean) => (
+  const renderFullBanner = (item: SlideView, isActive: boolean) => {
+    const href = resolveSlideHref(item.btnLink, allProductHref)
+    const alt = item.imageAlt?.trim() || stripHtml(item.heading) || item.btnText
+
+    return (
     <div
       key={item.id}
       className={clsx(
@@ -135,11 +147,12 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
         isActive ? 'block' : 'hidden'
       )}
     >
-      <Link href={allProductHref} className="block w-full" aria-label={item.btnText}>
+      <Link href={href} className="block w-full" aria-label={item.btnText} title={item.imageTitle || undefined}>
         {/* Native img avoids Next.js resize/compress; use 1920×720+ source for sharp full-width */}
         <img
           src={item.imageUrl}
-          alt={item.heading}
+          alt={alt}
+          title={item.imageTitle || undefined}
           width={HERO_BANNER_WIDTH}
           height={HERO_BANNER_HEIGHT}
           loading="eager"
@@ -150,8 +163,13 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
       </Link>
     </div>
   )
+  }
 
-  const renderSplitSlide = (item: SlideView, index: number, isActive: boolean) => (
+  const renderSplitSlide = (item: SlideView, index: number, isActive: boolean) => {
+    const href = resolveSlideHref(item.btnLink, allProductHref)
+    const alt = item.imageAlt?.trim() || stripHtml(item.heading) || item.btnText
+
+    return (
     <div
       key={item.id}
       className={clsx(
@@ -202,7 +220,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
           dangerouslySetInnerHTML={{ __html: item.heading }}
         />
 
-        <ButtonPrimary className="mt-10 fade--animation__button sm:mt-20" href={allProductHref}>
+        <ButtonPrimary className="mt-10 fade--animation__button sm:mt-20" href={href}>
           <span className="me-2">{item.btnText}</span>
           <HugeiconsIcon icon={Search01Icon} size={20} />
         </ButtonPrimary>
@@ -213,7 +231,8 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
           sizes="(max-width: 768px) 100vw, 60vw"
           className="h-auto w-full max-w-[40rem] object-contain fade--animation__image select-none"
           src={item.imageUrl || heroImage2.src}
-          alt={item.heading.replace(/<[^>]+>/g, ' ')}
+          alt={alt}
+          title={item.imageTitle || undefined}
           width={790}
           height={790}
           priority
@@ -222,6 +241,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
       </div>
     </div>
   )
+  }
 
   const renderItem = (index: number) => {
     const isActive = indexActive === index
