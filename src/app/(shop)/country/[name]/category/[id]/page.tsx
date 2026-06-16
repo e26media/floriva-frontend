@@ -1,9 +1,10 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatPrice, getCurrencyForCountry } from '@/utils/currency'
+import { productInCategory, collectCategoriesFromProducts } from '@/lib/productCategories'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string }
@@ -16,7 +17,7 @@ interface CountryInfo { _id: string; name: string }
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
-  category: Category; subCategory: string; color: Color
+  category: Category; categories?: Category[]; subCategory: string; color: Color
   country: CountryInfo
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
 }
@@ -382,13 +383,7 @@ export default function CountryCategoryPage() {
         }
 
         // Build unique category list from products
-        const categoryMap = new Map<string, Category>()
-        for (const p of products) {
-          if (p.category?._id && !categoryMap.has(p.category._id)) {
-            categoryMap.set(p.category._id, p.category)
-          }
-        }
-        const categories = Array.from(categoryMap.values())
+        const categories = collectCategoriesFromProducts(products)
 
         let found: Category | null = null
         let foundSubId = 'all'
@@ -396,14 +391,14 @@ export default function CountryCategoryPage() {
         // 1. Try urlId as a top-level category _id
         const directCat = categories.find(c => c._id === urlId)
         if (directCat) {
-          found = directCat
+          found = directCat as Category
           foundSubId = 'all'
         } else {
           // 2. Try urlId as a subcategory _id
           for (const cat of categories) {
             const sub = cat.subCategories?.find(s => s._id === urlId)
             if (sub) {
-              found = cat
+              found = cat as Category
               foundSubId = sub._id
               break
             }
@@ -414,7 +409,7 @@ export default function CountryCategoryPage() {
           throw new Error('Category not found for this country. Check the URL.')
         }
 
-        const filtered = products.filter(p => p.category?._id === found!._id)
+        const filtered = products.filter(p => productInCategory(p, found!._id))
         setMatchedCategory(found)
         setActiveSub(foundSubId)
         setAllProducts(filtered)

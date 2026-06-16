@@ -1,8 +1,9 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { productInCategory, collectCategoriesFromProducts } from '@/lib/productCategories'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string }
@@ -18,7 +19,7 @@ interface Country {
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
-  category: Category; subCategory: string; color: Color
+  category: Category; categories?: Category[]; subCategory: string; color: Color
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
   country?: Country | string;
 }
@@ -454,7 +455,7 @@ export default function CategoryPage() {
 
         // Only keep INDIAN products that belong to this category
         const categoryProducts = indianProducts.filter(
-          p => p.category?._id === matchedCategory!._id
+          p => productInCategory(p, matchedCategory!._id)
         )
 
         setCategory(matchedCategory)
