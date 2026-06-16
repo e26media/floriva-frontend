@@ -131,15 +131,33 @@ const Footer: React.FC = () => {
   const allMenus: WidgetFooterMenu[] = [...widgetMenus,categoriesMenu, categoriesMenuone]
 
   return (
-    <div className="relative border-t py-20 lg:pt-28 lg:pb-24 ">
-      <div className="container grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-10">
-        <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
-          <Logo />
-          <SocialsList1 />
+    <footer className="relative border-t">
+      <div className="container py-20 lg:pt-28 lg:pb-24">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-10">
+          <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
+            <Logo />
+            <SocialsList1 />
+          </div>
+          {allMenus.map(renderWidgetMenuItem)}
         </div>
-        {allMenus.map(renderWidgetMenuItem)}
       </div>
-    </div>
+
+      <div className="border-t border-neutral-200 bg-neutral-50 py-5 dark:border-neutral-800 dark:bg-neutral-900/40">
+        <div className="container text-center text-sm text-neutral-600 dark:text-neutral-400">
+          <p>
+            Copyright reserved by Floriva Gifts · Powered by The Scenarios Co. · Made by{' '}
+            <Link
+              href="https://www.e26media.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#EA597A] transition-colors hover:text-[#d44d6a] hover:underline"
+            >
+              E26 Media
+            </Link>
+          </p>
+        </div>
+      </div>
+    </footer>
   )
 }
 

@@ -33,7 +33,7 @@ const SocialsList1: FC<SocialsList1Props> = ({ className }) => {
           href={item.href}
           title={item.name}
           aria-label={item.name}
-          className="relative block h-7 w-7 text-neutral-700 transition-colors hover:text-black dark:text-neutral-300 dark:hover:text-white"
+          className="relative block h-7 w-7 transition-opacity hover:opacity-75"
         >
           <Image fill sizes="28px" src={item.icon} alt="" />
         </Link>
