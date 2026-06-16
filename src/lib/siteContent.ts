@@ -64,8 +64,9 @@ export function resolveMediaUrl(path?: string | null): string {
 }
 
 export async function fetchSiteContent(): Promise<SiteContentPayload> {
+  const apiBase = getApiBase()
   try {
-    const res = await fetch(`${API_BASE}/api/site-content`, { cache: 'no-store' })
+    const res = await fetch(`${apiBase}/api/site-content`, { cache: 'no-store' })
     if (!res.ok) return { heroSlides: [], siteImages: [], socialLinks: [] }
     const json = await res.json()
     if (!json.success || !json.data) return { heroSlides: [], siteImages: [], socialLinks: [] }

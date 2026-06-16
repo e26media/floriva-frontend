@@ -8,7 +8,6 @@ import { fetchSiteContent, type SocialLink } from '@/lib/siteContent'
 import clsx from 'clsx'
 import Image from 'next/image'
 import { FC, useEffect, useMemo, useState } from 'react'
-import { Link } from '../link'
 
 interface SocialsList1Props {
   className?: string
@@ -22,27 +21,56 @@ const ICONS: Record<SocialLink['platform'], typeof instagram> = {
 }
 
 const FALLBACK_SOCIALS: SocialLink[] = [
-  { _id: 'fb', platform: 'facebook', label: 'Facebook', url: '#', isActive: true },
-  { _id: 'ig', platform: 'instagram', label: 'Instagram', url: '#', isActive: true },
-  { _id: 'tt', platform: 'tiktok', label: 'TikTok', url: '#', isActive: true },
-  { _id: 'pi', platform: 'pinterest', label: 'Pinterest', url: '#', isActive: true },
+  {
+    _id: 'ig',
+    platform: 'instagram',
+    label: 'Instagram',
+    url: 'https://www.instagram.com/florivagifts?igsh=a2JwYWY5MjhpdG13',
+    isActive: true,
+  },
+  {
+    _id: 'fb',
+    platform: 'facebook',
+    label: 'Facebook',
+    url: 'https://www.facebook.com/share/1HJd5iiihR/',
+    isActive: true,
+  },
+  {
+    _id: 'tt',
+    platform: 'tiktok',
+    label: 'TikTok',
+    url: 'https://www.tiktok.com/@florivagifts?_r=1&_t=ZS-97EI1dLRelw',
+    isActive: true,
+  },
+  {
+    _id: 'pi',
+    platform: 'pinterest',
+    label: 'Pinterest',
+    url: 'https://pin.it/2tvbfQDx7',
+    isActive: true,
+  },
 ]
 
+function activeSocialLinks(links: SocialLink[]): SocialLink[] {
+  return links.filter(
+    (link) => link.isActive !== false && link.url && link.url !== '#'
+  )
+}
+
 const SocialsList1: FC<SocialsList1Props> = ({ className }) => {
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([])
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>(FALLBACK_SOCIALS)
 
   useEffect(() => {
     fetchSiteContent().then(({ socialLinks: links }) => {
-      if (links.length > 0) setSocialLinks(links)
+      const active = activeSocialLinks(links)
+      if (active.length > 0) setSocialLinks(active)
     })
   }, [])
 
-  const items = useMemo(() => {
-    if (socialLinks.length === 0) return FALLBACK_SOCIALS
-    return socialLinks.filter((link) => link.url && link.url !== '#')
+  const displayItems = useMemo(() => {
+    const active = activeSocialLinks(socialLinks)
+    return active.length > 0 ? active : FALLBACK_SOCIALS
   }, [socialLinks])
-
-  const displayItems = items.length > 0 ? items : FALLBACK_SOCIALS
 
   return (
     <nav
@@ -54,17 +82,17 @@ const SocialsList1: FC<SocialsList1Props> = ({ className }) => {
         if (!icon) return null
 
         return (
-          <Link
+          <a
             key={item.platform}
             target="_blank"
             rel="noopener noreferrer"
-            href={item.url || '#'}
+            href={item.url}
             title={item.label}
             aria-label={item.label}
             className="relative block h-7 w-7 transition-opacity hover:opacity-75"
           >
             <Image fill sizes="28px" src={icon} alt="" />
-          </Link>
+          </a>
         )
       })}
     </nav>
