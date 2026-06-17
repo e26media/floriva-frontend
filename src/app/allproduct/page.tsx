@@ -9,6 +9,7 @@ import {
   colorHex as pickerColorHex,
   productMatchesColorFilter,
 } from "@/lib/colorPickerAssets";
+import { getProductSubCategoryIds } from "@/lib/productCategories";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string; }
@@ -24,7 +25,7 @@ interface Country {
 interface Product {
   _id: string; name: string; title: string; description: string;
   exactPrice: number; discountPrice: number;
-  category: Category; subCategory: string | { _id: string } | null;
+  category: Category; subCategory: string | { _id: string } | null; subCategories?: string[];
   color: Color; stock: number; deliveryInfo: string;
   images: string[]; createdAt: string;
   country?: Country | string;
@@ -65,10 +66,10 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-const getSubId = (p: Product): string => {
-  if (!p.subCategory) return "";
-  if (typeof p.subCategory === "object") return (p.subCategory as any)?._id ?? "";
-  return p.subCategory ?? "";
+const productMatchesSubFilters = (p: Product, selectedSubIds: string[]) => {
+  if (selectedSubIds.length === 0) return true;
+  const productSubIds = getProductSubCategoryIds(p);
+  return productSubIds.some(id => selectedSubIds.includes(id));
 };
 
 const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
@@ -306,7 +307,7 @@ function FiltersSidebar({ products, allCatData, filters, setFilters, mobileOpen,
   };
 
   const subCount = (catName: string, ids: string[]) =>
-    products.filter(p => p.category?.name === catName && ids.includes(getSubId(p))).length;
+    products.filter(p => p.category?.name === catName && ids.some(id => getProductSubCategoryIds(p).includes(id))).length;
 
   const toggleCat = (name: string) => {
     const next = filters.categories.includes(name)
@@ -651,7 +652,7 @@ function AllProductsPageInner() {
   // ── Apply UI filters ────────────────────────────────────────────────────────
   const filtered = allProducts
     .filter(p => filters.categories.length === 0 || filters.categories.includes(p.category?.name))
-    .filter(p => filters.subCategories.length === 0 || filters.subCategories.includes(getSubId(p)))
+    .filter(p => productMatchesSubFilters(p, filters.subCategories))
     .filter(p => productMatchesColorFilter(p.color?.name, filters.color))
     .filter(p => p.discountPrice <= (filters.maxPrice ?? 999999))
     .filter(p => !filters.search ||

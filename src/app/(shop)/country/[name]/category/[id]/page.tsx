@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatPrice, getCurrencyForCountry } from '@/utils/currency'
-import { productInCategory, collectCategoriesFromProducts } from '@/lib/productCategories'
+import { productInCategory, productInSubCategory } from '@/lib/productCategories'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string }
@@ -17,7 +17,7 @@ interface CountryInfo { _id: string; name: string }
 interface Product {
   _id: string; name: string; title: string; description: string
   exactPrice: number; discountPrice: number
-  category: Category; categories?: Category[]; subCategory: string; color: Color
+  category: Category; categories?: Category[]; subCategory: string | { _id?: string }; subCategories?: string[]; color: Color
   country: CountryInfo
   stock: number; deliveryInfo: string; images: string[]; createdAt: string
 }
@@ -368,37 +368,41 @@ export default function CountryCategoryPage() {
       setError('')
     }, 0)
 
-    fetch(`${BASE}/api/countrywise?country=${encodeURIComponent(countryName)}`)
-      .then(r => {
+    Promise.all([
+      fetch(`${BASE}/api/categoryview`).then(r => {
+        if (!r.ok) throw new Error(`Failed to load categories (${r.status})`)
+        return r.json()
+      }),
+      fetch(`${BASE}/api/countrywise?country=${encodeURIComponent(countryName)}`).then(r => {
         if (!r.ok) throw new Error(`Failed to load products for "${countryName}" (${r.status})`)
         return r.json()
-      })
-      .then((json) => {
-        const products: Product[] = Array.isArray(json)
-          ? json
-          : json.data ?? json.products ?? []
+      }),
+    ])
+      .then(([catJson, prodJson]) => {
+        const allCategories: Category[] = Array.isArray(catJson)
+          ? catJson
+          : catJson.categories ?? catJson.data ?? []
 
-        if (!products.length) {
-          throw new Error(`No products found for country "${countryName}".`)
+        const products: Product[] = Array.isArray(prodJson)
+          ? prodJson
+          : prodJson.data ?? prodJson.products ?? []
+
+        if (!allCategories.length) {
+          throw new Error('Failed to load categories.')
         }
-
-        // Build unique category list from products
-        const categories = collectCategoriesFromProducts(products)
 
         let found: Category | null = null
         let foundSubId = 'all'
 
-        // 1. Try urlId as a top-level category _id
-        const directCat = categories.find(c => c._id === urlId)
+        const directCat = allCategories.find(c => c._id === urlId)
         if (directCat) {
-          found = directCat as Category
+          found = directCat
           foundSubId = 'all'
         } else {
-          // 2. Try urlId as a subcategory _id
-          for (const cat of categories) {
+          for (const cat of allCategories) {
             const sub = cat.subCategories?.find(s => s._id === urlId)
             if (sub) {
-              found = cat as Category
+              found = cat
               foundSubId = sub._id
               break
             }
@@ -406,7 +410,7 @@ export default function CountryCategoryPage() {
         }
 
         if (!found) {
-          throw new Error('Category not found for this country. Check the URL.')
+          throw new Error('Category not found. Check the URL.')
         }
 
         const filtered = products.filter(p => productInCategory(p, found!._id))
@@ -425,7 +429,7 @@ export default function CountryCategoryPage() {
 
   const filtered = activeSub === 'all'
     ? allProducts
-    : allProducts.filter(p => p.subCategory === activeSub)
+    : allProducts.filter(p => productInSubCategory(p, activeSub))
 
   const sorted = [...filtered].sort((a, b) => {
     if (sort === 'price-asc')  return a.discountPrice - b.discountPrice
@@ -565,7 +569,7 @@ export default function CountryCategoryPage() {
                     </span>
                   </button>
                   {matchedCategory.subCategories.map(sub => {
-                    const count = allProducts.filter(p => p.subCategory === sub._id).length
+                    const count = allProducts.filter(p => productInSubCategory(p, sub._id)).length
                     const isActive = activeSub === sub._id
                     return (
                       <button
