@@ -1,7 +1,7 @@
 'use client'
 
 import { addProductToCart } from '@/lib/cart'
-import { fetchJsonCached } from '@/lib/apiCache'
+import { fetchJsonCached, normalizeApiList } from '@/lib/apiCache'
 import Heading from '@/components/Heading/Heading'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
@@ -960,14 +960,8 @@ const CountryNewarrivals: FC<BestSellersProps> = ({
         if (!isBackground) setLoading(true)
         setError(null)
 
-        const json = await fetchJsonCached<unknown>(apiUrl, 60_000)
-
-        // API returns { data: [...] } or bare array
-        const all: TApiProduct[] = Array.isArray(json)
-          ? json
-          : Array.isArray(json.data)
-          ? json.data
-          : []
+        const json = await fetchJsonCached(apiUrl, 60_000)
+        const all = normalizeApiList<TApiProduct>(json)
 
         // ── 5. Filter: keep only products tagged "New Arrivals" ─────────────
         //   FeaturedProduct: [{ name: "New Arrivals" }, { name: "Best Seller" }]

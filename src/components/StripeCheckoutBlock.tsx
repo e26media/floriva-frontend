@@ -10,7 +10,7 @@ type Props = {
   clientSecret: string;
   totalAmount: number;
   currencySymbol: string;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void | Promise<void>;
   onError: (message: string) => void;
 };
 

@@ -2,7 +2,7 @@
 
 import Heading from '@/components/Heading/Heading'
 import { addProductToCart } from '@/lib/cart'
-import { fetchJsonCached } from '@/lib/apiCache'
+import { fetchJsonCached, normalizeApiList } from '@/lib/apiCache'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
 import useEmblaCarousel from 'embla-carousel-react'
@@ -758,13 +758,8 @@ const BestSellers: FC<BestSellersProps> = ({
       setError(null)
 
       const currentApiUrl = `${BASE_URL}/api/countrywise?country=${countrySlug}`
-      const json = await fetchJsonCached<unknown>(currentApiUrl, 60_000)
-
-      const all: TApiProduct[] = Array.isArray(json)
-        ? json
-        : Array.isArray(json.data)
-        ? json.data
-        : []
+      const json = await fetchJsonCached(currentApiUrl, 60_000)
+      const all = normalizeApiList<TApiProduct>(json)
 
       // Step 1: keep only correct country products
       const countryProducts = all.filter(p => isCountryProduct(p, countrySlug))

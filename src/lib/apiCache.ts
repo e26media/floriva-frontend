@@ -1,5 +1,15 @@
 const cache = new Map<string, { expires: number; data: unknown }>();
 
+export type ApiListPayload<T> = T[] | { data?: T[] };
+
+export function normalizeApiList<T>(json: ApiListPayload<T> | unknown): T[] {
+  if (Array.isArray(json)) return json;
+  if (json && typeof json === 'object' && Array.isArray((json as { data?: T[] }).data)) {
+    return (json as { data: T[] }).data;
+  }
+  return [];
+}
+
 export async function fetchJsonCached<T = unknown>(
   url: string,
   ttlMs = 60_000,
