@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
+import { getAuthHeaders } from "@/lib/auth";
 
 // =============================================================================
 //  TYPES
@@ -196,7 +197,14 @@ async function apiFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
-  const res = await fetch(url, options);
+  const res = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+      ...(options.headers as Record<string, string> | undefined),
+    },
+  });
   const ct  = res.headers.get("content-type") ?? "";
   if (ct.includes("text/html")) {
     throw new Error(`Server error at ${url} (${res.status})`);

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
+import { addProductToCart, getUserEmail } from "@/lib/cart";
 
 /* ─────────────────────────────────────────────────────────────────
    TYPES
@@ -46,73 +47,13 @@ const COLOR_HEX: Record<string, string> = {
   brown:"#a97c50", cream:"#f5f0e8", grey:"#9ca3af", gray:"#9ca3af",
 };
 
-/* ─────────────────────────────────────────────────────────────────
-   AUTH HELPER
-   localStorage keys:
-     floriva_token  → raw JWT string  (NOT JSON)
-     floriva_user   → JSON string: { username, email }
-   We read email from floriva_user.
-   Fallback: decode the JWT payload from floriva_token manually.
-───────────────────────────────────────────────────────────────── */
-function getUserEmail(): string | null {
-  try {
-    // ── Primary: floriva_user = {"username":"ISMAIL","email":"..."}
-    const userRaw = localStorage.getItem("floriva_user");
-    if (userRaw) {
-      const parsed = JSON.parse(userRaw);
-      if (parsed?.email) return parsed.email;
-    }
-
-    // ── Fallback: decode JWT payload from floriva_token
-    const token = localStorage.getItem("floriva_token");
-    if (token) {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (payload?.email) return payload.email;
-      }
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   ADD TO CART API CALL
-   POST /api/addtocart  →  { productId, userEmail, quantity }
-───────────────────────────────────────────────────────────────── */
 async function addToCartAPI(
   productId: string,
-  quantity: number
-): Promise<{ ok: boolean; message: string }> {
-  const userEmail = getUserEmail();
-
-  if (!userEmail) {
-    return { ok: false, message: "Please log in to add items to cart." };
-  }
-
-  try {
-    const res = await fetch(`${BASE}/api/addtocart`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, userEmail, quantity }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      return {
-        ok: false,
-        message: data?.message ?? `Failed to add to cart (${res.status})`,
-      };
-    }
-
-    return { ok: true, message: data?.message ?? "Product added to cart!" };
-  } catch {
-    return { ok: false, message: "Network error. Please try again." };
-  }
+  quantity: number,
+  product?: Product,
+): Promise<{ ok: boolean; message: string; requiresLogin?: boolean }> {
+  const result = await addProductToCart(productId, quantity, product);
+  return { ok: result.ok, message: result.message, requiresLogin: result.requiresLogin };
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -567,7 +508,7 @@ export default function ProductDetailPage() {
 
     setCartLoading(true);
 
-    const result = await addToCartAPI(product._id, qty);
+    const result = await addToCartAPI(product._id, qty, product);
 
     setCartLoading(false);
 
@@ -581,6 +522,10 @@ export default function ProductDetailPage() {
       );
       setTimeout(() => setCartAdded(false), 2800);
     } else {
+      if (result.requiresLogin) {
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
       pushToast(result.message || "Could not add to cart. Please try again.", "error");
     }
   };

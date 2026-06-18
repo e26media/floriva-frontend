@@ -3,22 +3,46 @@ import {
   getSelectedCountrySlug,
   getStoredUser,
   getUserCountrySlug,
-  isLoggedIn,
   normalizeCountrySlug,
   applyCountrySlug,
   type StoreCountrySlug,
 } from '@/lib/userCountry';
+import { decodeJwtPayload, getApiBase, getAuthHeaders, getAuthToken, withAuthBody } from '@/lib/auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
-
-export function getUserEmail(): string | null {
+export function getUserCartKey(): string | null {
   const user = getStoredUser();
-  return user?.email ? String(user.email).trim().toLowerCase() : null;
+  if (user?.email) return String(user.email).trim().toLowerCase();
+  if (user?.phone) return String(user.phone).trim().toLowerCase();
+
+  const token = getAuthToken();
+  if (!token) return null;
+
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+
+  const email = payload.email;
+  if (typeof email === 'string' && email.trim()) {
+    return email.trim().toLowerCase();
+  }
+
+  const phone = payload.phone;
+  if (typeof phone === 'string' && phone.trim()) {
+    return phone.trim().toLowerCase();
+  }
+
+  const id = payload.id || payload.userId || payload._id;
+  if (id) return String(id).trim().toLowerCase();
+
+  return null;
 }
 
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('floriva_token');
+/** @deprecated use getUserCartKey */
+export function getUserEmail(): string | null {
+  return getUserCartKey();
+}
+
+export function isLoggedIn(): boolean {
+  return Boolean(getAuthToken() && getUserCartKey());
 }
 
 export function getProductCountrySlug(product: unknown): StoreCountrySlug | null {
@@ -43,7 +67,10 @@ export async function addProductToCart(
   quantity = 1,
   product?: unknown,
 ): Promise<AddToCartResult> {
-  if (!isLoggedIn()) {
+  const token = getAuthToken();
+  const userKey = getUserCartKey();
+
+  if (!token || !userKey) {
     const redirect = typeof window !== 'undefined' ? window.location.pathname : '/';
     if (typeof window !== 'undefined') {
       window.location.href = getLoginUrl(redirect);
@@ -53,15 +80,6 @@ export async function addProductToCart(
       message: 'Please log in to add items to cart.',
       requiresLogin: true,
     };
-  }
-
-  const userEmail = getUserEmail();
-  const token = getAuthToken();
-  if (!userEmail || !token) {
-    if (typeof window !== 'undefined') {
-      window.location.href = getLoginUrl();
-    }
-    return { ok: false, message: 'Please log in to add items to cart.', requiresLogin: true };
   }
 
   const userCountry = getUserCountrySlug() || getSelectedCountrySlug();
@@ -82,15 +100,30 @@ export async function addProductToCart(
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/addtocart`, {
+    const apiBase = getApiBase();
+    const res = await fetch(`${apiBase}/api/addtocart`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ productId, userEmail, quantity }),
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(withAuthBody({
+        productId,
+        userEmail: userKey,
+        quantity,
+      })),
     });
     const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      localStorage.removeItem('floriva_token');
+      localStorage.removeItem('floriva_user');
+      window.dispatchEvent(new Event('floriva-auth-changed'));
+      return {
+        ok: false,
+        message: data?.message ?? 'Session expired. Please log in again.',
+        requiresLogin: true,
+      };
+    }
+
     if (!res.ok) {
       if (res.status === 403 && data?.userCountry) {
         await applyCountrySlug(data.userCountry, true);

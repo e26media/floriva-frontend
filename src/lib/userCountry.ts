@@ -1,3 +1,5 @@
+import { getAuthToken } from '@/lib/auth';
+
 export const STORAGE_KEY = 'floriva_selected_country';
 export const DEFAULT_COUNTRY_SLUG = 'india';
 export const SUPPORTED_COUNTRY_SLUGS = ['india', 'australia'] as const;
@@ -70,7 +72,7 @@ function fallbackCountrySlug(): StoreCountrySlug {
   return guessCountryFromClient();
 }
 
-export function getStoredUser(): { email?: string; username?: string; countrySlug?: string } | null {
+export function getStoredUser(): { email?: string; username?: string; phone?: string; countrySlug?: string } | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem('floriva_user');
@@ -82,7 +84,7 @@ export function getStoredUser(): { email?: string; username?: string; countrySlu
 
 export function isLoggedIn(): boolean {
   if (typeof window === 'undefined') return false;
-  return Boolean(localStorage.getItem('floriva_token') && localStorage.getItem('floriva_user'));
+  return Boolean(getAuthToken());
 }
 
 export function getUserCountrySlug(): StoreCountrySlug | null {

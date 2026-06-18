@@ -6,12 +6,8 @@ import { Divider } from '../Divider'
 import { Link } from '../Link'
 import backgroundLineSvg from '@/images/floriva/Primary Logo.png'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import {
-  completeGoogleLogin,
-  GOOGLE_POPUP_NAME,
-  subscribeGoogleAuth,
-  type GoogleAuthPayload,
-} from '@/lib/googleAuthPopup'
+import { finishLogin, normalizeUserPayload, startGoogleLogin } from '@/lib/auth'
+import { syncCountryForUser } from '@/lib/userCountry'
 
 // ─────────────────────────────────────────────────────────────────────────────
 const ENV_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
@@ -20,50 +16,6 @@ const getApiBase = () =>
     ? 'http://localhost:7000'
     : ENV_API_BASE;
 interface Props { className?: string }
-
-function applyGoogleAuthResult(
-  payload: GoogleAuthPayload,
-  onResult: (data: GoogleAuthPayload) => void,
-) {
-  void completeGoogleLogin(payload).finally(() => onResult(payload))
-}
-
-// ─── Google popup ─────────────────────────────────────────────────────────────
-function openGooglePopup(
-  onResult: (data: GoogleAuthPayload) => void,
-  onError: (msg: string) => void
-) {
-  const W = 500, H = 640
-  const left = Math.round(window.screenX + (window.outerWidth - W) / 2)
-  const top  = Math.round(window.screenY + (window.outerHeight - H) / 2)
-  const popup = window.open(
-    `${getApiBase()}/api/google-login`, GOOGLE_POPUP_NAME,
-    `width=${W},height=${H},left=${left},top=${top},toolbar=no,menubar=no,location=yes,scrollbars=yes,status=no`
-  )
-  if (!popup) { alert('Popup blocked! Please allow popups for this site.'); return }
-
-  const cleanup = subscribeGoogleAuth(
-    (payload) => {
-      cleanup()
-      clearInterval(poll)
-      try { popup.close() } catch { /* ignore */ }
-      applyGoogleAuthResult(payload, onResult)
-    },
-    (msg) => {
-      cleanup()
-      clearInterval(poll)
-      try { popup.close() } catch { /* ignore */ }
-      onError(msg || 'Google sign-in failed')
-    },
-  )
-
-  const poll = setInterval(() => {
-    if (popup.closed) {
-      clearInterval(poll)
-      cleanup()
-    }
-  }, 500)
-}
 
 // ─── UserAvatar ────────────────────────────────────────────────────────────────
 function UserAvatar({ imgUrl, name, email, size = 48 }: {
@@ -105,119 +57,12 @@ const FlorivaFlower = ({ size = 46 }: { size?: number }) => (
   </svg>
 )
 
-const GoogleG = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48">
-    <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.6-6.6C35.3 2.4 30 0 24 0 14.6 0 6.6 5.5 2.6 13.5l7.7 6C12.2 13.2 17.6 9.5 24 9.5z"/>
-    <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17z"/>
-    <path fill="#FBBC05" d="M10.3 28.5A14.4 14.4 0 0 1 9.5 24c0-1.6.3-3.1.8-4.5l-7.7-6A23.8 23.8 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.7-6.2z"/>
-    <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.4 0-11.8-4.3-13.7-10.2l-7.7 6.2C6.6 42.5 14.6 48 24 48z"/>
-  </svg>
-)
-
 const Spinner = ({ color = 'white' }: { color?: string }) => (
   <svg className="animate-spin" style={{ flexShrink: 0, animation: 'spin 1s linear infinite' }} width="17" height="17" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke={color === 'white' ? 'rgba(255,255,255,0.25)' : '#e5e7eb'} strokeWidth="3"/>
     <path d="M12 2a10 10 0 0 1 10 10" stroke={color} strokeWidth="3" strokeLinecap="round"/>
   </svg>
 )
-
-// ─── Google Loading Screen ──────────────────────────────────────────────────────
-function GoogleLoadingScreen({ user, onDone }: { user: { name: string; email: string }; onDone: () => void }) {
-  const [visible, setVisible] = useState(false)
-  const [phase, setPhase] = useState<'loading' | 'success'>('loading')
-  const initial = (user.name || user.email || 'U')[0].toUpperCase()
-
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true))
-    const t1 = setTimeout(() => setPhase('success'), 1200)
-    const t2 = setTimeout(() => { setVisible(false); setTimeout(onDone, 320) }, 2600)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [onDone])
-
-  return (
-    <div style={{
-      position: 'fixed', 
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      zIndex: 9999,
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: '16px',
-      background: 'rgba(0,0,0,0.55)', 
-      backdropFilter: 'blur(12px)',
-      transition: 'opacity 0.3s', 
-      opacity: visible ? 1 : 0,
-    }}>
-      <div style={{
-        background: 'white', 
-        borderRadius: '28px', 
-        padding: '40px 32px',
-        textAlign: 'center', 
-        boxShadow: '0 30px 80px rgba(0,0,0,0.25)',
-        width: '100%', 
-        maxWidth: '320px',
-        transition: 'transform 0.4s cubic-bezier(0.34,1.3,0.64,1)',
-        transform: visible ? 'scale(1)' : 'scale(0.88)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}><FlorivaFlower size={44}/></div>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #EA5A7B, #7C4CA3)',
-          margin: '0 auto 12px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          color: 'white', 
-          fontSize: '26px', 
-          fontWeight: 800, 
-          fontFamily: 'Georgia,serif',
-          boxShadow: '0 4px 16px rgba(234,90,123,0.4)',
-          animation: 'floraPopIn 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-        }}>
-          {initial}
-        </div>
-        <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827', fontFamily: 'Georgia,serif' }}>{user.name || 'Welcome back'}</div>
-        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', marginBottom: '24px' }}>{user.email}</div>
-        {phase === 'loading' ? (
-          <>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}>
-              {['#EA5A7B','#7C4CA3','#EA5A7B','#7C4CA3'].map((c,i) => (
-                <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: c, animation: `floraBounce 1.2s ease-in-out infinite`, animationDelay: `${i*0.14}s` }}/>
-              ))}
-            </div>
-            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Signing you in to Floriva…</p>
-          </>
-        ) : (
-          <>
-            <div style={{
-              width: 48, height: 48, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #EA5A7B, #7C4CA3)',
-              margin: '0 auto 12px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(234,90,123,0.4)',
-              animation: 'floraPopIn 0.42s cubic-bezier(0.34,1.56,0.64,1)',
-            }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M5 12l5 5L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <p style={{ fontSize: '14px', fontWeight: 700, color: '#EA5A7B', margin: 0 }}>Welcome to Floriva! 🌸</p>
-          </>
-        )}
-      </div>
-      <style>{`
-        @keyframes floraBounce{0%,80%,100%{transform:scale(0.6);opacity:0.35}40%{transform:scale(1.1);opacity:1}}
-        @keyframes floraPopIn{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
-        @keyframes spin{to{transform:rotate(360deg)}}
-      `}</style>
-    </div>
-  )
-}
 
 // ─── Auth Modal ────────────────────────────────────────────────────────────────
 function FlorivaAuthModal({ onClose, onSuccess }: {
@@ -228,11 +73,10 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
   const [email,      setEmail]      = useState('')
   const [otp,        setOtp]        = useState(['','','','','',''])
   const [loading,    setLoading]    = useState(false)
-  const [gLoading,   setGLoading]   = useState(false)
   const [error,      setError]      = useState('')
+  const [message,    setMessage]    = useState('')
   const [timer,      setTimer]      = useState(0)
   const [visible,    setVisible]    = useState(false)
-  const [googleUser, setGoogleUser] = useState<{ name: string; email: string; token: string } | null>(null)
 
   const otpRefs  = useRef<(HTMLInputElement | null)[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -270,14 +114,17 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
 
   const sendOtp = async () => {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Please enter a valid email address.'); return }
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setMessage('')
     try {
       const res = await fetch(`${getApiBase()}/api/send-otp`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: 'login' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || data.error || 'Failed to send OTP')
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || 'Failed to send OTP')
       setStep('otp'); startTimer()
+      setMessage(data.message || 'OTP sent to your email.')
     } catch (e: any) { setError(e.message || 'Something went wrong.') }
     finally { setLoading(false) }
   }
@@ -288,11 +135,13 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     setLoading(true); setError('')
     try {
       const res = await fetch(`${getApiBase()}/api/verify-otp`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp: code })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: code, purpose: 'login' }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || data.error || 'Invalid OTP')
-      onSuccess(data.user, data.token)
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || 'Invalid OTP')
+      finishLogin(data.token, normalizeUserPayload(data.user))
     } catch (e: any) {
       setError(e.message || 'Invalid OTP. Try again.')
       setOtp(['','','','','','']); otpRefs.current[0]?.focus()
@@ -317,24 +166,6 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     otpRefs.current[Math.min(d.length,5)]?.focus()
   }
 
-  const handleGoogleLogin = () => {
-    if (window.location.hostname === 'localhost') {
-      setError('For local testing, please use email OTP login. Google login uses production OAuth settings.')
-      return
-    }
-    setGLoading(true); setError('')
-    openGooglePopup(
-      (data) => { setGLoading(false); setGoogleUser(data) },
-      (msg)  => { setGLoading(false); setError(msg || 'Google sign-in failed. Please try again.') }
-    )
-    setTimeout(() => setGLoading(false), 3000)
-  }
-
-  const handleGoogleDone = useCallback(() => {
-    if (googleUser) onSuccess({ username: googleUser.name, email: googleUser.email }, googleUser.token)
-  }, [googleUser, onSuccess])
-
-  // FIXED: Perfectly centered overlay
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
     top: 0,
@@ -413,14 +244,18 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
                 <img src={backgroundLineSvg.src} alt="Floriva" style={{margin: '0 12px' }} className='h-10'/>
               </div>
               <h2 style={{ fontFamily: 'Georgia,serif', fontSize: '20px', fontWeight: 700, color: '#111827', margin: 0 }}>
-                {step === 'email' ? 'Sign Up / Login to Floriva!' : 'Check your inbox'}
+                {step === 'email' ? 'Login to Floriva' : 'Check your inbox'}
               </h2>
               <p style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280', lineHeight: 1.6, marginBottom: 0 }}>
-                {step === 'email' ? 'Enter your email address to continue' : (
-                  <><span>We emailed a 6-digit code to</span><br/><strong style={{ color: '#EA5A7B' }}>{email}</strong></>
+                {step === 'email' ? 'Use your email or continue with Google' : (
+                  <><span>We sent a 6-digit code to</span><br/><strong style={{ color: '#EA5A7B' }}>{email}</strong></>
                 )}
               </p>
             </div>
+
+            {message && step === 'otp' && (
+              <p style={{ marginBottom: '14px', fontSize: '12px', color: '#059669', textAlign: 'center' }}>{message}</p>
+            )}
 
             {/* Error message */}
             {error && (
@@ -447,6 +282,31 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
             {/* EMAIL STEP */}
             {step === 'email' && (
               <>
+                <button
+                  type="button"
+                  onClick={() => { closeModal(); startGoogleLogin() }}
+                  style={{
+                    width: '100%',
+                    padding: '13px',
+                    borderRadius: '16px',
+                    border: '1.5px solid #e5e7eb',
+                    background: 'white',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: '#374151',
+                    marginBottom: '14px',
+                  }}
+                >
+                  Continue with Google
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0 0 14px' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
+                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>or email</span>
+                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
+                </div>
+
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ 
                     display: 'block', 
@@ -529,55 +389,11 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
                   }}
                 >
                   {loading && <Spinner/>}
-                  {loading ? 'Sending OTP…' : 'Continue →'}
+                  {loading ? 'Sending OTP…' : 'Send OTP →'}
                 </button>
 
-                {/* Divider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '18px 0' }}>
-                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
-                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>or</span>
-                  <div style={{ flex: 1, height: '1px', background: '#f3f4f6' }}/>
-                </div>
-
-                {/* Google button */}
-                <button
-                  onClick={handleGoogleLogin}
-                  disabled={gLoading}
-                  style={{
-                    width: '100%', 
-                    padding: '13px', 
-                    borderRadius: '16px',
-                    border: '1.5px solid #e5e7eb', 
-                    background: 'white',
-                    fontSize: '14px', 
-                    fontWeight: 600,
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '10px',
-                    cursor: gLoading ? 'wait' : 'pointer', 
-                    color: '#374151',
-                    opacity: gLoading ? 0.7 : 1,
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                  }}
-                  onMouseEnter={e => { 
-                    if (!gLoading) { 
-                      e.currentTarget.style.borderColor = '#7C4CA3'; 
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(124,76,163,0.15)' 
-                    }
-                  }}
-                  onMouseLeave={e => { 
-                    e.currentTarget.style.borderColor = '#e5e7eb'; 
-                    e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)' 
-                  }}
-                >
-                  {gLoading ? <Spinner color="#7C4CA3"/> : <GoogleG size={20}/>}
-                  <span>{gLoading ? 'Opening Google…' : 'Login with Google'}</span>
-                </button>
-
-                <p style={{ marginTop: '10px', textAlign: 'center', fontSize: '11px', color: '#9ca3af', marginBottom: 0 }}>
-                  Google&apos;s account picker will open in a popup window
+                <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '11px', color: '#d1d5db', marginBottom: 0 }}>
+                  Delivery address is collected at checkout
                 </p>
                 <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '11px', color: '#d1d5db', marginBottom: 0 }}>
                   By continuing you agree to our{' '}
@@ -687,8 +503,6 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
           </div>
         </div>
       </div>
-
-      {googleUser && <GoogleLoadingScreen user={googleUser} onDone={handleGoogleDone}/>}
 
       <style>{`
         @keyframes floraSlide{0%{background-position:0% 0%}100%{background-position:200% 0%}}
@@ -900,39 +714,38 @@ export default function AvatarDropdown({ className }: Props) {
   const [user,      setUser]      = useState<any>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('floriva_user')
-    const token = localStorage.getItem('floriva_token')
-    if (saved && token) { 
-      try { 
-        setTimeout(() => {
-          setUser(JSON.parse(saved)) 
-        }, 0)
-      } catch (_) {}
+    const loadUser = () => {
+      const saved = localStorage.getItem('floriva_user')
+      const token = localStorage.getItem('floriva_token')
+      if (saved && token) {
+        try {
+          setUser(JSON.parse(saved))
+        } catch (_) {
+          setUser(null)
+        }
+      } else {
+        setUser(null)
+      }
     }
-  }, [])
 
-  useEffect(() => {
-    const cleanup = subscribeGoogleAuth(
-      (payload) => {
-        setUser({
-          username: payload.name,
-          email: payload.email,
-          countrySlug: payload.countrySlug,
-        })
-        setShowAuth(false)
-      },
-      () => {},
-    )
-    return cleanup
+    loadUser()
+    window.addEventListener('floriva-auth-changed', loadUser)
+    return () => window.removeEventListener('floriva-auth-changed', loadUser)
   }, [])
 
   const handleSuccess = useCallback((userData: any, token: string) => {
     if (token) {
       localStorage.setItem('floriva_token', token)
-      localStorage.setItem('floriva_user', JSON.stringify(userData))
+      localStorage.setItem('floriva_user', JSON.stringify({
+        username: userData.username,
+        email: userData.email,
+        countrySlug: userData.countrySlug,
+      }))
     }
     setUser(userData)
     setShowAuth(false)
+    syncCountryForUser(userData).catch(() => {})
+    window.dispatchEvent(new Event('floriva-auth-changed'))
   }, [])
 
   const handleLogout = () => {
@@ -940,6 +753,7 @@ export default function AvatarDropdown({ className }: Props) {
     localStorage.removeItem('floriva_user')
     setUser(null)
     setShowPanel(false)
+    window.dispatchEvent(new Event('floriva-auth-changed'))
   }
 
   if (!user) {

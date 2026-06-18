@@ -32,8 +32,6 @@ export default function CountryAccessProvider() {
             if (current && !canAccessCountry(current)) {
               router.replace(buildCountryRedirectPath(pathname, slug));
             }
-          } else if (isLoggedIn()) {
-            router.replace(`/country/${slug}`);
           }
         })
         .catch(() => {});

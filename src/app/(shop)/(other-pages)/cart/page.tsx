@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getAuthHeaders } from "@/lib/auth";
 
 // =============================================================================
 //  CONSTANTS — hardcoded to India only
@@ -194,7 +195,14 @@ async function resolveCountry(val?: string | { _id?: string; name?: string }): P
 async function apiFetch(
   url: string, options: RequestInit = {}
 ): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
-  const res = await fetch(url, options);
+  const res = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers: {
+      ...getAuthHeaders(),
+      ...(options.headers as Record<string, string> | undefined),
+    },
+  });
   const ct  = res.headers.get("content-type") ?? "";
   if (ct.includes("text/html")) throw new Error(`Server error at ${url} (${res.status})`);
   const json = (await res.json()) as Record<string, unknown>;

@@ -402,9 +402,10 @@ export default function LocationSelector() {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState<{ country: Country; city: string; locked?: boolean } | null>(null)
-  const locked = isLoggedIn()
+  const [loggedIn, setLoggedIn] = useState(false)
 
   const refreshSelected = () => {
+    setLoggedIn(isLoggedIn())
     const data = getSelectedCountryData()
     if (data?.country?.name) {
       setSelected(data)
@@ -428,15 +429,15 @@ export default function LocationSelector() {
   }, [])
 
   useEffect(() => {
-    if (!selected?.country?.name) return
+    if (!selected?.country?.name || loggedIn) return
     const slug = selected.country.name.toLowerCase()
     if (window.location.pathname === '/') {
       router.push(`/country/${slug}`)
     }
-  }, [selected, router])
+  }, [selected, loggedIn, router])
 
   const handleConfirm = (country: Country, city: string) => {
-    if (locked) return
+    if (loggedIn) return
     const data = persistSelectedCountry(country, city, false)
     setSelected(data)
     setModalOpen(false)
@@ -444,22 +445,25 @@ export default function LocationSelector() {
   }
 
   const openModal = () => {
-    if (locked) return
+    if (loggedIn) return
     setModalOpen(true)
   }
+
+  // Logged-in users have a locked country on their account — no picker needed.
+  if (loggedIn) return null
 
   return (
     <>
       <button
         type="button"
         onClick={openModal}
-        title={locked ? 'Country is set from your location' : 'Change delivery country'}
+        title="Change delivery country"
         className={clsx(
           'flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg ml-1 mr-1 mb-1 w-full',
           'bg-white border border-gray-200 shadow-sm',
           'lg:flex-row lg:items-center lg:gap-2',
           'lg:bg-transparent lg:border-0 lg:shadow-none',
-          locked ? 'cursor-default' : 'hover:bg-gray-50 lg:hover:bg-gray-100',
+          'hover:bg-gray-50 lg:hover:bg-gray-100',
           'transition-colors duration-150',
           'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/20',
         )}

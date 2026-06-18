@@ -6,28 +6,7 @@ import { Input } from "@/shared/input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-
-const ENV_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
-
-function getApiBase() {
-  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
-    return "http://localhost:7000";
-  }
-  return ENV_API_BASE;
-}
-
-function finishLogin(token: string, user: { email?: string; username?: string; countrySlug?: string }) {
-  localStorage.setItem("floriva_token", token);
-  localStorage.setItem("floriva_user", JSON.stringify(user));
-  window.dispatchEvent(new Event("floriva-auth-changed"));
-
-  import("@/lib/userCountry").then(({ syncCountryForUser, getSelectedCountrySlug }) => {
-    syncCountryForUser(user).finally(() => {
-      const slug = user.countrySlug || getSelectedCountrySlug();
-      window.location.assign(`/country/${slug}`);
-    });
-  });
-}
+import { finishLogin, getApiBase, normalizeUserPayload, startGoogleLogin } from "@/lib/auth";
 
 export default function PageSignUp() {
   const router = useRouter();
@@ -51,7 +30,7 @@ export default function PageSignUp() {
     setMessage("");
     const normalizedEmail = email.trim().toLowerCase();
     if (!name.trim()) {
-      setError("Please enter your name.");
+      setError("Please enter your full name.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -64,12 +43,16 @@ export default function PageSignUp() {
       const res = await fetch(`${apiBase}/api/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, name: name.trim(), purpose: "signup" }),
+        body: JSON.stringify({
+          email: normalizedEmail,
+          name: name.trim(),
+          purpose: "signup",
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || data.error || "Could not send OTP.");
       setStep("otp");
-      setMessage("We sent a 6-digit OTP to your email.");
+      setMessage("We sent a 6-digit code to your email.");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -90,12 +73,16 @@ export default function PageSignUp() {
       const res = await fetch(`${apiBase}/api/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), purpose: "signup" }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          otp: otp.trim(),
+          purpose: "signup",
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || data.error || "Invalid OTP.");
 
-      const user = { ...data.user, username: data.user?.username || name.trim() };
+      const user = normalizeUserPayload({ ...data.user, username: data.user?.username || name.trim() });
       finishLogin(data.token, user);
     } catch (err) {
       setError((err as Error).message);
@@ -119,18 +106,13 @@ export default function PageSignUp() {
         Sign up
       </h1>
       <div className="mx-auto max-w-md space-y-6">
-        <a
-          href={`${apiBase}/api/google-login`}
-          onClick={(event) => {
-            if (window.location.hostname === "localhost") {
-              event.preventDefault();
-              setError("For local testing, please use email OTP signup. Google login uses production OAuth settings.");
-            }
-          }}
+        <button
+          type="button"
+          onClick={startGoogleLogin}
           className="flex w-full rounded-lg bg-primary-50 px-4 py-3 text-center text-sm font-medium text-neutral-700 transition-transform hover:-translate-y-0.5 sm:px-6 dark:bg-neutral-800 dark:text-neutral-300"
         >
           <span className="grow">Continue with Google</span>
-        </a>
+        </button>
 
         <div className="relative text-center">
           <span className="relative z-10 inline-block bg-white px-4 text-sm font-medium dark:bg-neutral-900 dark:text-neutral-400">
@@ -140,56 +122,60 @@ export default function PageSignUp() {
         </div>
 
         <form onSubmit={handleSubmit}>
-        <Fieldset>
-          <FieldGroup className="sm:space-y-6">
-            <Field>
-              <Label>Name</Label>
-              <Input
-                type="text"
-                name="name"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading || step === "otp"}
-              />
-            </Field>
-            <Field>
-              <Label>Email</Label>
-              <Input
-                type="email"
-                name="email"
-                placeholder="example@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading || step === "otp"}
-              />
-            </Field>
-
-            {step === "otp" && (
+          <Fieldset>
+            <FieldGroup className="sm:space-y-6">
               <Field>
-                <Label>OTP</Label>
+                <Label>Full name</Label>
                 <Input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  name="otp"
-                  placeholder="Enter 6-digit code"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  disabled={loading}
+                  name="name"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading || step === "otp"}
                 />
               </Field>
-            )}
+              <Field>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  placeholder="you@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading || step === "otp"}
+                />
+              </Field>
 
-            {message && <p className="text-sm text-emerald-600">{message}</p>}
-            {error && <p className="text-sm text-red-600">{error}</p>}
+              {step === "otp" && (
+                <Field>
+                  <Label>OTP</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    name="otp"
+                    placeholder="Enter 6-digit code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    disabled={loading}
+                  />
+                </Field>
+              )}
 
-            <ButtonPrimary className="mt-2 w-full" type="submit" disabled={loading}>
-              {loading ? "Please wait..." : step === "details" ? "Send OTP" : "Verify & Create Account"}
-            </ButtonPrimary>
-          </FieldGroup>
-        </Fieldset>
+              {message && <p className="text-sm text-emerald-600">{message}</p>}
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              <ButtonPrimary className="mt-2 w-full" type="submit" disabled={loading}>
+                {loading ? "Please wait..." : step === "details" ? "Send OTP" : "Create Account"}
+              </ButtonPrimary>
+            </FieldGroup>
+          </Fieldset>
         </form>
+
+        <p className="text-center text-xs text-neutral-500">
+          Delivery address is collected at checkout.
+        </p>
 
         <span className="block text-center text-sm text-neutral-700 dark:text-neutral-300">
           Already have an account?{" "}

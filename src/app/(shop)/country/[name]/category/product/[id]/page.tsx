@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, usePathname } from "next/navigation";
 
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
+import { addProductToCart, getUserEmail } from "@/lib/cart";
 
 /* ─────────────────────────────────────────────────────────────────
    TYPES
@@ -43,43 +44,13 @@ function parsePathParams(path: string): { country: string; id: string } {
   return { country: "", id: "" };
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   AUTH
-   ───────────────────────────────────────────────────────────────── */
-function getUserEmail(): string | null {
-  try {
-    const raw = localStorage.getItem("floriva_user");
-    if (raw) { const p = JSON.parse(raw); if (p?.email) return p.email; }
-    const tok = localStorage.getItem("floriva_token");
-    if (tok) {
-      const parts = tok.split(".");
-      if (parts.length === 3) {
-        const p = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-        if (p?.email) return p.email;
-      }
-    }
-    return null;
-  } catch { return null; }
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   ADD TO CART
-   ───────────────────────────────────────────────────────────────── */
-async function addToCartAPI(productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
-  const userEmail = getUserEmail();
-  if (!userEmail) return { ok: false, message: "Please log in to add items to cart." };
-  try {
-    const res = await fetch(`${BASE}/api/addtocart`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, userEmail, quantity }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, message: data?.message ?? `Failed (${res.status})` };
-    return { ok: true, message: data?.message ?? "Added to cart!" };
-  } catch {
-    return { ok: false, message: "Network error. Try again." };
-  }
+async function addToCartAPI(
+  productId: string,
+  quantity: number,
+  product?: Product,
+): Promise<{ ok: boolean; message: string; requiresLogin?: boolean }> {
+  const result = await addProductToCart(productId, quantity, product);
+  return { ok: result.ok, message: result.message, requiresLogin: result.requiresLogin };
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -351,7 +322,7 @@ export default function ProductDetailPage() {
     if (!product || cartLoading) return;
     if (!getUserEmail()) { pushToast("Please log in to add items to your cart.", "error"); return; }
     setCartLoading(true);
-    const res = await addToCartAPI(product._id, qty);
+    const res = await addToCartAPI(product._id, qty, product);
     setCartLoading(false);
     if (res.ok) {
       setCartAdded(true);
@@ -359,6 +330,10 @@ export default function ProductDetailPage() {
         ? res.message : `🛍️ Added to cart! (Qty: ${qty})`, "success");
       setTimeout(() => setCartAdded(false), 2800);
     } else {
+      if (res.requiresLogin) {
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
       pushToast(res.message || "Could not add to cart.", "error");
     }
   };
