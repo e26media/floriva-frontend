@@ -1,6 +1,7 @@
 'use client'
 
 import { addProductToCart } from '@/lib/cart'
+import { fetchJsonCached } from '@/lib/apiCache'
 import Heading from '@/components/Heading/Heading'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
@@ -975,9 +976,7 @@ const CountryBestSellers: FC<BestSellersProps> = ({
         if (!isBackground) setLoading(true)
         setError(null)
 
-        const res = await fetch(apiUrl, { cache: 'no-store' })
-        if (!res.ok) throw new Error(`Server error ${res.status}`)
-        const json = await res.json()
+        const json = await fetchJsonCached<unknown>(apiUrl, 60_000)
 
         // API returns { data: [...] } or bare array
         const all: TApiProduct[] = Array.isArray(json)

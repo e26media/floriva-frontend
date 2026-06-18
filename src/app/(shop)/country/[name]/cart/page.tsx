@@ -68,7 +68,7 @@ const COUNTRY_URL  = (id: string)    => `${BASE}/api/allCountries/${id}`;
 const ALL_COUNTRIES_URL = `${BASE}/api/allCountries`;
 const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 
-const REFRESH_INTERVAL = 5000;
+const REFRESH_INTERVAL = 0;
 
 // Using shared currency utility
 
@@ -394,10 +394,12 @@ function CartItemCard({
     let cancelled = false;
     setMetaLoading(true);
 
+    const countryLabel = extractDirectName(p?.country) || currentCountry;
+
     Promise.all([
       resolveColor(p?.color),
       resolveCategory(p?.category),
-      resolveCountry(p?.country),
+      Promise.resolve({ id: '', name: countryLabel }),
     ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
       const countryName = countryResult.name;
@@ -931,16 +933,32 @@ export default function CartPage() {
     } catch { /* silent */ }
   }, [isValidCountry]);
 
-  // ── Initial load ────────────────────────────────────────────────────────────
+  // ── Initial load (start cart fetch immediately; filter when country resolves) ─
   useEffect(() => {
-    if (userEmail && !isValidating && isValidCountry) {
+    if (userEmail) {
       fetchCart(userEmail);
     }
-  }, [userEmail, fetchCart, isValidating, isValidCountry]);
+  }, [userEmail, fetchCart]);
 
-  // ── Auto-refresh ────────────────────────────────────────────────────────────
+  // ── Refresh when user returns to tab ─────────────────────────────────────────
   useEffect(() => {
     if (!userEmail || !isValidCountry) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        silentFetch(userEmail);
+      }
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [userEmail, silentFetch, isValidCountry]);
+
+  // ── Auto-refresh (disabled when REFRESH_INTERVAL is 0) ─────────────────────
+  useEffect(() => {
+    if (!userEmail || !isValidCountry || REFRESH_INTERVAL <= 0) return;
     intervalRef.current = setInterval(() => silentFetch(userEmail), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [userEmail, silentFetch, isValidCountry]);

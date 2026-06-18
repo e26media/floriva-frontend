@@ -1,16 +1,22 @@
 "use client";
 
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
-import StripePaymentForm from "@/components/StripePaymentForm";
+import { getAuthHeaders } from "@/lib/auth";
+import { getUserCartKey } from "@/lib/cart";
 
-// Initialize Stripe outside of the component to prevent multiple initializations
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "");
+const StripeCheckoutBlock = dynamic(() => import("@/components/StripeCheckoutBlock"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-4 text-sm text-neutral-500">
+      Loading secure payment…
+    </div>
+  ),
+});
 
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
 
@@ -492,6 +498,7 @@ function CheckoutPageContent() {
   const { symbol: currencySymbol, code: currency } = getCurrencyForCountry(countrySlug);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartLoading, setCartLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -510,16 +517,44 @@ function CheckoutPageContent() {
       : "",
   });
 
-  // ── Load cart from sessionStorage + prefill user email / name ─────────────
+  // ── Load cart from sessionStorage, or fetch from API as fallback ───────────
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("checkout_data");
-      if (raw) {
-        const data = JSON.parse(raw) as { items?: CartItem[] };
-        setCartItems(data.items ?? []);
-      }
-    } catch { /* ignore */ }
+    let cancelled = false;
 
+    async function loadCart() {
+      try {
+        const raw = sessionStorage.getItem("checkout_data");
+        if (raw) {
+          const data = JSON.parse(raw) as { items?: CartItem[] };
+          if (data.items?.length) {
+            if (!cancelled) setCartItems(data.items);
+            return;
+          }
+        }
+
+        const cartKey = getUserCartKey();
+        if (!cartKey) return;
+
+        const res = await fetch(`${BASE_URL}/api/view/${encodeURIComponent(cartKey)}`, {
+          headers: getAuthHeaders(),
+          credentials: "include",
+        });
+        const json = (await res.json()) as { success?: boolean; data?: CartItem[] };
+        if (!cancelled && res.ok && json.success && Array.isArray(json.data)) {
+          setCartItems(json.data);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setCartLoading(false);
+      }
+    }
+
+    loadCart();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     const user = getUserData();
     setForm((f) => ({
       ...f,
@@ -716,6 +751,14 @@ function CheckoutPageContent() {
           />
         </main>
         <Toast t={toast} />
+      </div>
+    );
+  }
+
+  if (cartLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+        <CheckoutLoadingFallback />
       </div>
     );
   }
@@ -1034,15 +1077,13 @@ function CheckoutPageContent() {
                 {/* Interactive Submit Area */}
                 <div className="px-6 pb-6">
                   {paymentMethod === "online" && clientSecret ? (
-                    /* The Real Stripe Payment Form */
-                    <Elements stripe={stripePromise} options={{ clientSecret }}>
-                      <StripePaymentForm 
-                        totalAmount={subtotal} 
-                        currencySymbol={currencySymbol} 
-                        onSuccess={handleStripeSuccess}
-                        onError={(msg) => showToast(msg, "error")}
-                      />
-                    </Elements>
+                    <StripeCheckoutBlock
+                      clientSecret={clientSecret}
+                      totalAmount={subtotal}
+                      currencySymbol={currencySymbol}
+                      onSuccess={handleStripeSuccess}
+                      onError={(msg) => showToast(msg, "error")}
+                    />
                   ) : (
                     /* Normal Submit Button (shows "Proceed" for online, "Place" for COD) */
                     <button

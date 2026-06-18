@@ -71,7 +71,7 @@ const COUNTRY_URL  = (id: string)    => `${BASE}/api/allCountries/${id}`;
 const ALL_COUNTRIES_URL = `${BASE}/api/allCountries`;
 const IMAGE_BASE   = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
 
-const REFRESH_INTERVAL = 5000;
+const REFRESH_INTERVAL = 0;
 
 // =============================================================================
 //  GENERIC HELPERS
@@ -360,7 +360,7 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove, onM
     Promise.all([
       resolveColor(p?.color),
       resolveCategory(p?.category),
-      resolveCountry(p?.country),
+      Promise.resolve({ id: '', name: 'India' }),
     ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
       const resolved: ResolvedMeta = {
@@ -812,16 +812,32 @@ export default function CartPage() {
     } catch { /* silent */ }
   }, []);
 
-  // ── Load cart once user email + India ID are ready ──────────────────────────
+  // ── Load cart once user email is ready (don't wait for country ID lookup) ───
   useEffect(() => {
-    if (userEmail && !isResolvingId) {
+    if (userEmail) {
       fetchCart(userEmail);
     }
-  }, [userEmail, fetchCart, isResolvingId]);
+  }, [userEmail, fetchCart]);
 
-  // ── Auto-refresh ────────────────────────────────────────────────────────────
+  // ── Refresh when user returns to tab (no constant polling) ─────────────────
   useEffect(() => {
     if (!userEmail) return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        silentFetch(userEmail);
+      }
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [userEmail, silentFetch]);
+
+  // ── Auto-refresh (disabled when REFRESH_INTERVAL is 0) ─────────────────────
+  useEffect(() => {
+    if (!userEmail || REFRESH_INTERVAL <= 0) return;
     intervalRef.current = setInterval(() => silentFetch(userEmail), REFRESH_INTERVAL);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [userEmail, silentFetch]);
@@ -901,7 +917,7 @@ export default function CartPage() {
   const totalItems = filteredItems.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
 
   // ── Loading state (resolving India ID or fetching cart) ─────────────────────
-  if (isResolvingId || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">

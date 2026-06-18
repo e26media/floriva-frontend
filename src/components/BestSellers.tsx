@@ -2,6 +2,7 @@
 
 import Heading from '@/components/Heading/Heading'
 import { addProductToCart } from '@/lib/cart'
+import { fetchJsonCached } from '@/lib/apiCache'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
 import useEmblaCarousel from 'embla-carousel-react'
@@ -42,7 +43,7 @@ import { formatPrice } from '@/utils/currency'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL           = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
-const POLL_INTERVAL      = 30_000
+const POLL_INTERVAL      = 0
 const BEST_SELLERS_LABEL = 'Best Seller'
 
 
@@ -757,9 +758,7 @@ const BestSellers: FC<BestSellersProps> = ({
       setError(null)
 
       const currentApiUrl = `${BASE_URL}/api/countrywise?country=${countrySlug}`
-      const res = await fetch(currentApiUrl, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      const json = await res.json()
+      const json = await fetchJsonCached<unknown>(currentApiUrl, 60_000)
 
       const all: TApiProduct[] = Array.isArray(json)
         ? json
