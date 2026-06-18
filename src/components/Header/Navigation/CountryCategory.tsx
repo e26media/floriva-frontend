@@ -32,7 +32,7 @@ const API_URL =
     ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/categoryview`
     : 'http://localhost:7000/api/categoryview'
 
-const POLL_INTERVAL = 30_000
+const POLL_INTERVAL = 0
 
 // ─── Helper: build correct href ───────────────────────────────────────────────
 

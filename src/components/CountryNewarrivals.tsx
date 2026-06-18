@@ -41,7 +41,7 @@ export interface TApiProduct {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
-const POLL_INTERVAL = 30_000
+const POLL_INTERVAL = 0
 const NEW_ARRIVALS_LABEL = 'New Arrivals' // Changed from 'Best Seller' to 'New Arrivals'
 
 import { formatPrice } from '@/utils/currency'

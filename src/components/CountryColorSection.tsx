@@ -43,7 +43,7 @@ export interface TApiProduct {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
-const POLL_INTERVAL = 30_000
+const POLL_INTERVAL = 0
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Country extraction — reads from params synchronously (no async useEffect)

@@ -29,7 +29,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000"
 const API_URL = `${BASE_URL}/api/categoryview`;
 
 /** Re-fetch interval in ms (30 s). Set to 0 to disable polling. */
-const POLL_INTERVAL = 30_000
+const POLL_INTERVAL = 0
 
 // ─── Sub-item link ─────────────────────────────────────────────────────────────
 

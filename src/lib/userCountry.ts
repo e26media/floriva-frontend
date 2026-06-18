@@ -1,5 +1,5 @@
 export const STORAGE_KEY = 'floriva_selected_country';
-export const DEFAULT_COUNTRY_SLUG = 'australia';
+export const DEFAULT_COUNTRY_SLUG = 'india';
 export const SUPPORTED_COUNTRY_SLUGS = ['india', 'australia'] as const;
 
 export type StoreCountrySlug = (typeof SUPPORTED_COUNTRY_SLUGS)[number];
@@ -49,6 +49,27 @@ export function capitalize(str: string): string {
   return capitalizeCountry(str);
 }
 
+export function guessCountryFromClient(): StoreCountrySlug {
+  if (typeof window === 'undefined') return DEFAULT_COUNTRY_SLUG;
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (/Australia/i.test(tz)) return 'australia';
+    if (/Asia|India|Kolkata|Calcutta|Colombo|Dhaka|Karachi|Singapore|Bangkok/i.test(tz)) {
+      return 'india';
+    }
+    const lang = navigator.language || '';
+    if (/en-AU|au/i.test(lang)) return 'australia';
+    if (/en-IN|hi-IN|in/i.test(lang)) return 'india';
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_COUNTRY_SLUG;
+}
+
+function fallbackCountrySlug(): StoreCountrySlug {
+  return guessCountryFromClient();
+}
+
 export function getStoredUser(): { email?: string; username?: string; countrySlug?: string } | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -79,11 +100,11 @@ export function getSelectedCountrySlug(): StoreCountrySlug {
 
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return DEFAULT_COUNTRY_SLUG;
+    if (!saved) return fallbackCountrySlug();
     const parsed = JSON.parse(saved);
-    return normalizeCountrySlug(parsed?.country?.name) || DEFAULT_COUNTRY_SLUG;
+    return normalizeCountrySlug(parsed?.country?.name) || fallbackCountrySlug();
   } catch {
-    return DEFAULT_COUNTRY_SLUG;
+    return fallbackCountrySlug();
   }
 }
 
@@ -115,7 +136,7 @@ export async function detectCountryFromGeo(): Promise<{
   try {
     const res = await fetch(`${API_BASE}/api/geo/detect`);
     const json = await res.json();
-    const slug = normalizeCountrySlug(json.countrySlug) || DEFAULT_COUNTRY_SLUG;
+    const slug = normalizeCountrySlug(json.countrySlug) || fallbackCountrySlug();
     if (json.country?._id) {
       return { countrySlug: slug, country: json.country };
     }
@@ -123,7 +144,7 @@ export async function detectCountryFromGeo(): Promise<{
     const match = countries.find((c) => normalizeCountrySlug(c.name) === slug);
     return { countrySlug: slug, country: match || null };
   } catch {
-    return { countrySlug: DEFAULT_COUNTRY_SLUG, country: null };
+    return { countrySlug: fallbackCountrySlug(), country: null };
   }
 }
 
@@ -148,16 +169,62 @@ export async function applyCountrySlug(
   return persistSelectedCountry(match, '', locked);
 }
 
+export async function syncCountryFromServer(): Promise<StoreCountrySlug | null> {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('floriva_token');
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/sync-country`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const slug = normalizeCountrySlug(json.countrySlug);
+    if (!slug) return null;
+
+    const user = getStoredUser() || {};
+    localStorage.setItem(
+      'floriva_user',
+      JSON.stringify({ ...user, countrySlug: slug }),
+    );
+
+    if (json.country?._id) {
+      persistSelectedCountry(json.country, '', true);
+    } else {
+      await applyCountrySlug(slug, true);
+    }
+
+    window.dispatchEvent(new Event('floriva_country_changed'));
+    return slug;
+  } catch {
+    return null;
+  }
+}
+
 export async function syncCountryForUser(user: { countrySlug?: string | null }) {
   const slug = normalizeCountrySlug(user?.countrySlug);
-  if (!slug) return null;
+  if (!slug) return syncCountryFromServer();
   return applyCountrySlug(slug, true);
 }
 
 export async function initializeVisitorCountry() {
   if (isLoggedIn()) {
-    const slug = getUserCountrySlug();
-    if (slug) return applyCountrySlug(slug, true);
+    let slug = getUserCountrySlug();
+    if (!slug) {
+      slug = await syncCountryFromServer();
+    }
+    if (slug) {
+      return applyCountrySlug(slug, true);
+    }
+
+    const detected = await detectCountryFromGeo();
+    if (detected.country) {
+      return persistSelectedCountry(detected.country, '', true);
+    }
+    return applyCountrySlug(detected.countrySlug, true);
   }
 
   const existing = getSelectedCountryData();
@@ -167,9 +234,9 @@ export async function initializeVisitorCountry() {
 
   const detected = await detectCountryFromGeo();
   if (detected.country) {
-    return persistSelectedCountry(detected.country, '', isLoggedIn());
+    return persistSelectedCountry(detected.country, '', false);
   }
-  return null;
+  return applyCountrySlug(detected.countrySlug, false);
 }
 
 export function canAccessCountry(pathCountrySlug: string): boolean {
