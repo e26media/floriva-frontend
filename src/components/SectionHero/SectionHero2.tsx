@@ -14,8 +14,10 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { useSwipeable } from 'react-swipeable'
 import { useInterval } from 'react-use'
 
-/** Served from /public — no Next.js image optimization or recompression */
+/** Served from /public — desktop hero */
 const HERO_BANNER_SRC = '/images/hero-banner.png'
+/** Mobile-only hero (portrait gift box banner) */
+const HERO_MOBILE_BANNER_SRC = '/images/hero-mobile-banner.png'
 const HERO_BANNER_WIDTH = 1024
 const HERO_BANNER_HEIGHT = 384
 
@@ -148,42 +150,21 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
         isActive ? 'block' : 'hidden'
       )}
     >
-      <div className="relative min-h-[520px] overflow-hidden bg-[#fff2f6] px-5 pb-8 pt-8 sm:min-h-[580px] sm:px-8 md:hidden">
+      <Link
+        href={href}
+        className="relative block w-full overflow-hidden md:hidden"
+        aria-label={item.btnText}
+        title={item.imageTitle || undefined}
+      >
         <img
-          src={item.imageUrl}
-          alt=""
-          aria-hidden="true"
+          src={HERO_MOBILE_BANNER_SRC}
+          alt={alt}
           loading="eager"
+          fetchPriority="high"
           decoding="async"
-          className="absolute inset-0 h-full w-full scale-105 object-cover object-[72%_center]"
+          className="block h-auto w-full object-contain object-top"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,246,248,0.99)_0%,rgba(255,246,248,0.94)_43%,rgba(255,246,248,0.48)_68%,rgba(255,246,248,0.06)_100%)]" />
-        <div className="relative z-10 flex min-h-[470px] max-w-[300px] flex-col justify-center sm:max-w-[340px]">
-          <div className="mb-3 flex items-center gap-3 text-[#7C4CA3]">
-            <span className="h-px w-12 bg-current opacity-35" />
-            <span className="h-2.5 w-2.5 rounded-full border border-current" />
-            <span className="h-px w-12 bg-current opacity-35" />
-          </div>
-          {item.subHeading && (
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[#7c348b] sm:text-sm">
-              {stripHtml(item.subHeading)}
-            </p>
-          )}
-          <h1
-            className="max-w-[280px] text-[2.7rem] font-semibold leading-[0.96] tracking-[-0.04em] text-[#7b2b86] sm:max-w-[330px] sm:text-[3.35rem]"
-            dangerouslySetInnerHTML={{ __html: item.heading }}
-          />
-          {item.imageDescription && (
-            <p className="mt-5 max-w-[250px] text-sm leading-6 text-[#7b3f83] sm:max-w-[290px] sm:text-base">
-              {stripHtml(item.imageDescription)}
-            </p>
-          )}
-          <ButtonPrimary className="mt-6 w-fit shadow-lg shadow-[#7C4CA3]/20" href={href}>
-            <span className="me-2">{item.btnText}</span>
-            <HugeiconsIcon icon={Search01Icon} size={18} />
-          </ButtonPrimary>
-        </div>
-      </div>
+      </Link>
 
       <Link href={href} className="hidden w-full md:block" aria-label={item.btnText} title={item.imageTitle || undefined}>
         <div className="relative w-full overflow-hidden md:overflow-visible">
