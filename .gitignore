@@ -27,6 +27,10 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.production
+
+# local design drafts (production assets live in public/images/)
+/assets/design-previews/
 
 # vercel
 .vercel
