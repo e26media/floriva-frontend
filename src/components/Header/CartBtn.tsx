@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { ShoppingCart02Icon, Store02Icon } from '@hugeicons/core-free-icons'
+import { Store02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import CartIconButton from './CartIconButton'
+import { getCartHref } from '@/lib/cartState'
 import { useRouter, useParams } from 'next/navigation'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
@@ -452,11 +454,9 @@ export default function CartBtn() {
   const [showVendorPopup, setShowVendorPopup] = useState(false)
 
   const handleCartClick = () => {
-    // 1. Check URL params first
     let countryName = params?.name as string | undefined
     if (params?.country) countryName = params.country as string
 
-    // 2. Fallback to localStorage
     if (!countryName && typeof window !== 'undefined') {
       const saved = localStorage.getItem('floriva_selected_country')
       if (saved) {
@@ -467,22 +467,12 @@ export default function CartBtn() {
       }
     }
 
-    if (countryName) {
-      router.push(`/country/${countryName.toLowerCase()}/cart`)
-    } else {
-      router.push('/cart')
-    }
+    router.push(getCartHref(countryName))
   }
 
   return (
     <>
-      <button
-        onClick={handleCartClick}
-        title="Cart"
-        className="relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800"
-      >
-        <HugeiconsIcon icon={ShoppingCart02Icon} size={24} color="currentColor" strokeWidth={1.5} />
-      </button>
+      <CartIconButton onClick={handleCartClick} />
 
       <button
         onClick={() => setShowVendorPopup(true)}

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
 import { addProductToCart, getUserEmail } from "@/lib/cart";
+import { getCartHref } from "@/lib/cartState";
+import { useProductInCart } from "@/hooks/useProductInCart";
 
 /* ─────────────────────────────────────────────────────────────────
    TYPES
@@ -231,7 +233,10 @@ export default function ProductDetailPage() {
   const [imgIdx,      setImgIdx]      = useState(0);
   const [qty,         setQty]         = useState(1);
   const [cartLoading, setCartLoading] = useState(false);
-  const [cartAdded,   setCartAdded]   = useState(false);
+
+  const router = useRouter();
+  const inCart = useProductInCart(product?._id);
+  const goToCart = inCart;
   const [toasts,      setToasts]      = useState<IToast[]>([]);
   const [shared,      setShared]      = useState(false);
   const [zoom,        setZoom]        = useState(false);
@@ -320,15 +325,19 @@ export default function ProductDetailPage() {
   /* ── Add to cart ── */
   const handleAddToCart = async () => {
     if (!product || cartLoading) return;
+
+    if (goToCart) {
+      router.push(getCartHref(country));
+      return;
+    }
+
     if (!getUserEmail()) { pushToast("Please log in to add items to your cart.", "error"); return; }
     setCartLoading(true);
     const res = await addToCartAPI(product._id, qty, product);
     setCartLoading(false);
     if (res.ok) {
-      setCartAdded(true);
       pushToast(res.message && res.message !== "Added to cart!"
         ? res.message : `🛍️ Added to cart! (Qty: ${qty})`, "success");
-      setTimeout(() => setCartAdded(false), 2800);
     } else {
       if (res.requiresLogin) {
         window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
@@ -610,11 +619,11 @@ ${rawDebug}`}
                 {/* Add to cart button */}
                 <button
                   onClick={handleAddToCart}
-                  disabled={cartLoading || cartAdded}
+                  disabled={cartLoading}
                   className="flex-1 min-w-[170px] h-[52px] rounded-2xl border-none font-bold text-[0.93rem] tracking-wide flex items-center justify-center gap-2.5 text-amber-50 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0"
                   style={{
-                    background: cartAdded?"#16a34a":cartLoading?"#6b7280":"#1c1410",
-                    boxShadow: cartAdded?"0 8px 28px rgba(22,163,74,.35)":cartLoading?"none":"0 6px 24px rgba(28,20,16,.22)",
+                    background: goToCart?"#EA5A7B":cartLoading?"#6b7280":"#1c1410",
+                    boxShadow: goToCart?"0 8px 28px rgba(234,90,123,.35)":cartLoading?"none":"0 6px 24px rgba(28,20,16,.22)",
                   }}
                 >
                   {cartLoading ? (
@@ -625,12 +634,13 @@ ${rawDebug}`}
                       </svg>
                       Adding…
                     </>
-                  ) : cartAdded ? (
+                  ) : goToCart ? (
                     <>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M20 6L9 17l-5-5"/>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                       </svg>
-                      Added to Cart!
+                      Go to Cart
                     </>
                   ) : (
                     <>

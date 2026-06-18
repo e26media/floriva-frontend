@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { formatPrice as sharedFormatPrice, getCurrencyForCountry } from "@/utils/currency";
 import { getAuthHeaders } from "@/lib/auth";
+import { fetchJsonCached, normalizeApiList } from "@/lib/apiCache";
+import { syncCartState } from "@/lib/cartState";
 
 // =============================================================================
 //  TYPES
@@ -392,26 +394,43 @@ function CartItemCard({
 
   useEffect(() => {
     let cancelled = false;
-    setMetaLoading(true);
-
     const countryLabel = extractDirectName(p?.country) || currentCountry;
+    const syncColor = extractDirectName(p?.color);
+    const syncCategory = extractDirectName(p?.category);
+    const { symbol: currencySymbol, code: currencyCode } = getCurrencyForCountry(currentCountry);
+
+    if (syncCategory) {
+      const resolved: ResolvedMeta = {
+        colorName: syncColor || "",
+        categoryName: syncCategory,
+        countryName: countryLabel,
+        countryId: extractId(p?.country) || "",
+        currencySymbol,
+        currencyCode,
+      };
+      setMeta(resolved);
+      setMetaLoading(false);
+      onMetaResolved(cartId, resolved);
+      if (syncColor) return () => { cancelled = true; };
+    } else {
+      setMetaLoading(true);
+    }
 
     Promise.all([
-      resolveColor(p?.color),
-      resolveCategory(p?.category),
-      Promise.resolve({ id: '', name: countryLabel }),
+      syncColor ? Promise.resolve(syncColor) : resolveColor(p?.color),
+      syncCategory ? Promise.resolve(syncCategory) : resolveCategory(p?.category),
+      Promise.resolve({ id: extractId(p?.country) || "", name: countryLabel }),
     ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
       const countryName = countryResult.name;
       const countryId = countryResult.id;
-      const { symbol: currencySymbol, code: currencyCode } = getCurrencyForCountry(currentCountry);
-      const resolved: ResolvedMeta = { 
-        colorName, 
-        categoryName, 
-        countryName, 
+      const resolved: ResolvedMeta = {
+        colorName,
+        categoryName,
+        countryName,
         countryId,
-        currencySymbol, 
-        currencyCode 
+        currencySymbol,
+        currencyCode,
       };
       setMeta(resolved);
       setMetaLoading(false);
@@ -789,7 +808,7 @@ export default function CartPage() {
   const [currentCountry, setCurrentCountry] = useState<string>(urlCountry);
   const [countryId,      setCountryId]      = useState<string>("");
   const [isValidCountry, setIsValidCountry] = useState<boolean>(true);
-  const [isValidating,   setIsValidating]   = useState<boolean>(true);
+  const [isValidating,   setIsValidating]   = useState<boolean>(false);
 
   const [userEmail,     setUserEmail]     = useState<string>("");
   const [cartItems,     setCartItems]     = useState<CartItem[]>([]);
@@ -829,42 +848,38 @@ export default function CartPage() {
     if (!currentCountry) {
       setIsValidating(false);
       setIsValidCountry(false);
-      setLoading(false);
       return;
     }
+
+    let cancelled = false;
 
     const validateCountry = async () => {
       setIsValidating(true);
       try {
-        const res = await fetch(ALL_COUNTRIES_URL);
-        if (!res.ok) {
-          setIsValidCountry(false);
-          setIsValidating(false);
-          return;
-        }
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          const found = json.data.find(
-            (c: { name?: string; _id?: string }) =>
-              c.name?.toLowerCase() === currentCountry.toLowerCase()
-          );
-          if (found?._id) {
-            setCountryId(found._id);
-            setIsValidCountry(true);
-          } else {
-            setIsValidCountry(false);
-          }
+        const json = await fetchJsonCached<{ success?: boolean; data?: { name?: string; _id?: string }[] }>(
+          ALL_COUNTRIES_URL,
+          120_000,
+        );
+        if (cancelled) return;
+        const countries = normalizeApiList<{ name?: string; _id?: string }>(json?.data ?? json);
+        const found = countries.find(
+          (c) => c.name?.toLowerCase() === currentCountry.toLowerCase(),
+        );
+        if (found?._id) {
+          setCountryId(found._id);
+          setIsValidCountry(true);
         } else {
           setIsValidCountry(false);
         }
       } catch {
-        setIsValidCountry(false);
+        if (!cancelled) setIsValidCountry(true);
       } finally {
-        setIsValidating(false);
+        if (!cancelled) setIsValidating(false);
       }
     };
 
     validateCountry();
+    return () => { cancelled = true; };
   }, [currentCountry]);
 
   const showToast = useCallback((message: string, type: ToastState["type"] = "success") => {
@@ -878,27 +893,19 @@ export default function CartPage() {
 
   // ── Filter items: only show products belonging to the URL country ───────────
   const filterItemsByCountry = useCallback((items: CartItem[]) => {
-    if (!currentCountry || !countryId) return [];
+    if (!currentCountry) return [];
 
     return items.filter((item) => {
       const productCountry = item.productId?.country;
       if (!productCountry) return false;
 
-      let productCountryId   = "";
-      let productCountryName = "";
-
-      if (typeof productCountry === "string") {
-        productCountryId = productCountry;
-      } else {
-        if (productCountry._id)  productCountryId   = productCountry._id;
-        if (productCountry.name) productCountryName = productCountry.name.toLowerCase();
-      }
-
-      // Match by resolved MongoDB _id
-      if (countryId && productCountryId === countryId) return true;
-
-      // Fallback: match by name
+      const productCountryName = extractDirectName(productCountry)?.toLowerCase();
       if (productCountryName && productCountryName === currentCountry.toLowerCase()) return true;
+
+      if (countryId) {
+        const productCountryId = extractId(productCountry);
+        if (productCountryId && productCountryId === countryId) return true;
+      }
 
       return false;
     });
@@ -906,7 +913,7 @@ export default function CartPage() {
 
   // ── Full cart fetch ──────────────────────────────────────────────────────────
   const fetchCart = useCallback(async (email: string) => {
-    if (!email || !isValidCountry) return;
+    if (!email) return;
     setLoading(true);
     try {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
@@ -919,11 +926,11 @@ export default function CartPage() {
     } finally {
       setLoading(false);
     }
-  }, [showToast, isValidCountry]);
+  }, [showToast]);
 
   // ── Silent background refresh ───────────────────────────────────────────────
   const silentFetch = useCallback(async (email: string) => {
-    if (!email || isMutating.current || !isValidCountry) return;
+    if (!email || isMutating.current) return;
     try {
       const { ok, status, json } = await apiFetch(VIEW_URL(email));
       if (!ok) throw new Error((json.message as string) ?? `HTTP ${status}`);
@@ -931,12 +938,13 @@ export default function CartPage() {
         setCartItems(json.data as CartItem[]);
       }
     } catch { /* silent */ }
-  }, [isValidCountry]);
+  }, []);
 
   // ── Initial load (start cart fetch immediately; filter when country resolves) ─
   useEffect(() => {
     if (userEmail) {
       fetchCart(userEmail);
+      syncCartState().catch(() => {});
     }
   }, [userEmail, fetchCart]);
 
@@ -965,12 +973,12 @@ export default function CartPage() {
 
   // ── Re-filter whenever items or country resolution changes ──────────────────
   useEffect(() => {
-    if (cartItems.length > 0 && isValidCountry) {
+    if (cartItems.length > 0) {
       setFilteredItems(filterItemsByCountry(cartItems));
     } else {
       setFilteredItems([]);
     }
-  }, [cartItems, filterItemsByCountry, isValidCountry]);
+  }, [cartItems, filterItemsByCountry]);
 
   // ── Update quantity ─────────────────────────────────────────────────────────
   const handleUpdateQty = useCallback(async (cartId: string, newQty: number) => {
@@ -1049,19 +1057,8 @@ export default function CartPage() {
     ? currentCountry.charAt(0).toUpperCase() + currentCountry.slice(1)
     : "";
 
-  // ── Show validation state while checking country ───────────────────────────
-  if (isValidating) {
-    return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
-        <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-          <CartSkeleton />
-        </main>
-      </div>
-    );
-  }
-
-  // ── If country is invalid, show error ───────────────────────────────────────
-  if (!isValidCountry) {
+  // ── Show invalid country only after validation completes ─────────────────────
+  if (!isValidating && !isValidCountry && currentCountry) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
         <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">

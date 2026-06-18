@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getAuthHeaders } from "@/lib/auth";
+import { syncCartState } from "@/lib/cartState";
 
 // =============================================================================
 //  CONSTANTS — hardcoded to India only
@@ -356,11 +357,30 @@ function CartItemCard({ item, isUpdating, isRemoving, onUpdateQty, onRemove, onM
 
   useEffect(() => {
     let cancelled = false;
-    setMetaLoading(true);
+    const syncColor = extractDirectName(p?.color);
+    const syncCategory = extractDirectName(p?.category);
+
+    if (syncCategory) {
+      const resolved: ResolvedMeta = {
+        colorName: syncColor || "",
+        categoryName: syncCategory,
+        countryName: extractDirectName(p?.country) || "India",
+        countryId: extractId(p?.country) || "",
+        currencySymbol: INDIA_CURRENCY.symbol,
+        currencyCode: INDIA_CURRENCY.code,
+      };
+      setMeta(resolved);
+      setMetaLoading(false);
+      onMetaResolved(cartId, resolved);
+      if (syncColor) return () => { cancelled = true; };
+    } else {
+      setMetaLoading(true);
+    }
+
     Promise.all([
-      resolveColor(p?.color),
-      resolveCategory(p?.category),
-      Promise.resolve({ id: '', name: 'India' }),
+      syncColor ? Promise.resolve(syncColor) : resolveColor(p?.color),
+      syncCategory ? Promise.resolve(syncCategory) : resolveCategory(p?.category),
+      Promise.resolve({ id: extractId(p?.country) || "", name: extractDirectName(p?.country) || "India" }),
     ]).then(([colorName, categoryName, countryResult]) => {
       if (cancelled) return;
       const resolved: ResolvedMeta = {
@@ -816,6 +836,7 @@ export default function CartPage() {
   useEffect(() => {
     if (userEmail) {
       fetchCart(userEmail);
+      syncCartState().catch(() => {});
     }
   }, [userEmail, fetchCart]);
 

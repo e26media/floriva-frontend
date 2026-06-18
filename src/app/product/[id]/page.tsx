@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatPrice, getCurrencyForCountry } from "@/utils/currency";
 import { addProductToCart, getUserEmail } from "@/lib/cart";
+import { getCartHref } from "@/lib/cartState";
+import { useProductInCart } from "@/hooks/useProductInCart";
 
 /* ─────────────────────────────────────────────────────────────────
    TYPES
@@ -344,7 +346,9 @@ export default function ProductDetailPage() {
   const [qty,      setQty]      = useState(1);
 
   const [cartLoading, setCartLoading] = useState(false);
-  const [cartAdded,   setCartAdded]   = useState(false);
+
+  const inCart = useProductInCart(product?._id);
+  const goToCart = inCart;
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
@@ -500,6 +504,12 @@ export default function ProductDetailPage() {
   const handleAddToCart = async () => {
     if (!product || cartLoading) return;
 
+    if (goToCart) {
+      const cartCountry = getProductCountry(product) || selectedCountry || "india";
+      router.push(getCartHref(cartCountry));
+      return;
+    }
+
     const userEmail = getUserEmail();
     if (!userEmail) {
       pushToast("Please log in to add items to your cart.", "error");
@@ -513,14 +523,12 @@ export default function ProductDetailPage() {
     setCartLoading(false);
 
     if (result.ok) {
-      setCartAdded(true);
       pushToast(
         result.message && result.message !== "Product added to cart!"
           ? result.message
           : `🛍️ Product added to cart! (Qty: ${qty})`,
         "success"
       );
-      setTimeout(() => setCartAdded(false), 2800);
     } else {
       if (result.requiresLogin) {
         window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
@@ -589,7 +597,7 @@ export default function ProductDetailPage() {
   const hexCol = COLOR_HEX[product.color?.name?.toLowerCase()] ?? "#d4c5b0";
   const imgs   = product.images ?? [];
 
-  const cartBtnDisabled = cartLoading || cartAdded;
+  const cartBtnDisabled = cartLoading;
 
   /* ══════════ RENDER ══════════ */
   return (
@@ -818,9 +826,9 @@ export default function ProductDetailPage() {
                   disabled={cartBtnDisabled}
                   className="flex-1 min-w-[170px] h-[52px] rounded-2xl border-none font-bold text-[0.93rem] tracking-wide flex items-center justify-center gap-2.5 text-amber-50 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0"
                   style={{
-                    background: cartAdded ? "#16a34a" : cartLoading ? "#6b7280" : "#1c1410",
-                    boxShadow: cartAdded
-                      ? "0 8px 28px rgba(22,163,74,.35)"
+                    background: goToCart ? "#EA5A7B" : cartLoading ? "#6b7280" : "#1c1410",
+                    boxShadow: goToCart
+                      ? "0 8px 28px rgba(234,90,123,.35)"
                       : cartLoading ? "none"
                       : "0 6px 24px rgba(28,20,16,.22)",
                     cursor: cartBtnDisabled ? "not-allowed" : "pointer",
@@ -834,8 +842,8 @@ export default function ProductDetailPage() {
                       </svg>
                       Adding…
                     </>
-                  ) : cartAdded ? (
-                    <><CheckIcon /> Added to Cart!</>
+                  ) : goToCart ? (
+                    <><CartIcon n={20} /> Go to Cart</>
                   ) : (
                     <><CartIcon n={20} /> Add to Cart</>
                   )}

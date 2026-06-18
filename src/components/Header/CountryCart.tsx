@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ShoppingCart02Icon, Store02Icon } from '@hugeicons/core-free-icons'
+import { Store02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import CartIconButton from './CartIconButton'
+import { getCartHref } from '@/lib/cartState'
 import { useRouter, useParams } from 'next/navigation'
 
 /* ─── Configuration ─────────────────────────────────────────────────── */
@@ -487,19 +489,12 @@ export default function CountryCart() {
   const [showVendorPopup, setShowVendorPopup] = useState(false)
 
   const handleCartClick = () => {
-    if (countryName) {
-      router.push(`/country/${countryName}/cart`)
-    } else {
-      router.push('/cart')
-    }
+    router.push(getCartHref(countryName))
   }
 
   return (
     <>
-      <button onClick={handleCartClick} title="Cart"
-        className="relative -m-2.5 flex cursor-pointer items-center justify-center rounded-full p-2.5 hover:bg-neutral-100 focus-visible:outline-0 dark:hover:bg-neutral-800">
-        <HugeiconsIcon icon={ShoppingCart02Icon} size={24} color="currentColor" strokeWidth={1.5} />
-      </button>
+      <CartIconButton onClick={handleCartClick} />
 
      
 

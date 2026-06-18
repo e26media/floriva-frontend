@@ -8,6 +8,7 @@ import {
   type StoreCountrySlug,
 } from '@/lib/userCountry';
 import { decodeJwtPayload, getApiBase, getAuthHeaders, getAuthToken, withAuthBody } from '@/lib/auth';
+import { bumpCartCount, rememberProductInCart, syncCartState } from '@/lib/cartState';
 
 export function getUserCartKey(): string | null {
   const user = getStoredUser();
@@ -139,6 +140,9 @@ export async function addProductToCart(
         productCountry: normalizeCountrySlug(data?.productCountry),
       };
     }
+    rememberProductInCart(productId);
+    bumpCartCount(quantity);
+    syncCartState().catch(() => {});
     return { ok: true, message: data?.message ?? 'Added to cart!' };
   } catch {
     return { ok: false, message: 'Network error. Please try again.' };
