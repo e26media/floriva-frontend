@@ -212,10 +212,8 @@ export async function syncCountryForUser(user: { countrySlug?: string | null }) 
 
 export async function initializeVisitorCountry() {
   if (isLoggedIn()) {
-    let slug = getUserCountrySlug();
-    if (!slug) {
-      slug = await syncCountryFromServer();
-    }
+    const synced = await syncCountryFromServer();
+    const slug = synced || getUserCountrySlug();
     if (slug) {
       return applyCountrySlug(slug, true);
     }
