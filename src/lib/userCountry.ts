@@ -98,9 +98,14 @@ export function getSelectedCountryData(): SelectedCountryData | null {
 }
 
 export async function fetchStoreCountries(): Promise<StoreCountry[]> {
-  const res = await fetch(`${API_BASE}/api/allCountries`);
-  const json = await res.json();
-  return Array.isArray(json) ? json : (json.data ?? []);
+  try {
+    const res = await fetch(`${API_BASE}/api/allCountries`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    return Array.isArray(json) ? json : (json.data ?? []);
+  } catch {
+    return [];
+  }
 }
 
 export async function detectCountryFromGeo(): Promise<{
