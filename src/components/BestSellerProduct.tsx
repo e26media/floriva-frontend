@@ -1,5 +1,6 @@
 'use client'
 
+import { addProductToCart } from '@/lib/cart'
 import Heading from '@/components/Heading/Heading'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
@@ -197,19 +198,9 @@ import { formatPrice } from '@/utils/currency'
 // Cart API
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function apiAddToCart(productId: string, quantity: number) {
-  const userEmail = getUserEmail()
-  if (!userEmail) return { ok: false, message: 'Please log in to add items to cart.' }
-  try {
-    const res = await fetch(`${BASE_URL}/api/addtocart`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, userEmail, quantity }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { ok: false, message: data?.message ?? `Failed (${res.status})` }
-    return { ok: true, message: data?.message ?? 'Added to cart!' }
-  } catch { return { ok: false, message: 'Network error. Please try again.' } }
+async function apiAddToCart(product: TApiProduct, productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
+  const result = await addProductToCart(productId, quantity, product)
+  return { ok: result.ok, message: result.message }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,7 +263,7 @@ function useAddToCart(product: TApiProduct) {
   const addToCart = useCallback(async (qty = 1) => {
     if (loading || product.stock === 0) return
     setLoading(true)
-    const r = await apiAddToCart(product._id, qty)
+    const r = await apiAddToCart(product, product._id, qty)
     setLoading(false)
     if (r.ok) { setAdded(true); pushToast(product, qty, 'success'); setTimeout(() => setAdded(false), 2200) }
     else pushToast(product, qty, 'error', r.message)

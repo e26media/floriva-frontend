@@ -1,13 +1,15 @@
-'use client'
+'use client';
 
-import { Toaster } from 'react-hot-toast'
+import CountryAccessProvider from '@/components/CountryAccessProvider';
+import { Toaster } from 'react-hot-toast';
 
 const GlobalClient = () => {
   return (
     <>
+      <CountryAccessProvider />
       <Toaster />
     </>
-  )
-}
+  );
+};
 
-export default GlobalClient
+export default GlobalClient;

@@ -1,6 +1,7 @@
 'use client'
 
 import Heading from '@/components/Heading/Heading'
+import { addProductToCart } from '@/lib/cart'
 import { useCarouselArrowButtons } from '@/hooks/use-carousel-arrow-buttons'
 import type { EmblaOptionsType } from 'embla-carousel'
 import useEmblaCarousel from 'embla-carousel-react'
@@ -81,49 +82,10 @@ function isCountryProduct(product: TApiProduct, countrySlug: string): boolean {
   return false
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// User email (for cart)
-// ─────────────────────────────────────────────────────────────────────────────
 
-function getUserEmail(): string | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const userRaw = localStorage.getItem('floriva_user')
-    if (userRaw) {
-      const parsed = JSON.parse(userRaw)
-      if (parsed?.email) return parsed.email
-    }
-    const token = localStorage.getItem('floriva_token')
-    if (token) {
-      const parts = token.split('.')
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-        if (payload?.email) return payload.email
-      }
-    }
-    return null
-  } catch { return null }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Cart API
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function apiAddToCart(productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
-  const userEmail = getUserEmail()
-  if (!userEmail) return { ok: false, message: 'Please log in to add items to cart.' }
-  try {
-    const res = await fetch(`${BASE_URL}/api/addtocart`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, userEmail, quantity }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { ok: false, message: data?.message ?? `Failed (${res.status})` }
-    return { ok: true, message: data?.message ?? 'Added to cart!' }
-  } catch {
-    return { ok: false, message: 'Network error. Please try again.' }
-  }
+async function apiAddToCart(product: TApiProduct, productId: string, quantity: number): Promise<{ ok: boolean; message: string }> {
+  const result = await addProductToCart(productId, quantity, product)
+  return { ok: result.ok, message: result.message }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,7 +222,7 @@ function useAddToCart(product: TApiProduct, countrySlug: string | null) {
   const addToCart = useCallback(async (qty: number = 1) => {
     if (loading || product.stock === 0) return
     setLoading(true)
-    const result = await apiAddToCart(product._id, qty)
+    const result = await apiAddToCart(product, product._id, qty)
     setLoading(false)
     if (result.ok) {
       setAdded(true)

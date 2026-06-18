@@ -28,6 +28,7 @@ function CallbackContent() {
     const token   = searchParams.get('token')
     const name    = searchParams.get('name')  || ''
     const email   = searchParams.get('email') || ''
+    const countrySlug = searchParams.get('countrySlug') || ''
     const success = searchParams.get('success')
     const popup   = typeof window !== 'undefined' && !!window.opener
 
@@ -48,17 +49,28 @@ function CallbackContent() {
       if (success === 'true' && token) {
         setUserName(name || email)
         setPhase('success')
+        const user = { username: name, email, countrySlug: countrySlug || undefined }
         localStorage.setItem('floriva_token', token)
-        localStorage.setItem('floriva_user', JSON.stringify({ username: name, email }))
+        localStorage.setItem('floriva_user', JSON.stringify(user))
+        window.dispatchEvent(new Event('floriva-auth-changed'))
+
+        const finish = () => {
+          import('@/lib/userCountry').then(({ syncCountryForUser, getSelectedCountrySlug }) => {
+            syncCountryForUser(user).finally(() => {
+              const slug = user.countrySlug || getSelectedCountrySlug()
+              router.replace(`/country/${slug}`)
+            })
+          })
+        }
 
         if (popup) {
           window.opener.postMessage(
-            { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email } },
+            { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email, countrySlug } },
             '*'
           )
           setTimeout(() => window.close(), 1800)
         } else {
-          setTimeout(() => router.replace('/'), 1800)
+          setTimeout(finish, 1200)
         }
         return
       }

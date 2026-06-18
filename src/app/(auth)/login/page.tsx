@@ -16,11 +16,23 @@ function getApiBase() {
   return ENV_API_BASE;
 }
 
-function finishLogin(token: string, user: unknown) {
+function finishLogin(token: string, user: { email?: string; username?: string; countrySlug?: string }) {
   localStorage.setItem("floriva_token", token);
   localStorage.setItem("floriva_user", JSON.stringify(user));
   window.dispatchEvent(new Event("floriva-auth-changed"));
-  window.location.assign("/");
+
+  import("@/lib/userCountry").then(({ syncCountryForUser, getSelectedCountrySlug }) => {
+    syncCountryForUser(user).finally(() => {
+      const slug = user.countrySlug || getSelectedCountrySlug();
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      if (redirect && redirect.startsWith("/")) {
+        window.location.assign(redirect);
+        return;
+      }
+      window.location.assign(`/country/${slug}`);
+    });
+  });
 }
 
 export default function PageLogin() {

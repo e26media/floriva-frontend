@@ -3,91 +3,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Config
-// ─────────────────────────────────────────────────────────────────────────────
+import {
+  applyCountrySlug,
+  capitalize,
+  getFlag,
+  getSelectedCountryData,
+  getUserCountrySlug,
+  initializeVisitorCountry,
+  isLoggedIn,
+  persistSelectedCountry,
+  type StoreCountry,
+} from '@/lib/userCountry'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface Country {
-  _id: string
-  name: string
-  createdAt: string
-  updatedAt: string
-  __v: number
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function capitalize(str: string): string {
-  if (!str) return ''
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
-
-const FLAG_MAP: Record<string, string> = {
-  india:                      '🇮🇳',
-  usa:                        '🇺🇸',
-  'united states':            '🇺🇸',
-  'united kingdom':           '🇬🇧',
-  uk:                         '🇬🇧',
-  canada:                     '🇨🇦',
-  australia:                  '🇦🇺',
-  uae:                        '🇦🇪',
-  'united arab emirates':     '🇦🇪',
-  germany:                    '🇩🇪',
-  france:                     '🇫🇷',
-  japan:                      '🇯🇵',
-  china:                      '🇨🇳',
-  brazil:                     '🇧🇷',
-  mexico:                     '🇲🇽',
-  italy:                      '🇮🇹',
-  spain:                      '🇪🇸',
-  russia:                     '🇷🇺',
-  'south korea':              '🇰🇷',
-  netherlands:                '🇳🇱',
-  switzerland:                '🇨🇭',
-  sweden:                     '🇸🇪',
-  norway:                     '🇳🇴',
-  denmark:                    '🇩🇰',
-  finland:                    '🇫🇮',
-  singapore:                  '🇸🇬',
-  'new zealand':              '🇳🇿',
-  portugal:                   '🇵🇹',
-  turkey:                     '🇹🇷',
-  indonesia:                  '🇮🇩',
-  malaysia:                   '🇲🇾',
-  thailand:                   '🇹🇭',
-  philippines:                '🇵🇭',
-  pakistan:                   '🇵🇰',
-  bangladesh:                 '🇧🇩',
-  'sri lanka':                '🇱🇰',
-  nepal:                      '🇳🇵',
-  egypt:                      '🇪🇬',
-  'saudi arabia':             '🇸🇦',
-  qatar:                      '🇶🇦',
-  kuwait:                     '🇰🇼',
-  bahrain:                    '🇧🇭',
-  oman:                       '🇴🇲',
-  kenya:                      '🇰🇪',
-  nigeria:                    '🇳🇬',
-  'south africa':             '🇿🇦',
-  ghana:                      '🇬🇭',
-  argentina:                  '🇦🇷',
-  colombia:                   '🇨🇴',
-  chile:                      '🇨🇱',
-  peru:                       '🇵🇪',
-}
-
-export function getFlag(name: string): string {
-  return FLAG_MAP[name.toLowerCase()] ?? '🌐'
-}
+type Country = StoreCountry
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LocationModal
@@ -472,67 +401,66 @@ export function LocationModal({ isOpen, onClose, onConfirm }: LocationModalProps
 export default function LocationSelector() {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
-  const [selected, setSelected] = useState<{ country: Country; city: string } | null>(null)
+  const [selected, setSelected] = useState<{ country: Country; city: string; locked?: boolean } | null>(null)
+  const locked = isLoggedIn()
+
+  const refreshSelected = () => {
+    const data = getSelectedCountryData()
+    if (data?.country?.name) {
+      setSelected(data)
+      return
+    }
+    initializeVisitorCountry().then((next) => {
+      if (next) setSelected(next)
+    })
+  }
 
   useEffect(() => {
-    const saved = localStorage.getItem('floriva_selected_country')
-    if (saved) {
-      try {
-        const data = JSON.parse(saved)
-        Promise.resolve().then(() => setSelected(data))
+    refreshSelected()
 
-        // If on home page, redirect to country-specific home
-        if (window.location.pathname === '/' && data?.country?.name) {
-          router.push(`/country/${data.country.name.toLowerCase()}`)
-        }
-      } catch (e) {
-        console.error('Failed to parse saved country', e)
-      }
-    } else {
-      // No country selected yet -> Fetch countries and default to Australia
-      fetch(`${BASE_URL}/api/allCountries`)
-        .then((res) => res.json())
-        .then((json) => {
-          const data = Array.isArray(json) ? json : (json.data ?? [])
-          const australia = data.find((c: any) => c.name.toLowerCase() === 'australia')
-          if (australia) {
-            const defaultData = { country: australia, city: '' }
-            setSelected(defaultData)
-            localStorage.setItem('floriva_selected_country', JSON.stringify(defaultData))
-            // Emit event to sync other components
-            window.dispatchEvent(new Event('floriva_country_changed'))
-            
-            // If on home page, consider redirecting to country-specific home
-            if (window.location.pathname === '/') {
-              router.push(`/country/australia`)
-            }
-          }
-        })
-        .catch((err) => console.error('Failed to fetch default country', err))
+    const onChange = () => refreshSelected()
+    window.addEventListener('floriva_country_changed', onChange)
+    window.addEventListener('floriva-auth-changed', onChange)
+    return () => {
+      window.removeEventListener('floriva_country_changed', onChange)
+      window.removeEventListener('floriva-auth-changed', onChange)
     }
-  }, [router])
+  }, [])
+
+  useEffect(() => {
+    if (!selected?.country?.name) return
+    const slug = selected.country.name.toLowerCase()
+    if (window.location.pathname === '/') {
+      router.push(`/country/${slug}`)
+    }
+  }, [selected, router])
 
   const handleConfirm = (country: Country, city: string) => {
-    const data = { country, city }
+    if (locked) return
+    const data = persistSelectedCountry(country, city, false)
     setSelected(data)
-    localStorage.setItem('floriva_selected_country', JSON.stringify(data))
-    // Emit event to sync other components
-    window.dispatchEvent(new Event('floriva_country_changed'))
     setModalOpen(false)
     router.push(`/country/${country.name.toLowerCase()}`)
+  }
+
+  const openModal = () => {
+    if (locked) return
+    setModalOpen(true)
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setModalOpen(true)}
+        onClick={openModal}
+        title={locked ? 'Country is set from your location' : 'Change delivery country'}
         className={clsx(
           'flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg ml-1 mr-1 mb-1 w-full',
           'bg-white border border-gray-200 shadow-sm',
           'lg:flex-row lg:items-center lg:gap-2',
           'lg:bg-transparent lg:border-0 lg:shadow-none',
-          'hover:bg-gray-50 lg:hover:bg-gray-100 transition-colors duration-150',
+          locked ? 'cursor-default' : 'hover:bg-gray-50 lg:hover:bg-gray-100',
+          'transition-colors duration-150',
           'focus:outline-none focus:ring-2 focus:ring-[#B4538F]/20',
         )}
       >
