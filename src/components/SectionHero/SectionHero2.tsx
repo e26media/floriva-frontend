@@ -46,6 +46,7 @@ const DEFAULT_SLIDES: SlideView[] = [
     imageUrl: HERO_BANNER_SRC,
     heading: 'Exclusive Collection for everyone',
     subHeading: 'In this season find the best',
+    imageDescription: 'Handcrafted arrangements made with fresh blooms and love, perfect for every occasion and every moment.',
     btnText: 'Explore Now',
     fullBanner: true,
   },
@@ -147,19 +148,57 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
         isActive ? 'block' : 'hidden'
       )}
     >
-      <Link href={href} className="block w-full" aria-label={item.btnText} title={item.imageTitle || undefined}>
-        {/* Native img avoids Next.js resize/compress; use 1920×720+ source for sharp full-width */}
+      <div className="relative min-h-[520px] overflow-hidden bg-[#fff2f6] px-5 pb-8 pt-8 sm:min-h-[580px] sm:px-8 md:hidden">
         <img
           src={item.imageUrl}
-          alt={alt}
-          title={item.imageTitle || undefined}
-          width={HERO_BANNER_WIDTH}
-          height={HERO_BANNER_HEIGHT}
+          alt=""
+          aria-hidden="true"
           loading="eager"
-          fetchPriority="high"
           decoding="async"
-          className="mx-auto block h-auto w-full max-w-[1920px] object-contain object-center"
+          className="absolute inset-0 h-full w-full scale-105 object-cover object-[72%_center]"
         />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,246,248,0.99)_0%,rgba(255,246,248,0.94)_43%,rgba(255,246,248,0.48)_68%,rgba(255,246,248,0.06)_100%)]" />
+        <div className="relative z-10 flex min-h-[470px] max-w-[300px] flex-col justify-center sm:max-w-[340px]">
+          <div className="mb-3 flex items-center gap-3 text-[#7C4CA3]">
+            <span className="h-px w-12 bg-current opacity-35" />
+            <span className="h-2.5 w-2.5 rounded-full border border-current" />
+            <span className="h-px w-12 bg-current opacity-35" />
+          </div>
+          {item.subHeading && (
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[#7c348b] sm:text-sm">
+              {stripHtml(item.subHeading)}
+            </p>
+          )}
+          <h1
+            className="max-w-[280px] text-[2.7rem] font-semibold leading-[0.96] tracking-[-0.04em] text-[#7b2b86] sm:max-w-[330px] sm:text-[3.35rem]"
+            dangerouslySetInnerHTML={{ __html: item.heading }}
+          />
+          {item.imageDescription && (
+            <p className="mt-5 max-w-[250px] text-sm leading-6 text-[#7b3f83] sm:max-w-[290px] sm:text-base">
+              {stripHtml(item.imageDescription)}
+            </p>
+          )}
+          <ButtonPrimary className="mt-6 w-fit shadow-lg shadow-[#7C4CA3]/20" href={href}>
+            <span className="me-2">{item.btnText}</span>
+            <HugeiconsIcon icon={Search01Icon} size={18} />
+          </ButtonPrimary>
+        </div>
+      </div>
+
+      <Link href={href} className="hidden w-full md:block" aria-label={item.btnText} title={item.imageTitle || undefined}>
+        <div className="relative w-full overflow-hidden md:overflow-visible">
+          <img
+            src={item.imageUrl}
+            alt={alt}
+            title={item.imageTitle || undefined}
+            width={HERO_BANNER_WIDTH}
+            height={HERO_BANNER_HEIGHT}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="block w-full object-cover object-center md:mx-auto md:h-auto md:max-h-none md:max-w-[1920px] md:object-contain"
+          />
+        </div>
       </Link>
     </div>
   )
@@ -229,7 +268,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
       <div className="relative -z-10 flex-1/2 lg:pr-10">
         <Image
           sizes="(max-width: 768px) 100vw, 60vw"
-          className="h-auto w-full max-w-[40rem] object-contain fade--animation__image select-none"
+          className="h-auto w-full max-w-160 object-contain fade--animation__image select-none"
           src={item.imageUrl || heroImage2.src}
           alt={alt}
           title={item.imageTitle || undefined}
@@ -258,7 +297,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
   const hasFullBannerOnly = slides.length === 1 && slides[0]?.fullBanner
 
   return (
-    <div className={clsx('relative z-[1]', className)} {...(hasFullBannerOnly ? {} : handlers)}>
+    <div className={clsx('relative z-1', className)} {...(hasFullBannerOnly ? {} : handlers)}>
       {slides.map((_, index) => renderItem(index))}
 
       {!hasFullBannerOnly && slideCount > 1 && (

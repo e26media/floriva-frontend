@@ -1,43 +1,111 @@
-import facebookSvg from '@/images/socials/facebook-2.svg'
-import googleSvg from '@/images/socials/google.svg'
-import twitterSvg from '@/images/socials/twitter.svg'
-import ButtonPrimary from '@/shared/Button/ButtonPrimary'
-import { Field, FieldGroup, Fieldset, Label } from '@/shared/fieldset'
-import { Input } from '@/shared/input'
-import { Metadata } from 'next'
-import Form from 'next/form'
-import Image from 'next/image'
-import Link from 'next/link'
+"use client";
 
-const loginSocials = [
-  {
-    name: 'Continue with Facebook',
-    href: '#',
-    icon: facebookSvg,
-  },
-  {
-    name: 'Continue with Twitter',
-    href: '#',
-    icon: twitterSvg,
-  },
-  {
-    name: 'Continue with Google',
-    href: '#',
-    icon: googleSvg,
-  },
-]
+import ButtonPrimary from "@/shared/Button/ButtonPrimary";
+import { Field, FieldGroup, Fieldset, Label } from "@/shared/fieldset";
+import { Input } from "@/shared/input";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
 
-export const metadata: Metadata = {
-  title: 'Signup',
-  description: 'Signup page for the application',
+const ENV_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:7000";
+
+function getApiBase() {
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "http://localhost:7000";
+  }
+  return ENV_API_BASE;
 }
 
-const PageSignUp = () => {
-  const handleSubmit = async (formData: FormData) => {
-    'use server'
-    const formObject = Object.fromEntries(formData.entries())
-    console.log(formObject)
-  }
+function finishLogin(token: string, user: unknown) {
+  localStorage.setItem("floriva_token", token);
+  localStorage.setItem("floriva_user", JSON.stringify(user));
+  window.dispatchEvent(new Event("floriva-auth-changed"));
+  window.location.assign("/");
+}
+
+export default function PageSignUp() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"details" | "otp">("details");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const apiBase = getApiBase();
+
+  useEffect(() => {
+    if (localStorage.getItem("floriva_token") && localStorage.getItem("floriva_user")) {
+      router.replace("/");
+    }
+  }, [router]);
+
+  const sendOtp = async () => {
+    setError("");
+    setMessage("");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, name: name.trim(), purpose: "signup" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || "Could not send OTP.");
+      setStep("otp");
+      setMessage("We sent a 6-digit OTP to your email.");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setError("");
+    setMessage("");
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError("Enter the 6-digit OTP.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/api/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), purpose: "signup" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || data.error || "Invalid OTP.");
+
+      const user = { ...data.user, username: data.user?.username || name.trim() };
+      finishLogin(data.token, user);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (step === "details") {
+      void sendOtp();
+      return;
+    }
+    void verifyOtp();
+  };
 
   return (
     <div className="container mb-24 lg:mb-32">
@@ -45,57 +113,85 @@ const PageSignUp = () => {
         Sign up
       </h1>
       <div className="mx-auto max-w-md space-y-6">
-        <div className="grid gap-3">
-          {loginSocials.map((item, index) => (
-            <a
-              key={index}
-              href={item.href}
-              className="flex w-full transform rounded-lg bg-primary-50 px-4 py-3 transition-transform hover:translate-y-[-2px] sm:px-6 dark:bg-neutral-800"
-            >
-              <Image sizes="40px" className="size-5 shrink-0 object-cover" src={item.icon} alt={item.name} />
-              <h3 className="grow text-center text-sm font-medium text-neutral-700 sm:text-sm dark:text-neutral-300">
-                {item.name}
-              </h3>
-            </a>
-          ))}
-        </div>
-        {/* OR */}
+        <a
+          href={`${apiBase}/api/google-login`}
+          onClick={(event) => {
+            if (window.location.hostname === "localhost") {
+              event.preventDefault();
+              setError("For local testing, please use email OTP signup. Google login uses production OAuth settings.");
+            }
+          }}
+          className="flex w-full rounded-lg bg-primary-50 px-4 py-3 text-center text-sm font-medium text-neutral-700 transition-transform hover:-translate-y-0.5 sm:px-6 dark:bg-neutral-800 dark:text-neutral-300"
+        >
+          <span className="grow">Continue with Google</span>
+        </a>
+
         <div className="relative text-center">
           <span className="relative z-10 inline-block bg-white px-4 text-sm font-medium dark:bg-neutral-900 dark:text-neutral-400">
             OR
           </span>
-          <div className="absolute top-1/2 left-0 w-full -translate-y-1/2 transform border border-neutral-100 dark:border-neutral-800"></div>
+          <div className="absolute top-1/2 left-0 w-full -translate-y-1/2 transform border border-neutral-100 dark:border-neutral-800" />
         </div>
-        {/* FORM */}
-        <Form action={handleSubmit}>
-          <Fieldset>
-            <FieldGroup className="sm:space-y-6">
-              <Field>
-                <Label>Email</Label>
-                <Input type="email" name="email" placeholder="example@example.com" />
-              </Field>
-              <Field>
-                <Label>Password</Label>
-                <Input type="password" name="password" />
-              </Field>
 
-              <ButtonPrimary className="mt-2 w-full" type="submit">
-                Continue
-              </ButtonPrimary>
-            </FieldGroup>
-          </Fieldset>
-        </Form>
+        <form onSubmit={handleSubmit}>
+        <Fieldset>
+          <FieldGroup className="sm:space-y-6">
+            <Field>
+              <Label>Name</Label>
+              <Input
+                type="text"
+                name="name"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading || step === "otp"}
+              />
+            </Field>
+            <Field>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                name="email"
+                placeholder="example@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading || step === "otp"}
+              />
+            </Field>
 
-        {/* ==== */}
+            {step === "otp" && (
+              <Field>
+                <Label>OTP</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  name="otp"
+                  placeholder="Enter 6-digit code"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  disabled={loading}
+                />
+              </Field>
+            )}
+
+            {message && <p className="text-sm text-emerald-600">{message}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <ButtonPrimary className="mt-2 w-full" type="submit" disabled={loading}>
+              {loading ? "Please wait..." : step === "details" ? "Send OTP" : "Verify & Create Account"}
+            </ButtonPrimary>
+          </FieldGroup>
+        </Fieldset>
+        </form>
+
         <span className="block text-center text-sm text-neutral-700 dark:text-neutral-300">
-          Already have an account? {` `}
+          Already have an account?{" "}
           <Link className="text-primary-600 underline" href="/login">
             Sign in
           </Link>
         </span>
       </div>
     </div>
-  )
+  );
 }
-
-export default PageSignUp

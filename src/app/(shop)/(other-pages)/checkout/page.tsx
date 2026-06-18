@@ -560,6 +560,7 @@ function CheckoutPageContent() {
     if (!form.lastName.trim()) e.lastName = "Required";
     if (!form.email.trim()) e.email = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email";
+    if (!form.phone.trim()) e.phone = "Required";
     if (!form.streetAddress1.trim()) e.streetAddress1 = "Required";
     if (!form.city.trim()) e.city = "Required";
     if (!form.stateProvinceRegionId.trim()) e.stateProvinceRegionId = "Required";
@@ -592,6 +593,8 @@ function CheckoutPageContent() {
 
     const payload = {
       userEmail: form.email,
+      customerName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+      customerPhone: form.phone.trim(),
       paymentMethod,
       currency,
       products: cartItems.map((item) => ({
@@ -769,8 +772,8 @@ function CheckoutPageContent() {
                   <Field label="Email Address" id="email" required error={errors.email}>
                     <Input id="email" type="email" placeholder="john@example.com" value={form.email} onChange={handleChange} error={errors.email} disabled={submitting} />
                   </Field>
-                  <Field label="Phone" id="phone">
-                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={handleChange} disabled={submitting} />
+                  <Field label="Mobile Number" id="phone" required error={errors.phone}>
+                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={handleChange} error={errors.phone} disabled={submitting} />
                   </Field>
                 </div>
               </section>

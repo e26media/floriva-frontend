@@ -39,7 +39,7 @@ function CallbackContent() {
         setErrorMsg(msg)
         setPhase('error')
         if (popup) {
-          window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, window.location.origin)
+          window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, '*')
           setTimeout(() => window.close(), 2500)
         }
         return
@@ -54,7 +54,7 @@ function CallbackContent() {
         if (popup) {
           window.opener.postMessage(
             { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email } },
-            window.location.origin
+            '*'
           )
           setTimeout(() => window.close(), 1800)
         } else {
@@ -66,7 +66,7 @@ function CallbackContent() {
       setErrorMsg('Authentication failed. Please try again.')
       setPhase('error')
       if (popup) {
-        window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, window.location.origin)
+        window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, '*')
         setTimeout(() => window.close(), 2500)
       }
     }, 0)

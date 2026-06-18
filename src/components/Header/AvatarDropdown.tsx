@@ -8,7 +8,16 @@ import backgroundLineSvg from '@/images/floriva/Primary Logo.png'
 import { useState, useRef, useEffect, useCallback } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+const ENV_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
+const getApiBase = () =>
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:7000'
+    : ENV_API_BASE;
+const GOOGLE_ALLOWED_ORIGINS = new Set([
+  'https://florivagifts.com',
+  'https://www.florivagifts.com',
+  'http://localhost:3000',
+]);
 interface Props { className?: string }
 
 // ─── Google popup ─────────────────────────────────────────────────────────────
@@ -20,13 +29,13 @@ function openGooglePopup(
   const left = Math.round(window.screenX + (window.outerWidth - W) / 2)
   const top  = Math.round(window.screenY + (window.outerHeight - H) / 2)
   const popup = window.open(
-    `${API_BASE}/api/google-login`, 'FlorivaGoogleLogin',
+    `${getApiBase()}/api/google-login`, 'FlorivaGoogleLogin',
     `width=${W},height=${H},left=${left},top=${top},toolbar=no,menubar=no,location=yes,scrollbars=yes,status=no`
   )
   if (!popup) { alert('Popup blocked! Please allow popups for this site.'); return }
 
   const handler = (e: MessageEvent) => {
-    if (e.origin !== window.location.origin) return
+    if (e.origin !== window.location.origin && !GOOGLE_ALLOWED_ORIGINS.has(e.origin)) return
     if (e.data?.type === 'FLORIVA_GOOGLE_SUCCESS') {
       window.removeEventListener('message', handler); clearInterval(poll); popup.close()
       onResult(e.data.payload)
@@ -249,7 +258,7 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Please enter a valid email address.'); return }
     setLoading(true); setError('')
     try {
-      const res = await fetch(`${API_BASE}/api/send-otp`, {
+      const res = await fetch(`${getApiBase()}/api/send-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
       })
       const data = await res.json()
@@ -264,7 +273,7 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
     if (code.length < 6) { setError('Please enter all 6 digits.'); return }
     setLoading(true); setError('')
     try {
-      const res = await fetch(`${API_BASE}/api/verify-otp`, {
+      const res = await fetch(`${getApiBase()}/api/verify-otp`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp: code })
       })
       const data = await res.json()
@@ -295,6 +304,10 @@ function FlorivaAuthModal({ onClose, onSuccess }: {
   }
 
   const handleGoogleLogin = () => {
+    if (window.location.hostname === 'localhost') {
+      setError('For local testing, please use email OTP login. Google login uses production OAuth settings.')
+      return
+    }
     setGLoading(true); setError('')
     openGooglePopup(
       (data) => { setGLoading(false); setGoogleUser(data) },
@@ -886,7 +899,7 @@ export default function AvatarDropdown({ className }: Props) {
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return
+      if (e.origin !== window.location.origin && !GOOGLE_ALLOWED_ORIGINS.has(e.origin)) return
       if (e.data?.type === 'FLORIVA_GOOGLE_SUCCESS') {
         const { token, name, email } = e.data.payload
         localStorage.setItem('floriva_token', token)

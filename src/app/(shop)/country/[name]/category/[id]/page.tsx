@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatPrice, getCurrencyForCountry } from '@/utils/currency'
-import { productInCategory, productInSubCategory } from '@/lib/productCategories'
+import { productInSubCategory, productMatchesCategoryListing } from '@/lib/productCategories'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SubCategory { _id: string; name: string }
@@ -27,6 +27,8 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000'
 const imgSrc = (p: string) => `${BASE}${p}`
 const pct = (e: number, d: number) => e > 0 ? Math.round(((e - d) / e) * 100) : 0
 const PER_PAGE = 12
+const isBestSellerCategory = (category?: { name?: string } | null) =>
+  category?.name?.trim().toLowerCase() === 'best seller'
 
 // ─── Currency map by country name ─────────────────────────────────────────────
 
@@ -378,7 +380,7 @@ export default function CountryCategoryPage() {
         return r.json()
       }),
     ])
-      .then(([catJson, prodJson]) => {
+      .then(async ([catJson, prodJson]) => {
         const allCategories: Category[] = Array.isArray(catJson)
           ? catJson
           : catJson.categories ?? catJson.data ?? []
@@ -413,7 +415,21 @@ export default function CountryCategoryPage() {
           throw new Error('Category not found. Check the URL.')
         }
 
-        const filtered = products.filter(p => productInCategory(p, found!._id))
+        let filtered = products.filter(p => productMatchesCategoryListing(p, found!))
+
+        if (isBestSellerCategory(found)) {
+          const bestSellerRes = await fetch(
+            `${BASE}/api/products-by-featured?featured=${encodeURIComponent('Best Seller')}&country=${encodeURIComponent(countryName)}`
+          )
+          if (bestSellerRes.ok) {
+            const bestSellerJson = await bestSellerRes.json()
+            const bestSellerProducts: Product[] = Array.isArray(bestSellerJson)
+              ? bestSellerJson
+              : bestSellerJson.data ?? bestSellerJson.products ?? []
+            if (bestSellerProducts.length > 0) filtered = bestSellerProducts
+          }
+        }
+
         setMatchedCategory(found)
         setActiveSub(foundSubId)
         setAllProducts(filtered)

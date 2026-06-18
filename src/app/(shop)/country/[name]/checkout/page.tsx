@@ -616,6 +616,7 @@ export default function CheckoutPage() {
     if (!form.email.trim())                 e.email                 = "Required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "Invalid email";
+    if (!form.phone.trim())                 e.phone                 = "Required";
     if (!form.streetAddress1.trim())        e.streetAddress1        = "Required";
     if (!form.city.trim())                  e.city                  = "Required";
     if (!form.stateProvinceRegionId.trim()) e.stateProvinceRegionId = "Required";
@@ -647,6 +648,8 @@ export default function CheckoutPage() {
 
     const payload = {
       userEmail:    form.email,
+      customerName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
+      customerPhone: form.phone.trim(),
       paymentMethod,
       country:      countrySlug,
       currency:     cfg?.currencyCode ?? "QAR",
@@ -833,13 +836,14 @@ export default function CheckoutPage() {
                       disabled={submitting}
                     />
                   </Field>
-                  <Field label="Phone" id="phone">
+                  <Field label="Mobile Number" id="phone" required error={errors.phone}>
                     <Input
                       id="phone"
                       type="tel"
                       placeholder="+974 5000 0000"
                       value={form.phone}
                       onChange={handleChange}
+                      error={errors.phone}
                       disabled={submitting}
                     />
                   </Field>

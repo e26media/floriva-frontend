@@ -89,7 +89,7 @@ const Footer: React.FC = () => {
         <h2 className="font-semibold text-neutral-700 dark:text-neutral-200">
           {menu.title}
         </h2>
-        <ul className="mt-5 space-y-4">
+        <ul className="mt-4 space-y-3">
           {menu.menus.map((item, idx) => (
             <li key={idx}>
               <Link
@@ -132,9 +132,9 @@ const Footer: React.FC = () => {
 
   return (
     <footer className="relative border-t">
-      <div className="container py-20 lg:pt-28 lg:pb-24">
-        <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-10">
-          <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
+      <div className="container py-12 lg:py-16">
+        <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-8 md:grid-cols-4 lg:grid-cols-5 lg:gap-x-10">
+          <div className="col-span-2 flex flex-col gap-4 md:col-span-4 lg:col-span-1">
             <Logo />
             <SocialsList1 />
           </div>
@@ -150,7 +150,7 @@ const Footer: React.FC = () => {
               href="https://www.e26media.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-[#EA597A] transition-colors hover:text-[#d44d6a] hover:underline"
+              className="font-medium text-[#7C4CA3] transition-colors hover:text-[#6a3f8f] hover:underline"
             >
               E26 Media
             </Link>

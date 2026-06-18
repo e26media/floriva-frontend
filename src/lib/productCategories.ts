@@ -65,6 +65,58 @@ export function productInSubCategory(product: ProductWithSubCategories, subCateg
   return getProductSubCategoryIds(product).includes(subCategoryIdValue);
 }
 
+type ProductWithFeatured = ProductWithCategories & {
+  FeaturedProduct?: unknown;
+  featuredProduct?: unknown;
+  featured_product?: unknown;
+};
+
+function normalizeLabel(value?: string | null): string {
+  return (value || '').trim().toLowerCase();
+}
+
+function categoryNameOf(cat?: CategoryLike | null): string {
+  return normalizeLabel(cat?.name || cat?.categoryName || cat?.title);
+}
+
+function featuredName(item: unknown): string {
+  if (!item) return '';
+  if (typeof item === 'string') return normalizeLabel(item);
+  if (typeof item === 'object') {
+    const record = item as { name?: string; title?: string; label?: string };
+    return normalizeLabel(record.name || record.title || record.label);
+  }
+  return '';
+}
+
+export function productHasFeaturedLabel(product: ProductWithFeatured, label: string): boolean {
+  const raw =
+    product.FeaturedProduct ??
+    product.featuredProduct ??
+    product.featured_product ??
+    null;
+  const expected = normalizeLabel(label);
+
+  if (Array.isArray(raw)) {
+    return raw.some(item => featuredName(item) === expected);
+  }
+
+  return featuredName(raw) === expected;
+}
+
+export function productMatchesCategoryListing(
+  product: ProductWithFeatured,
+  listingCategory: CategoryLike
+): boolean {
+  if (productInCategory(product, categoryId(listingCategory))) return true;
+
+  if (categoryNameOf(listingCategory) === 'best seller') {
+    return productHasFeaturedLabel(product, 'Best Seller');
+  }
+
+  return false;
+}
+
 export function collectCategoriesFromProducts(products: ProductWithCategories[]): CategoryLike[] {
   const categoryMap = new Map<string, CategoryLike>();
 
