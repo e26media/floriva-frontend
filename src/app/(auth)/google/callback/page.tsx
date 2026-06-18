@@ -3,6 +3,12 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import {
+  completeGoogleLogin,
+  isGoogleOAuthPopup,
+  notifyGoogleAuthError,
+  notifyGoogleAuthSuccess,
+} from '@/lib/googleAuthPopup'
 
 const FlorivaFlower = ({ size = 52 }: { size?: number }) => (
   <svg viewBox="0 0 52 52" width={size} height={size} fill="none">
@@ -30,17 +36,17 @@ function CallbackContent() {
     const email   = searchParams.get('email') || ''
     const countrySlug = searchParams.get('countrySlug') || ''
     const success = searchParams.get('success')
-    const popup   = typeof window !== 'undefined' && !!window.opener
+    const oauthPopup = isGoogleOAuthPopup()
 
     const timer = setTimeout(() => {
-      setIsPopup(popup)
+      setIsPopup(oauthPopup)
 
       if (error) {
         const msg = decodeURIComponent(error)
         setErrorMsg(msg)
         setPhase('error')
-        if (popup) {
-          window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: msg }, '*')
+        if (oauthPopup) {
+          notifyGoogleAuthError(msg)
           setTimeout(() => window.close(), 2500)
         }
         return
@@ -49,36 +55,30 @@ function CallbackContent() {
       if (success === 'true' && token) {
         setUserName(name || email)
         setPhase('success')
-        const user = { username: name, email, countrySlug: countrySlug || undefined }
-        localStorage.setItem('floriva_token', token)
-        localStorage.setItem('floriva_user', JSON.stringify(user))
-        window.dispatchEvent(new Event('floriva-auth-changed'))
 
-        const finish = () => {
-          import('@/lib/userCountry').then(({ syncCountryForUser, getSelectedCountrySlug }) => {
-            syncCountryForUser(user).finally(() => {
-              const slug = user.countrySlug || getSelectedCountrySlug()
-              router.replace(`/country/${slug}`)
-            })
-          })
-        }
+        const payload = { token, name, email, countrySlug: countrySlug || undefined }
 
-        if (popup) {
-          window.opener.postMessage(
-            { type: 'FLORIVA_GOOGLE_SUCCESS', payload: { token, name, email, countrySlug } },
-            '*'
+        if (oauthPopup) {
+          localStorage.setItem('floriva_token', token)
+          localStorage.setItem(
+            'floriva_user',
+            JSON.stringify({ username: name, email, countrySlug: countrySlug || undefined }),
           )
-          setTimeout(() => window.close(), 1800)
-        } else {
-          setTimeout(finish, 1200)
+          notifyGoogleAuthSuccess(payload)
+          setTimeout(() => window.close(), 1200)
+          return
         }
+
+        completeGoogleLogin(payload).catch(() => {
+          router.replace('/')
+        })
         return
       }
 
       setErrorMsg('Authentication failed. Please try again.')
       setPhase('error')
-      if (popup) {
-        window.opener.postMessage({ type: 'FLORIVA_GOOGLE_ERROR', error: 'Authentication failed.' }, '*')
+      if (oauthPopup) {
+        notifyGoogleAuthError('Authentication failed.')
         setTimeout(() => window.close(), 2500)
       }
     }, 0)
@@ -117,7 +117,7 @@ function CallbackContent() {
             <h2 style={{ fontSize:22, fontWeight:700, color:'#10b981', margin:'0 0 6px' }}>You are in! 🌸</h2>
             <p style={{ fontSize:15, color:'#6b7280', margin:'0 0 6px' }}>Welcome{userName ? `, ${userName}` : ' back'}!</p>
             <p style={{ fontSize:12, color:'#d1d5db', marginTop:14 }}>
-              {isPopup ? 'This window will close automatically…' : 'Redirecting you to home…'}
+              {isPopup ? 'Returning you to Floriva…' : 'Redirecting you to home…'}
             </p>
           </>
         )}

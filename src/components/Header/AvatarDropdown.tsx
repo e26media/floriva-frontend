@@ -6,6 +6,12 @@ import { Divider } from '../Divider'
 import { Link } from '../Link'
 import backgroundLineSvg from '@/images/floriva/Primary Logo.png'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  completeGoogleLogin,
+  GOOGLE_POPUP_NAME,
+  subscribeGoogleAuth,
+  type GoogleAuthPayload,
+} from '@/lib/googleAuthPopup'
 
 // ─────────────────────────────────────────────────────────────────────────────
 const ENV_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000';
@@ -13,41 +19,49 @@ const getApiBase = () =>
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:7000'
     : ENV_API_BASE;
-const GOOGLE_ALLOWED_ORIGINS = new Set([
-  'https://florivagifts.com',
-  'https://www.florivagifts.com',
-  'http://localhost:3000',
-]);
 interface Props { className?: string }
+
+function applyGoogleAuthResult(
+  payload: GoogleAuthPayload,
+  onResult: (data: GoogleAuthPayload) => void,
+) {
+  void completeGoogleLogin(payload).finally(() => onResult(payload))
+}
 
 // ─── Google popup ─────────────────────────────────────────────────────────────
 function openGooglePopup(
-  onResult: (data: { token: string; name: string; email: string }) => void,
+  onResult: (data: GoogleAuthPayload) => void,
   onError: (msg: string) => void
 ) {
   const W = 500, H = 640
   const left = Math.round(window.screenX + (window.outerWidth - W) / 2)
   const top  = Math.round(window.screenY + (window.outerHeight - H) / 2)
   const popup = window.open(
-    `${getApiBase()}/api/google-login`, 'FlorivaGoogleLogin',
+    `${getApiBase()}/api/google-login`, GOOGLE_POPUP_NAME,
     `width=${W},height=${H},left=${left},top=${top},toolbar=no,menubar=no,location=yes,scrollbars=yes,status=no`
   )
   if (!popup) { alert('Popup blocked! Please allow popups for this site.'); return }
 
-  const handler = (e: MessageEvent) => {
-    if (e.origin !== window.location.origin && !GOOGLE_ALLOWED_ORIGINS.has(e.origin)) return
-    if (e.data?.type === 'FLORIVA_GOOGLE_SUCCESS') {
-      window.removeEventListener('message', handler); clearInterval(poll); popup.close()
-      onResult(e.data.payload)
-    }
-    if (e.data?.type === 'FLORIVA_GOOGLE_ERROR') {
-      window.removeEventListener('message', handler); clearInterval(poll); popup.close()
-      onError(e.data.error || 'Google sign-in failed')
-    }
-  }
-  window.addEventListener('message', handler)
+  const cleanup = subscribeGoogleAuth(
+    (payload) => {
+      cleanup()
+      clearInterval(poll)
+      try { popup.close() } catch { /* ignore */ }
+      applyGoogleAuthResult(payload, onResult)
+    },
+    (msg) => {
+      cleanup()
+      clearInterval(poll)
+      try { popup.close() } catch { /* ignore */ }
+      onError(msg || 'Google sign-in failed')
+    },
+  )
+
   const poll = setInterval(() => {
-    if (popup.closed) { clearInterval(poll); window.removeEventListener('message', handler) }
+    if (popup.closed) {
+      clearInterval(poll)
+      cleanup()
+    }
   }, 500)
 }
 
@@ -898,18 +912,18 @@ export default function AvatarDropdown({ className }: Props) {
   }, [])
 
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin && !GOOGLE_ALLOWED_ORIGINS.has(e.origin)) return
-      if (e.data?.type === 'FLORIVA_GOOGLE_SUCCESS') {
-        const { token, name, email } = e.data.payload
-        localStorage.setItem('floriva_token', token)
-        localStorage.setItem('floriva_user', JSON.stringify({ username: name, email }))
-        setUser({ username: name, email })
+    const cleanup = subscribeGoogleAuth(
+      (payload) => {
+        setUser({
+          username: payload.name,
+          email: payload.email,
+          countrySlug: payload.countrySlug,
+        })
         setShowAuth(false)
-      }
-    }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+      },
+      () => {},
+    )
+    return cleanup
   }, [])
 
   const handleSuccess = useCallback((userData: any, token: string) => {
