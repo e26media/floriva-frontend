@@ -16,7 +16,7 @@ import { useInterval } from 'react-use'
 
 /** Served from /public — desktop hero */
 const HERO_BANNER_SRC = '/images/hero-banner.png'
-/** Mobile-only hero — Floriva design artwork */
+/** Mobile-only hero (portrait gift box banner) */
 const HERO_MOBILE_BANNER_SRC = '/images/hero-mobile-banner.png'
 const HERO_BANNER_WIDTH = 1024
 const HERO_BANNER_HEIGHT = 384
@@ -48,9 +48,8 @@ const DEFAULT_SLIDES: SlideView[] = [
     imageUrl: HERO_BANNER_SRC,
     heading: 'Exclusive Collection for everyone',
     subHeading: 'In this season find the best',
-    imageDescription:
-      'Handcrafted arrangements made with fresh blooms and love, perfect for every occasion and every moment.',
-    btnText: 'Shop Flowers',
+    imageDescription: 'Handcrafted arrangements made with fresh blooms and love, perfect for every occasion and every moment.',
+    btnText: 'Explore Now',
     fullBanner: true,
   },
 ]
@@ -141,9 +140,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
 
   const renderFullBanner = (item: SlideView, isActive: boolean) => {
     const href = resolveSlideHref(item.btnLink, allProductHref)
-    const alt =
-      item.imageAlt?.trim() ||
-      'Premium flower delivery across Australia — handcrafted floral arrangements and thoughtful gifts'
+    const alt = item.imageAlt?.trim() || stripHtml(item.heading) || item.btnText
 
     return (
     <div
@@ -155,7 +152,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     >
       <Link
         href={href}
-        className="relative block w-full px-4 pb-2 pt-3 md:hidden"
+        className="relative block w-full overflow-hidden md:hidden"
         aria-label={item.btnText}
         title={item.imageTitle || undefined}
       >
@@ -165,7 +162,7 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
           loading="eager"
           fetchPriority="high"
           decoding="async"
-          className="block h-auto w-full rounded-[28px] object-contain"
+          className="block h-auto w-full object-contain object-top"
         />
       </Link>
 
