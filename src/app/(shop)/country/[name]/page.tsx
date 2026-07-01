@@ -18,7 +18,7 @@ async function PageHome() {
   return (
     <div className="nc-PageHome relative overflow-hidden">
       <SectionHero2 />
-      <CountrySectionCollectionSlider className="mt-24 lg:mt-32"  />
+      <CountrySectionCollectionSlider className="mt-6 lg:mt-32" />
 
       <div className="relative container my-24 flex flex-col gap-y-24 lg:my-32 lg:gap-y-32">
        

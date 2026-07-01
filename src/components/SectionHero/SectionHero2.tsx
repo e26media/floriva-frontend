@@ -16,8 +16,6 @@ import { useInterval } from 'react-use'
 
 /** Served from /public — desktop hero */
 const HERO_BANNER_SRC = '/images/hero-banner.png'
-/** Mobile-only hero (portrait gift box banner) */
-const HERO_MOBILE_BANNER_SRC = '/images/hero-mobile-banner.png'
 const HERO_BANNER_WIDTH = 1024
 const HERO_BANNER_HEIGHT = 384
 
@@ -146,27 +144,11 @@ const SectionHero2: FC<Props> = ({ className = '' }) => {
     <div
       key={item.id}
       className={clsx(
-        'fade--animation relative -mt-px w-full overflow-hidden bg-[#FAF0E8] leading-none',
+        'fade--animation relative -mt-px w-full overflow-hidden bg-[#FAF0E8] leading-none max-md:hidden',
         isActive ? 'block' : 'hidden'
       )}
     >
-      <Link
-        href={href}
-        className="relative block w-full overflow-hidden md:hidden"
-        aria-label={item.btnText}
-        title={item.imageTitle || undefined}
-      >
-        <img
-          src={HERO_MOBILE_BANNER_SRC}
-          alt={alt}
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-          className="block h-auto w-full object-contain object-top"
-        />
-      </Link>
-
-      <Link href={href} className="hidden w-full md:block" aria-label={item.btnText} title={item.imageTitle || undefined}>
+      <Link href={href} className="block w-full" aria-label={item.btnText} title={item.imageTitle || undefined}>
         <div className="relative w-full overflow-hidden md:overflow-visible">
           <img
             src={item.imageUrl}
