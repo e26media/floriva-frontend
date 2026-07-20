@@ -4,8 +4,8 @@ import FaqAccordion from './FaqAccordion'
 import FloatingWhatsApp from './FloatingWhatsApp'
 import ProductSections from './ProductSections'
 import StickyCtaBar from './StickyCtaBar'
-import { CATEGORIES, LINKS } from './seo'
-import type { LandingProduct } from './products'
+import { LINKS } from './seo'
+import type { LandingCategory, LandingProduct } from './products'
 
 const WHY_POINTS = [
   {
@@ -148,6 +148,8 @@ export default function MelbourneBouquetContent({
   bestsellers = [],
   bouquets = [],
   roses = [],
+  categories = [],
+  heroImage = '/images/promo-australia.png',
   bestsellersHref = LINKS.bestSellers,
   bouquetsHref = LINKS.bouquets,
   rosesHref = LINKS.roses,
@@ -155,6 +157,8 @@ export default function MelbourneBouquetContent({
   bestsellers?: LandingProduct[]
   bouquets?: LandingProduct[]
   roses?: LandingProduct[]
+  categories?: LandingCategory[]
+  heroImage?: string
   bestsellersHref?: string
   bouquetsHref?: string
   rosesHref?: string
@@ -165,8 +169,8 @@ export default function MelbourneBouquetContent({
       <section className="mlb-hero" aria-label="Bouquet Delivery Melbourne">
         <div className="mlb-hero-media">
           <Image
-            src="https://images.unsplash.com/photo-1487530811176-3780de880c2d?auto=format&fit=crop&w=2000&q=80"
-            alt="Premium handcrafted flower bouquet delivery across Melbourne"
+            src={heroImage}
+            alt="Premium handcrafted Floriva flower bouquet delivery across Melbourne"
             fill
             priority
             sizes="100vw"
@@ -285,17 +289,17 @@ export default function MelbourneBouquetContent({
       <section className="mlb-section mlb-section-soft" id="bouquet-categories">
         <div className="container">
           <header className="mlb-section-head">
-            <p className="mlb-eyebrow">Shop by style</p>
-            <h2>Bouquet categories for every Melbourne moment</h2>
+            <p className="mlb-eyebrow">Shop by Floriva category</p>
+            <h2>Our flower categories for Melbourne delivery</h2>
             <p>
-              Explore curated collections designed for real occasions — from rose bouquets Melbourne
-              romantics love, to bright congratulations flowers and gentle sympathy designs.
+              Browse real Floriva Gifts collections — birthday, anniversary, roses, boxes, baskets,
+              and more — using the same categories and product images from our Australia shop.
             </p>
           </header>
 
           <div className="mlb-category-grid">
-            {CATEGORIES.map((cat) => (
-              <Link key={cat.name} href={cat.href} className="mlb-category-card">
+            {categories.map((cat) => (
+              <Link key={cat.id} href={cat.href} className="mlb-category-card">
                 <div className="mlb-category-media">
                   <Image
                     src={cat.image}
@@ -308,6 +312,9 @@ export default function MelbourneBouquetContent({
                 <div className="mlb-category-body">
                   <h3>{cat.name}</h3>
                   <p>{cat.description}</p>
+                  {cat.count > 0 ? (
+                    <p className="mlb-category-count">{cat.count} designs</p>
+                  ) : null}
                   <span className="mlb-category-link">Shop collection →</span>
                 </div>
               </Link>

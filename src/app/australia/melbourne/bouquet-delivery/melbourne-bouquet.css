@@ -490,6 +490,13 @@
   font-weight: 600;
 }
 
+.mlb-category-count {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--mlb-muted);
+}
+
 .mlb-internal-links {
   margin-top: 2.75rem;
   padding-top: 1.75rem;

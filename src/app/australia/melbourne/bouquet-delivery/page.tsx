@@ -88,6 +88,8 @@ export default async function BouquetDeliveryMelbournePage() {
         bestsellers={products.bestsellers}
         bouquets={products.bouquets}
         roses={products.roses}
+        categories={products.categories}
+        heroImage={products.heroImage}
         bestsellersHref={products.bestsellersHref}
         bouquetsHref={products.bouquetsHref}
         rosesHref={products.rosesHref}
