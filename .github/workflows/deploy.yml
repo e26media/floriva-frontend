@@ -8,8 +8,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_FRONTEND_PATH != '' }}
     steps:
+      - name: Check deploy secrets
+        id: check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_FRONTEND_PATH: ${{ secrets.DEPLOY_FRONTEND_PATH }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          missing=0
+          for v in DEPLOY_HOST DEPLOY_FRONTEND_PATH DEPLOY_USER DEPLOY_SSH_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Missing GitHub Actions secret: $v"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "Add these repository secrets, then re-run this workflow:"
+            echo "  DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_FRONTEND_PATH"
+            exit 1
+          fi
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
