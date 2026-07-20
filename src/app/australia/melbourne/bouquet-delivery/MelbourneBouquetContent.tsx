@@ -2,8 +2,10 @@ import Image from 'next/image'
 import Link from 'next/link'
 import FaqAccordion from './FaqAccordion'
 import FloatingWhatsApp from './FloatingWhatsApp'
+import ProductSections from './ProductSections'
 import StickyCtaBar from './StickyCtaBar'
 import { CATEGORIES, LINKS } from './seo'
+import type { LandingProduct } from './products'
 
 const WHY_POINTS = [
   {
@@ -142,7 +144,21 @@ const TRUST = [
   'Handcrafted by florists',
 ]
 
-export default function MelbourneBouquetContent() {
+export default function MelbourneBouquetContent({
+  bestsellers = [],
+  bouquets = [],
+  roses = [],
+  bestsellersHref = LINKS.bestSellers,
+  bouquetsHref = LINKS.bouquets,
+  rosesHref = LINKS.roses,
+}: {
+  bestsellers?: LandingProduct[]
+  bouquets?: LandingProduct[]
+  roses?: LandingProduct[]
+  bestsellersHref?: string
+  bouquetsHref?: string
+  rosesHref?: string
+}) {
   return (
     <div className="mlb-page">
       {/* HERO */}
@@ -188,7 +204,7 @@ export default function MelbourneBouquetContent() {
             <Link href={LINKS.bouquets} className="mlb-btn mlb-btn-primary">
               Shop Bouquets
             </Link>
-            <Link href={LINKS.bestSellers} className="mlb-btn mlb-btn-secondary">
+            <Link href="#shop-bouquets" className="mlb-btn mlb-btn-secondary">
               Order Today
             </Link>
             <Link href="#same-day-delivery" className="mlb-btn mlb-btn-outline">
@@ -203,6 +219,16 @@ export default function MelbourneBouquetContent() {
           </ul>
         </div>
       </section>
+
+      {/* REAL PRODUCTS FROM FLORIVA AUSTRALIA SHOP */}
+      <ProductSections
+        bestsellers={bestsellers}
+        bouquets={bouquets}
+        roses={roses}
+        bestsellersHref={bestsellersHref}
+        bouquetsHref={bouquetsHref}
+        rosesHref={rosesHref}
+      />
 
       {/* WHY */}
       <section className="mlb-section" id="why-floriva">

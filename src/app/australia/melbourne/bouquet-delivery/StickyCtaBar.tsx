@@ -22,7 +22,7 @@ export default function StickyCtaBar() {
           <span> across Melbourne on eligible orders</span>
         </p>
         <div className="mlb-sticky-actions">
-          <Link href={LINKS.bouquets} className="mlb-btn mlb-btn-primary mlb-btn-sm">
+          <Link href="#shop-bouquets" className="mlb-btn mlb-btn-primary mlb-btn-sm">
             Shop Now
           </Link>
           <Link href={LINKS.bestSellers} className="mlb-btn mlb-btn-ghost mlb-btn-sm">

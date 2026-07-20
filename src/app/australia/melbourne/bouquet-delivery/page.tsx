@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import MelbourneBouquetContent from './MelbourneBouquetContent'
+import { getMelbourneLandingProducts } from './products'
 import {
   CANONICAL_URL,
   OG_IMAGE,
@@ -9,6 +10,8 @@ import {
   buildJsonLd,
 } from './seo'
 import './melbourne-bouquet.css'
+
+export const revalidate = 120
 
 export const metadata: Metadata = {
   title: { absolute: SEO_TITLE },
@@ -71,8 +74,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
 }
 
-export default function BouquetDeliveryMelbournePage() {
+export default async function BouquetDeliveryMelbournePage() {
   const jsonLd = buildJsonLd()
+  const products = await getMelbourneLandingProducts()
 
   return (
     <>
@@ -80,7 +84,14 @@ export default function BouquetDeliveryMelbournePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <MelbourneBouquetContent />
+      <MelbourneBouquetContent
+        bestsellers={products.bestsellers}
+        bouquets={products.bouquets}
+        roses={products.roses}
+        bestsellersHref={products.bestsellersHref}
+        bouquetsHref={products.bouquetsHref}
+        rosesHref={products.rosesHref}
+      />
     </>
   )
 }
