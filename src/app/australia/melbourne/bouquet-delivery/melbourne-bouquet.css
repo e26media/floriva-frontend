@@ -47,6 +47,22 @@
   margin-bottom: 2.5rem;
 }
 
+.mlb-section-head-row {
+  max-width: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.mlb-section-head-row > div {
+  max-width: 46rem;
+}
+
+.mlb-view-all {
+  flex-shrink: 0;
+}
+
 .mlb-section-head h2 {
   font-size: clamp(1.85rem, 3vw, 2.6rem);
   line-height: 1.15;
@@ -311,6 +327,105 @@
 
 .mlb-prose p {
   margin: 0 0 1rem;
+}
+
+/* Product grid — real Floriva Australia catalogue */
+.mlb-product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+
+.mlb-product-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--mlb-white);
+  color: inherit;
+  border: 1px solid rgba(30, 22, 16, 0.07);
+  overflow: hidden;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.mlb-product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(30, 22, 16, 0.1);
+}
+
+.mlb-product-media {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #efe7de;
+}
+
+.mlb-product-img {
+  object-fit: cover;
+  transition: transform 0.45s ease;
+}
+
+.mlb-product-card:hover .mlb-product-img {
+  transform: scale(1.05);
+}
+
+.mlb-product-badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 1;
+  background: #b5623b;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+}
+
+.mlb-product-badge-sold {
+  background: #7a1f1f;
+}
+
+.mlb-product-body {
+  padding: 0.95rem 1rem 1.1rem;
+}
+
+.mlb-product-cat {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mlb-plum);
+}
+
+.mlb-product-body h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.2rem;
+  line-height: 1.25;
+}
+
+.mlb-product-title {
+  margin: 0 0 0.7rem;
+  color: var(--mlb-muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mlb-product-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.mlb-product-price s {
+  color: #b0a090;
+  font-weight: 400;
+  font-size: 0.8rem;
 }
 
 /* Categories */
@@ -787,7 +902,8 @@
 
 @media (max-width: 1100px) {
   .mlb-category-grid,
-  .mlb-steps {
+  .mlb-steps,
+  .mlb-product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -801,6 +917,11 @@
 
   .mlb-aside-panel {
     position: static;
+  }
+
+  .mlb-section-head-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -826,6 +947,15 @@
   .mlb-review-grid,
   .mlb-steps {
     grid-template-columns: 1fr;
+  }
+
+  .mlb-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .mlb-product-body h3 {
+    font-size: 0.95rem;
   }
 
   .mlb-sticky-inner {
